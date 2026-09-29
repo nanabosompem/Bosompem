@@ -25,7 +25,7 @@
     #settings-panel.active { display: block; }
     .setting-group { margin-bottom: 20px; }
     .setting-group label { display: block; font-size: 0.85rem; color: #9ca3af; margin-bottom: 6px; }
-    .setting-group input { width: 100%; padding: 12px; background: #12151e; border: 1px solid #1f2937; color: #f3f4f6; border-radius: 8px; outline: none; }
+    .setting-group input, .setting-group select { width: 100%; padding: 12px; background: #12151e; border: 1px solid #1f2937; color: #f3f4f6; border-radius: 8px; outline: none; }
 
     footer { padding: 12px; background: #12151e; border-top: 1px solid #1f2937; display: flex; gap: 8px; align-items: center; position: sticky; bottom: 0; }
     input[type="text"] { flex: 1; padding: 12px 16px; background: #090a0f; border: 1px solid #1f2937; color: #f3f4f6; border-radius: 24px; outline: none; font-size: 1rem; }
@@ -47,7 +47,7 @@
 
   <main id="chat-container">
     <div class="message assistant">
-      Greetings. I am <strong>Bosompem</strong>. Add your API Key in Settings to get started.
+      Greetings. I am <strong>Bosompem</strong>. Configure your API key in settings if needed.
     </div>
   </main>
 
@@ -59,6 +59,13 @@
     <div class="setting-group">
       <label for="api-key">Gemini API Key</label>
       <input type="text" id="api-key" placeholder="AQ... or AIza..." />
+    </div>
+    <div class="setting-group">
+      <label for="model-select">Gemini Model</label>
+      <select id="model-select">
+        <option value="gemini-1.5-flash">Gemini 1.5 Flash (Standard Free Tier)</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+      </select>
     </div>
     <button style="width: 100%; padding: 12px; background: #6366f1; border: none; color: white; border-radius: 8px; font-weight: 600;" onclick="saveSettings()">Save Configuration</button>
   </div>
@@ -72,14 +79,15 @@
   <script>
     const state = {
       apiKey: localStorage.getItem('bosompem_api_key') || '',
-      history: [],
-      isListening: false
+      model: localStorage.getItem('bosompem_model') || 'gemini-1.5-flash',
+      history: []
     };
 
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('user-input');
     const statusIndicator = document.getElementById('status-indicator');
     const apiKeyInput = document.getElementById('api-key');
+    const modelSelect = document.getElementById('model-select');
     const micBtn = document.getElementById('mic-btn');
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -97,6 +105,7 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       apiKeyInput.value = state.apiKey;
+      modelSelect.value = state.model;
       updateStatus();
     });
 
@@ -114,7 +123,9 @@
 
     function saveSettings() {
       state.apiKey = apiKeyInput.value.trim();
+      state.model = modelSelect.value;
       localStorage.setItem('bosompem_api_key', state.apiKey);
+      localStorage.setItem('bosompem_model', state.model);
       updateStatus();
       toggleSettings();
       appendMessage('system', 'Configuration saved successfully.');
@@ -145,6 +156,26 @@
       if (e.key === 'Enter') sendMessage();
     }
 
+    async function fetchModelResponse(modelName, contents) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-goog-api-key': state.apiKey
+        },
+        body: JSON.stringify({ contents })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
+    }
+
     async function sendMessage() {
       const text = userInput.value.trim();
       if (!text) return;
@@ -158,24 +189,18 @@
       sendBtn.disabled = true;
 
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-        
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': state.apiKey
-          },
-          body: JSON.stringify({ contents: state.history })
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP ${res.status}`);
+        let reply = '';
+        try {
+          reply = await fetchModelResponse(state.model, state.history);
+        } catch (firstErr) {
+          // Automatic fallback to gemini-1.5-flash if primary model fails
+          if (state.model !== 'gemini-1.5-flash') {
+            reply = await fetchModelResponse('gemini-1.5-flash', state.history);
+          } else {
+            throw firstErr;
+          }
         }
 
-        const data = await res.json();
-        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
         appendMessage('assistant', reply);
         speakText(reply);
         state.history.push({ role: 'model', parts: [{ text: reply }] });
