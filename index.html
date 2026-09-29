@@ -23,8 +23,8 @@
     .message.system { align-self: center; background: rgba(239, 68, 68, 0.1); color: #ef4444; font-size: 0.85rem; border: 1px solid rgba(239, 68, 68, 0.2); }
 
     .thinking { align-self: flex-start; font-style: italic; color: #9ca3af; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
-    .dots { display: inline-block; animation: pulse 1.5s infinite; }
-    @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    .dots { display: inline-block; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
 
     #settings-panel { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #090a0f; z-index: 100; padding: 20px; overflow-y: auto; }
     #settings-panel.active { display: block; }
@@ -71,7 +71,7 @@
     <div class="setting-group">
       <label for="model-select">Primary Model</label>
       <select id="model-select">
-        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest)</option>
         <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
       </select>
     </div>
@@ -85,7 +85,7 @@
   </footer>
 
   <script>
-    const SYSTEM_INSTRUCTION = "You are Bosompem, an elite, professional, and knowledgeable AI assistant. Provide highly structured, polite, articulate, accurate, and concise answers tailored to the user's needs.";
+    const SYSTEM_INSTRUCTION = "You are Bosompem, an elite AI assistant. Keep all responses brief, highly direct, professional, and clear. Avoid wordy intros or fluff.";
 
     const state = {
       apiKey: localStorage.getItem('bosompem_api_key') || '',
@@ -183,57 +183,32 @@
       if (e.key === 'Enter') sendMessage();
     }
 
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    async function fetchFastResponse(modelName, history) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
 
-    async function streamResponseWithFallback(modelName, history, thinkingNode) {
-      const fallbackModel = modelName === 'gemini-2.5-flash' ? 'gemini-1.5-flash' : 'gemini-2.5-flash';
-      const modelsToTry = [modelName, fallbackModel];
-
-      for (const targetModel of modelsToTry) {
-        let attempts = 0;
-        const maxAttempts = 2;
-
-        while (attempts < maxAttempts) {
-          try {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?key=${encodeURIComponent(state.apiKey)}&alt=sse`;
-
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'x-goog-api-key': state.apiKey 
-              },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-                contents: history
-              })
-            });
-
-            if (response.status === 429 || response.status === 503) {
-              attempts++;
-              if (attempts < maxAttempts) {
-                await sleep(1500);
-                continue;
-              }
-              break; // Try next fallback model
-            }
-
-            if (!response.ok) {
-              const errData = await response.json().catch(() => ({}));
-              throw new Error(errData.error?.message || `HTTP ${response.status}`);
-            }
-
-            return response; // Successfully connected
-
-          } catch (err) {
-            attempts++;
-            if (attempts >= maxAttempts) break;
-            await sleep(1000);
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-goog-api-key': state.apiKey 
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+          contents: history,
+          generationConfig: {
+            maxOutputTokens: 500,
+            temperature: 0.7
           }
-        }
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${res.status}`);
       }
 
-      throw new Error('All models are currently experiencing high demand. Please try again in a few seconds.');
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
     }
 
     async function sendMessage() {
@@ -243,6 +218,11 @@
 
       appendMessage('user', text);
       userInput.value = '';
+
+      // Keep context small (last 6 messages) for high speed
+      if (state.history.length > 6) {
+        state.history = state.history.slice(-6);
+      }
       state.history.push({ role: 'user', parts: [{ text }] });
 
       const sendBtn = document.getElementById('send-btn');
@@ -250,61 +230,26 @@
 
       const thinkingNode = document.createElement('div');
       thinkingNode.className = 'thinking';
-      thinkingNode.innerHTML = `<span>Bosompem is thinking</span><span class="dots">...</span>`;
+      thinkingNode.innerHTML = `<span>Thinking</span><span class="dots">...</span>`;
       chatContainer.appendChild(thinkingNode);
       chatContainer.scrollTop = chatContainer.scrollHeight;
 
-      let assistantMsgNode = null;
-      let accumulatedText = '';
-
       try {
-        const response = await streamResponseWithFallback(state.model, state.history, thinkingNode);
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop();
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const dataStr = line.replace('data: ', '').trim();
-              if (dataStr === '[DONE]') break;
-              try {
-                const parsed = JSON.parse(dataStr);
-                const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                if (chunk) {
-                  if (chatContainer.contains(thinkingNode)) {
-                    chatContainer.removeChild(thinkingNode);
-                  }
-                  if (!assistantMsgNode) {
-                    assistantMsgNode = appendMessage('assistant', '');
-                  }
-                  accumulatedText += chunk;
-                  assistantMsgNode.innerText = accumulatedText;
-                  chatContainer.scrollTop = chatContainer.scrollHeight;
-                }
-              } catch (e) {
-                // partial JSON parsing
-              }
-            }
-          }
+        let reply = '';
+        try {
+          reply = await fetchFastResponse(state.model, state.history);
+        } catch (firstErr) {
+          const fallbackModel = state.model === 'gemini-2.5-flash' ? 'gemini-1.5-flash' : 'gemini-2.5-flash';
+          reply = await fetchFastResponse(fallbackModel, state.history);
         }
 
-        if (!accumulatedText) {
-          if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
-          accumulatedText = "I received an empty response. Please try again.";
-          appendMessage('assistant', accumulatedText);
+        if (chatContainer.contains(thinkingNode)) {
+          chatContainer.removeChild(thinkingNode);
         }
 
-        speakText(accumulatedText);
-        state.history.push({ role: 'model', parts: [{ text: accumulatedText }] });
+        appendMessage('assistant', reply);
+        speakText(reply);
+        state.history.push({ role: 'model', parts: [{ text: reply }] });
 
       } catch (err) {
         if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
