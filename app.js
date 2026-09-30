@@ -61,7 +61,6 @@ function toggleAudio() {
 
 function updateTtsIcon() {
   ttsToggle.innerHTML = state.speechEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
-  ttsToggle.classList.toggle('active', state.speechEnabled);
 }
 
 function toggleSettings() { document.getElementById('settings-panel').classList.toggle('active'); }
@@ -72,7 +71,8 @@ function toggleGallery() {
 
 function toggleLiveMode() {
   state.liveMode = !state.liveMode;
-  liveBtn.classList.toggle('live-active', state.liveMode);
+  liveBtn.classList.toggle('active', state.liveMode);
+  
   if (state.liveMode) {
     state.speechEnabled = true;
     updateTtsIcon();
@@ -161,7 +161,6 @@ function appendAssistantMessage(text, imageUrl = null) {
   const msg = document.createElement('div');
   msg.className = 'message assistant';
   
-  // Render Markdown formatting using marked.js
   if (window.marked) {
     msg.innerHTML = marked.parse(text);
   } else {
@@ -371,5 +370,4 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-    }
-      
+  }
