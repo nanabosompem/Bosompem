@@ -42,7 +42,9 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function scrollToBottom() {
-  setTimeout(() => { chatContainer.scrollTop = chatContainer.scrollHeight; }, 50);
+  setTimeout(() => { 
+    chatContainer.scrollTop = chatContainer.scrollHeight; 
+  }, 50);
 }
 
 function updateStatus() {
@@ -58,7 +60,8 @@ function toggleAudio() {
 }
 
 function updateTtsIcon() {
-  ttsToggle.innerText = state.speechEnabled ? '🔊' : '🔇';
+  ttsToggle.innerHTML = state.speechEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
+  ttsToggle.classList.toggle('active', state.speechEnabled);
 }
 
 function toggleSettings() { document.getElementById('settings-panel').classList.toggle('active'); }
@@ -157,7 +160,13 @@ function appendAssistantMessage(text, imageUrl = null) {
 
   const msg = document.createElement('div');
   msg.className = 'message assistant';
-  msg.innerHTML = text;
+  
+  // Render Markdown formatting using marked.js
+  if (window.marked) {
+    msg.innerHTML = marked.parse(text);
+  } else {
+    msg.innerText = text;
+  }
 
   if (imageUrl) {
     const img = document.createElement('img');
@@ -172,10 +181,10 @@ function appendAssistantMessage(text, imageUrl = null) {
   const actions = document.createElement('div');
   actions.className = 'msg-actions';
   actions.innerHTML = `
-    <button class="msg-action-btn" onclick="toggleLike(this, 'like')" title="Like">👍</button>
-    <button class="msg-action-btn" onclick="toggleLike(this, 'dislike')" title="Dislike">👎</button>
-    <button class="msg-action-btn" onclick="copyMessageText(this)" title="Copy">📋</button>
-    <button class="msg-action-btn" onclick="shareMessageText(this)" title="Share">🔗</button>
+    <button class="msg-action-btn" onclick="toggleLike(this, 'like')" title="Like"><i class="fa-regular fa-thumbs-up"></i></button>
+    <button class="msg-action-btn" onclick="toggleLike(this, 'dislike')" title="Dislike"><i class="fa-regular fa-thumbs-down"></i></button>
+    <button class="msg-action-btn" onclick="copyMessageText(this)" title="Copy"><i class="fa-regular fa-copy"></i></button>
+    <button class="msg-action-btn" onclick="shareMessageText(this)" title="Share"><i class="fa-solid fa-share-nodes"></i></button>
   `;
 
   wrapper.appendChild(msg);
@@ -207,12 +216,15 @@ function renderGallery() {
 
 function toggleLike(btn, type) {
   const parent = btn.parentElement;
+  const likeBtn = parent.children[0];
+  const dislikeBtn = parent.children[1];
+
   if (type === 'like') {
-    parent.children[0].classList.toggle('liked');
-    parent.children[1].classList.remove('disliked');
+    likeBtn.classList.toggle('liked');
+    dislikeBtn.classList.remove('disliked');
   } else {
-    parent.children[1].classList.toggle('disliked');
-    parent.children[0].classList.remove('liked');
+    dislikeBtn.classList.toggle('disliked');
+    likeBtn.classList.remove('liked');
   }
 }
 
@@ -287,7 +299,7 @@ async function sendMessage() {
 
   const thinkingNode = document.createElement('div');
   thinkingNode.className = 'thinking';
-  thinkingNode.innerHTML = `<span>Thinking</span><span class="dots">...</span>`;
+  thinkingNode.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking</span><span class="dots">...</span>`;
   chatContainer.appendChild(thinkingNode);
   scrollToBottom();
 
@@ -360,3 +372,4 @@ async function sendMessage() {
     scrollToBottom();
   }
     }
+      
