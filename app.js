@@ -2,7 +2,7 @@ const PROMPT_PREFIX = "You are Bosompem, an intelligent AI assistant. Provide he
 
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
-  model: localStorage.getItem('bosompem_model') || 'gemini-1.5-flash',
+  model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
   speechEnabled: localStorage.getItem('bosompem_speech') !== 'false',
   liveMode: false,
   history: [],
@@ -339,7 +339,7 @@ async function sendMessage() {
     try {
       reply = await callGemini(state.model, state.history);
     } catch (err1) {
-      const fallback = state.model === 'gemini-1.5-flash' ? 'gemini-1.5-flash-8b' : 'gemini-1.5-flash';
+      const fallback = state.model === 'gemini-3.8-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.8-flash';
       reply = await callGemini(fallback, state.history);
     }
 
@@ -359,5 +359,4 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-      }
-    
+    }
