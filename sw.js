@@ -1,5 +1,10 @@
 const CACHE_NAME = 'bosompem-v1';
-const ASSETS = ['./', './index.html'];
+const ASSETS = [
+  './',
+  './index.html',
+  './style.css',
+  './app.js'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
