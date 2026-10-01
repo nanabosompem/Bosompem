@@ -29,7 +29,6 @@ html, body {
   padding-bottom: 90px;
 }
 
-/* Glass Buttons */
 .liquid-glass-btn {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
@@ -88,19 +87,18 @@ header {
   margin: 0 auto;
 }
 
-/* Welcome Header Card */
 .welcome-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-xl);
-  padding: 16px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .welcome-text h2 {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
 }
 
 .welcome-text p {
@@ -109,7 +107,7 @@ header {
   line-height: 1.4;
 }
 
-/* DUAL LIVE MODES SECTION */
+/* DUAL LIVE VOICE CARD */
 .dual-live-card {
   background: linear-gradient(135deg, #0e072b 0%, #0a1128 100%);
   border: 1px solid rgba(124, 58, 237, 0.3);
@@ -184,50 +182,44 @@ header {
 /* Feature Grid */
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
 }
 
 .feature-item {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
-  padding: 12px 4px;
+  padding: 16px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
 }
 
 .feature-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
 }
 
 .feature-item span.title {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
 .feature-item span.sub {
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
 }
 
-/* Panels */
-.dashboard-split {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
+/* Overview Panel */
 .panel-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
@@ -265,8 +257,8 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px;
-  border-radius: 10px;
+  padding: 12px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
 }
@@ -274,28 +266,51 @@ header {
 .item-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .icon-badge {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   flex-shrink: 0;
 }
 
 .item-details p {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
 .item-details span {
   font-size: 0.72rem;
   color: var(--text-muted);
+}
+
+/* Profile Card */
+.profile-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  color: #fff;
 }
 
 /* Bottom Nav */
@@ -321,7 +336,7 @@ header {
   align-items: center;
   gap: 4px;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   cursor: pointer;
 }
 
@@ -357,6 +372,15 @@ header {
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--card-border);
+}
+
+.chat-header-info h2 {
+  font-size: 1.1rem;
+}
+
+.online-indicator {
+  font-size: 0.72rem;
+  color: var(--green-accent);
 }
 
 .chat-messages-box {
