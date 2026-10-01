@@ -180,16 +180,18 @@
     </div>
   </div>
 
-  <!-- Settings Modal -->
+  <!-- Preferences / Settings Modal -->
   <div id="settings-panel" class="modal-overlay">
     <div class="modal-header">
       <h2>Preferences</h2>
       <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
     </div>
+    
     <div class="setting-group">
       <label for="api-key">Gemini API Key</label>
       <input type="password" id="api-key" placeholder="Paste Gemini API Key here" />
     </div>
+    
     <div class="setting-group">
       <label for="model-select">Primary Model</label>
       <select id="model-select">
@@ -198,6 +200,15 @@
         <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
       </select>
     </div>
+
+    <!-- Voice Security Setup -->
+    <div class="setting-group">
+      <label>Voice Security (Owner Verification)</label>
+      <button class="liquid-glass-btn save-config-btn" style="background: #06b6d4;" onclick="captureOwnerVoicePrint()">
+        <i class="fa-solid fa-fingerprint" style="margin-right: 8px;"></i> Train / Register Owner Voice
+      </button>
+    </div>
+
     <button class="liquid-glass-btn save-config-btn" onclick="saveSettings()">Save Preferences</button>
   </div>
 
