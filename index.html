@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Bosompem AI</title>
+  <title>Bosompem AI Pro</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -21,11 +21,11 @@
   <header>
     <div class="header-left">
       <div class="brand-avatar">
-        <i class="fa-solid fa-robot"></i>
+        <i class="fa-solid fa-brain"></i>
       </div>
       <div class="brand-info">
-        <h1>Bosompem</h1>
-        <p>Your Personal AI Assistant</p>
+        <h1>Bosompem Pro</h1>
+        <p>Research & Device Assistant</p>
       </div>
     </div>
     <button class="liquid-glass-btn" onclick="toggleSettings()" title="Settings"><i class="fa-solid fa-gear"></i></button>
@@ -33,11 +33,11 @@
 
   <main class="dashboard-container">
     
-    <!-- Welcome Card with Dynamic Name Greeting -->
+    <!-- Welcome Card -->
     <section class="welcome-card">
       <div class="welcome-text">
         <h2 id="dynamic-greeting">Good day! 👑</h2>
-        <p>Bosompem is ready. Ask questions directly in chat or use voice to manage tasks and explore answers.</p>
+        <p>Bosompem Pro is configured for deep analytical research, complex Q&A, and quick device control.</p>
       </div>
     </section>
 
@@ -69,12 +69,12 @@
       <button class="liquid-glass-btn" style="margin: 10px auto 0 auto; width: 36px; height: 36px;" onclick="stopLiveMode()" title="Stop Voice"><i class="fa-solid fa-stop"></i></button>
     </section>
 
-    <!-- Cleaned Feature Grid (Single Chat Icon + Calls + Reminders) -->
+    <!-- Feature Grid -->
     <section class="feature-grid">
       <div class="feature-item" onclick="openChatModal()">
-        <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-robot"></i></div>
-        <span class="title">AI Chat</span>
-        <span class="sub">Pro Assistant</span>
+        <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-brain"></i></div>
+        <span class="title">Research Chat</span>
+        <span class="sub">Deep Q&A</span>
       </div>
       <div class="feature-item" onclick="triggerQuickAction('call')">
         <div class="feature-icon" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
@@ -92,8 +92,8 @@
     <div class="dashboard-split">
       <div class="panel-card">
         <div class="panel-header">
-          <h4><i class="fa-regular fa-calendar" style="color: #c084fc;"></i> Today's Overview</h4>
-          <a href="#" onclick="triggerQuickAction('reminder'); return false;">View all &rarr;</a>
+          <h4><i class="fa-regular fa-calendar" style="color: #c084fc;"></i> Active Tasks & Schedule</h4>
+          <a href="#" onclick="triggerQuickAction('reminder'); return false;">Manage &rarr;</a>
         </div>
         <div id="overview-reminders-list" class="list-group">
           <!-- Dynamically populated -->
@@ -103,7 +103,7 @@
 
   </main>
 
-  <!-- Bottom Navigation Bar (No App Tab) -->
+  <!-- Bottom Navigation Bar -->
   <nav class="bottom-nav">
     <div class="nav-tab active" onclick="switchTab('home', this)">
       <i class="fa-solid fa-house"></i>
@@ -111,10 +111,10 @@
     </div>
     <div class="nav-tab" onclick="switchTab('chat', this)">
       <i class="fa-solid fa-comment-dots"></i>
-      <span>Chat</span>
+      <span>Research</span>
     </div>
     <div class="nav-tab" onclick="switchTab('memory', this)">
-      <i class="fa-solid fa-brain"></i>
+      <i class="fa-solid fa-memory"></i>
       <span>Memory</span>
     </div>
     <div class="nav-tab" onclick="switchTab('profile', this)">
@@ -123,20 +123,26 @@
     </div>
   </nav>
 
-  <!-- Upgraded Professional Chat Modal -->
+  <!-- Upgraded Professional Research Chat Modal -->
   <div id="chat-modal" class="modal-overlay">
     <div class="modal-header">
       <div class="chat-header-info">
-        <h2>Bosompem Pro AI</h2>
-        <span class="online-indicator"><i class="fa-solid fa-circle"></i> Online</span>
+        <h2>Bosompem Pro Research</h2>
+        <span class="online-indicator"><i class="fa-solid fa-microchip"></i> High-Reasoning Engine</span>
       </div>
-      <button class="liquid-glass-btn" onclick="closeChatModal()"><i class="fa-solid fa-xmark"></i></button>
+      <div style="display: flex; gap: 8px;">
+        <button class="liquid-glass-btn" onclick="clearChatHistory()" title="Clear History"><i class="fa-solid fa-trash-can"></i></button>
+        <button class="liquid-glass-btn" onclick="closeChatModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
     </div>
+    
     <div id="chat-modal-messages" class="chat-messages-box">
-      <div class="chat-msg assistant">Hello! I am Bosompem, your professional AI assistant. How can I help you today?</div>
+      <!-- Chat Rendered Dynamically -->
     </div>
+    
     <div class="chat-input-row">
-      <input type="text" id="chat-modal-input" placeholder="Ask Bosompem anything..." onkeydown="if(event.key==='Enter') handleChatSubmit()" />
+      <input type="text" id="chat-modal-input" placeholder="Ask a research topic, calculation, or analysis..." onkeydown="if(event.key==='Enter') handleChatSubmit()" />
+      <button class="liquid-glass-btn" onclick="webSearchFallback()" title="Search Web"><i class="fa-solid fa-globe"></i></button>
       <button class="liquid-glass-btn" onclick="handleChatSubmit()"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
   </div>
@@ -158,7 +164,7 @@
       <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="profile-card">
-      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">Bosompem remembers conversation context across sessions to provide personalized answers and continuous task tracking.</p>
+      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">Bosompem remembers conversation context across sessions to provide continuous reasoning and structured insights.</p>
     </div>
   </div>
 
@@ -189,12 +195,16 @@
       <input type="password" id="api-key" placeholder="Paste Gemini API Key here" />
     </div>
     <div class="setting-group">
-      <label for="model-select">Primary Model</label>
+      <label for="model-select">Primary Reasoning Model</label>
       <select id="model-select">
-        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recommended)</option>
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash (High Speed Research)</option>
+        <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Logical Research)</option>
         <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
-        <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
       </select>
+    </div>
+    <div class="setting-group" style="flex-direction: row; justify-content: space-between; align-items: center;">
+      <label for="deep-research-toggle" style="margin: 0;">Enable Deep Research Mode</label>
+      <input type="checkbox" id="deep-research-toggle" style="width: auto; height: 18px;" />
     </div>
     <div class="setting-group">
       <label>Voice Security (Owner Verification)</label>
