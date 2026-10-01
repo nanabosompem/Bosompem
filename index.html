@@ -19,9 +19,9 @@
       overflow: hidden;
     }
 
-    body { display: flex; flex-direction: column; }
+    body { display: flex; flex-direction: column; position: relative; }
 
-    /* Glass Elements */
+    /* Premium Glass Design Elements */
     .glass-btn {
       background: rgba(255, 255, 255, 0.06);
       backdrop-filter: blur(12px);
@@ -33,19 +33,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.2s ease;
     }
     .glass-btn:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.25); color: #ffffff; }
 
-    /* Custom Header Menu Bar */
+    /* Header Bar */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 12px 18px;
-      background: rgba(15, 18, 28, 0.7);
+      background: rgba(15, 18, 28, 0.75);
       backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       flex-shrink: 0;
       z-index: 10;
@@ -60,7 +59,27 @@
     .header-actions { display: flex; gap: 8px; align-items: center; }
     .icon-btn { width: 38px; height: 38px; border-radius: 10px; font-size: 0.95rem; }
 
-    /* Chat Container */
+    /* Slide-out Sidebar Menu */
+    .sidebar-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 200;
+    }
+    .sidebar-overlay.active { display: block; }
+    .sidebar {
+      position: fixed; top: 0; left: -280px; width: 280px; height: 100%;
+      background: rgba(15, 18, 28, 0.95); backdrop-filter: blur(20px);
+      border-right: 1px solid rgba(255, 255, 255, 0.1); z-index: 201;
+      transition: left 0.3s ease; padding: 20px; display: flex; flex-direction: column; gap: 20px;
+    }
+    .sidebar.active { left: 0; }
+    .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; }
+    .menu-item {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px;
+      color: #e5e7eb; cursor: pointer; background: rgba(255,255,255,0.03); transition: background 0.2s;
+    }
+    .menu-item:hover { background: rgba(255,255,255,0.08); }
+
+    /* Scrollable Chat Container */
     #chat-container {
       flex: 1;
       overflow-y: auto;
@@ -95,21 +114,25 @@
       border-bottom-left-radius: 4px;
     }
     .message.system {
-      align-self: center;
-      background: rgba(239, 68, 68, 0.12);
-      color: #f87171;
-      font-size: 0.85rem;
-      border: 1px solid rgba(239, 68, 68, 0.25);
-      border-radius: 20px;
-      padding: 8px 16px;
+      align-self: center; background: rgba(239, 68, 68, 0.12); color: #f87171;
+      font-size: 0.85rem; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 20px; padding: 8px 16px;
     }
 
     .attached-preview-img, .generated-img {
       max-width: 100%; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15); margin-top: 8px; display: block;
     }
 
-    .msg-actions { display: flex; gap: 10px; align-items: center; padding-left: 4px; }
-    .msg-action-btn { background: transparent; border: none; color: #6b7280; cursor: pointer; font-size: 0.85rem; }
+    /* Active Listening Bar */
+    .listening-bar {
+      display: none; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px; background: rgba(16, 185, 129, 0.12); border-radius: 12px;
+      border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; font-size: 0.85rem; font-weight: 500; margin: 0 16px;
+    }
+    .listening-bar.active { display: flex; }
+    .wave-bar { width: 4px; height: 16px; background: #10b981; border-radius: 2px; animation: wave 0.8s infinite ease-in-out; }
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes wave { 0%, 100% { height: 8px; } 50% { height: 20px; } }
 
     /* Modals */
     .modal-overlay {
@@ -126,23 +149,37 @@
       width: 100%; padding: 12px 14px; background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.12); color: #f3f4f6; border-radius: 10px; outline: none;
     }
+    .setting-group select option { background: #131722; color: #f3f4f6; }
 
     .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
     .gallery-item { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); aspect-ratio: 1; }
     .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
 
-    /* Footer & Input Bar */
+    /* Expanded Multiline Keyboard/Input Field */
     footer {
-      padding: 12px 16px; background: rgba(15, 18, 28, 0.7);
+      padding: 12px 16px; background: rgba(15, 18, 28, 0.75);
       backdrop-filter: blur(16px); border-top: 1px solid rgba(255, 255, 255, 0.08);
       display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
     }
-    .input-bar { display: flex; gap: 8px; align-items: center; }
+    .input-bar { display: flex; gap: 8px; align-items: flex-end; }
     .input-wrapper { flex: 1; display: flex; align-items: center; }
-    input[type="text"] {
-      width: 100%; padding: 12px 16px; background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12); color: #f3f4f6; border-radius: 24px; outline: none;
+    
+    textarea#user-input {
+      width: 100%;
+      min-height: 44px;
+      max-height: 140px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f3f4f6;
+      border-radius: 20px;
+      outline: none;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      resize: none;
+      overflow-y: auto;
     }
+    textarea#user-input:focus { border-color: rgba(99, 102, 241, 0.6); }
 
     .action-btn { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; }
 
@@ -154,25 +191,25 @@
     .live-mode-btn.active {
       background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5); color: #10b981;
     }
-
-    /* Visual Indicator for Active Voice Listening */
-    .listening-bar {
-      display: none; align-items: center; justify-content: center; gap: 6px;
-      padding: 8px; background: rgba(16, 185, 129, 0.12); border-radius: 12px;
-      border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; font-size: 0.85rem; font-weight: 500;
-    }
-    .listening-bar.active { display: flex; }
-    .wave-bar { width: 4px; height: 16px; background: #10b981; border-radius: 2px; animation: wave 1s infinite ease-in-out; }
-    .wave-bar:nth-child(2) { animation-delay: 0.2s; }
-    .wave-bar:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes wave { 0%, 100% { height: 8px; } 50% { height: 20px; } }
   </style>
 </head>
 <body>
 
+  <!-- Slide-out Navigation Menu -->
+  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <span class="title">Bosompem Menu</span>
+      <button class="glass-btn icon-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="menu-item" onclick="clearChat(); toggleSidebar();"><i class="fa-solid fa-plus"></i> New Chat</div>
+    <div class="menu-item" onclick="toggleGallery(); toggleSidebar();"><i class="fa-regular fa-images"></i> Image Gallery</div>
+    <div class="menu-item" onclick="toggleSettings(); toggleSidebar();"><i class="fa-solid fa-gear"></i> Settings & Speaker Voice</div>
+  </aside>
+
   <header>
     <div class="header-left">
-      <button class="glass-btn icon-btn" onclick="toggleSidebar()" title="Menu">
+      <button class="glass-btn icon-btn" onclick="toggleSidebar()" title="Open Menu">
         <i class="fa-solid fa-bars"></i>
       </button>
       <div class="brand">
@@ -196,7 +233,7 @@
   <main id="chat-container">
     <div class="message-wrapper assistant">
       <div class="message assistant">
-        Hello! I am <strong>Bosompem AI</strong>. Configure your Gemini API key in ⚙️ <strong>Settings</strong>, or tap <strong>LIVE</strong> to begin voice interaction. You can ask me to generate or edit photos directly!
+        Hello! I am <strong>Bosompem AI</strong>. Configure your Gemini API key and voice speaker in ⚙️ <strong>Settings</strong>, or tap <strong>LIVE</strong> for immediate voice interaction. You can ask me to generate or edit photos directly!
       </div>
     </div>
   </main>
@@ -205,7 +242,7 @@
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
-    <span style="margin-left: 8px;">Bosompem is listening...</span>
+    <span style="margin-left: 8px;">Bosompem is listening... Speak now</span>
   </div>
 
   <div id="gallery-panel" class="modal-overlay">
@@ -236,7 +273,9 @@
     </div>
     <div class="setting-group">
       <label for="speaker-select">Voice Speaker Accent</label>
-      <select id="speaker-select"></select>
+      <select id="speaker-select">
+        <option value="">Loading speech voices...</option>
+      </select>
     </div>
     <div class="setting-group">
       <label for="speed-select">Talking Speed (<span id="speed-val">1.0</span>x)</label>
@@ -265,7 +304,7 @@
       </button>
 
       <div class="input-wrapper">
-        <input type="text" id="user-input" placeholder="Ask anything, or edit/create an image..." onkeypress="handleKeyPress(event)" />
+        <textarea id="user-input" rows="1" placeholder="Type a message or edit prompt..." oninput="autoExpandInput(this)" onkeydown="handleKeyDown(event)"></textarea>
       </div>
 
       <button id="mic-btn" class="glass-btn action-btn" onclick="toggleVoiceInput()" title="Voice Input">
@@ -280,4 +319,5 @@
 
   <script src="app.js"></script>
 </body>
-</html>
+          </html>
+          
