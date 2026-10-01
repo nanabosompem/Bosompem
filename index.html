@@ -9,7 +9,7 @@
 </head>
 <body>
 
-  <!-- Listening Wave Indicator (Siri Style Bar) -->
+  <!-- Listening Wave Indicator -->
   <div id="listening-indicator" class="listening-bar">
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
@@ -33,30 +33,45 @@
 
   <main class="dashboard-container">
     
-    <!-- Greeting & Feature Badge -->
+    <!-- Welcome Header -->
     <section class="welcome-card">
       <div class="welcome-text">
-        <h2>Good evening, Yung Cench 👑</h2>
-        <p>I'm Bosompem. I'm always here — to help, plan, create, and get things done. What can I do for you today?</p>
-      </div>
-      <div class="promo-badge">
-        <i class="fa-solid fa-brain" style="font-size: 1.2rem;"></i>
-        <span>Smarter. More personal. Always with you.</span>
+        <h2>Good day, Yung Cench 👑</h2>
+        <p>Bosompem is ready. Select a mode or quick action below to control your device or query the AI.</p>
       </div>
     </section>
 
-    <!-- Voice Tap Banner (Hands-Free Live Voice Controller) -->
-    <section class="voice-hero-card">
-      <button id="main-mic-btn" class="mic-pulse-btn" onclick="toggleLiveMode()" title="Toggle Live Voice Mode">
-        <i class="fa-solid fa-microphone"></i>
-      </button>
-      <h3 id="voice-hero-title">Tap to speak</h3>
-      <p id="voice-status-text">or just say “Hey Bosompem”</p>
+    <!-- DUAL LIVE SECTIONS CARD -->
+    <section class="dual-live-card">
+      <div class="live-card-title"><i class="fa-solid fa-bolt" style="color: #06b6d4;"></i> Ultra-Fast Voice Controls</div>
+      
+      <div class="live-buttons-row">
+        <!-- Live Mode 1: Multi-Task Device Controller -->
+        <div id="live-device-btn" class="live-mode-box" onclick="startLiveMode('device')">
+          <div class="mic-btn-small" style="background: linear-gradient(135deg, #22c55e, #06b6d4);">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+          </div>
+          <span class="mode-title">Device Tasks</span>
+          <span class="mode-desc">Calls, SMS, Apps, Search</span>
+        </div>
+
+        <!-- Live Mode 2: Direct AI Chat Instant Voice -->
+        <div id="live-chat-btn" class="live-mode-box" onclick="startLiveMode('chat')">
+          <div class="mic-btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7);">
+            <i class="fa-solid fa-comment-dots"></i>
+          </div>
+          <span class="mode-title">AI Live Chat</span>
+          <span class="mode-desc">Instant Q&A Answers</span>
+        </div>
+      </div>
+
+      <p id="voice-status-text" class="live-status-label">Select a Live mode above to speak</p>
+      <button class="liquid-glass-btn" style="margin: 10px auto 0 auto; width: 36px; height: 36px;" onclick="stopLiveMode()" title="Stop Voice"><i class="fa-solid fa-stop"></i></button>
     </section>
 
-    <!-- Category Feature Cards (Fully Interactive) -->
+    <!-- Category Feature Grid (Connected to Functional Modals) -->
     <section class="feature-grid">
-      <div class="feature-item" onclick="openChatModal()">
+      <div class="feature-item" onclick="triggerQuickAction('chat')">
         <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-comment"></i></div>
         <span class="title">Chat</span>
         <span class="sub">Ask anything</span>
@@ -64,17 +79,17 @@
       <div class="feature-item" onclick="triggerQuickAction('call')">
         <div class="feature-icon" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
         <span class="title">Calls</span>
-        <span class="sub">Make & receive</span>
+        <span class="sub">Dial contact</span>
       </div>
       <div class="feature-item" onclick="triggerQuickAction('reminder')">
         <div class="feature-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;"><i class="fa-solid fa-calendar-days"></i></div>
         <span class="title">Reminders</span>
-        <span class="sub">Never miss</span>
+        <span class="sub">View schedule</span>
       </div>
       <div class="feature-item" onclick="triggerQuickAction('tasks')">
         <div class="feature-icon" style="background: rgba(251, 146, 60, 0.15); color: #fb923c;"><i class="fa-solid fa-bolt"></i></div>
         <span class="title">Tasks</span>
-        <span class="sub">Get things done</span>
+        <span class="sub">Manage list</span>
       </div>
       <div class="feature-item" onclick="triggerQuickAction('apps')">
         <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;"><i class="fa-solid fa-border-all"></i></div>
@@ -141,7 +156,7 @@
 
   </main>
 
-  <!-- Interactive Navigation Bar -->
+  <!-- Interactive Bottom Navigation Bar -->
   <nav class="bottom-nav">
     <div class="nav-tab active" onclick="switchTab('home', this)">
       <i class="fa-solid fa-house"></i>
@@ -180,18 +195,68 @@
     </div>
   </div>
 
-  <!-- Preferences / Settings Modal -->
+  <!-- Reminders View Modal -->
+  <div id="reminders-modal" class="modal-overlay">
+    <div class="modal-header">
+      <h2>Reminders</h2>
+      <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="full-reminders-list" class="list-group" style="flex:1;"></div>
+    <button class="liquid-glass-btn save-config-btn" onclick="addReminder()">+ Add New Reminder</button>
+  </div>
+
+  <!-- Tasks View Modal -->
+  <div id="tasks-modal" class="modal-overlay">
+    <div class="modal-header">
+      <h2>Task Manager</h2>
+      <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="full-tasks-list" class="list-group" style="flex:1;"></div>
+    <button class="liquid-glass-btn save-config-btn" onclick="addTask()">+ Add New Task</button>
+  </div>
+
+  <!-- Apps Control Modal -->
+  <div id="apps-modal" class="modal-overlay">
+    <div class="modal-header">
+      <h2>System Apps</h2>
+      <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="list-group">
+      <div class="list-item" onclick="openAppCategory('Camera')"><p>📷 Camera</p></div>
+      <div class="list-item" onclick="openAppCategory('Gallery')"><p>🖼️ Photos & Gallery</p></div>
+      <div class="list-item" onclick="openAppCategory('Browser')"><p>🌐 Web Browser</p></div>
+    </div>
+  </div>
+
+  <!-- Memory Modal -->
+  <div id="memory-modal" class="modal-overlay">
+    <div class="modal-header">
+      <h2>Memory & Context</h2>
+      <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p style="font-size: 0.85rem; color: var(--text-muted);">Bosompem actively remembers recent commands and conversation context across sessions.</p>
+  </div>
+
+  <!-- Profile Modal -->
+  <div id="profile-modal" class="modal-overlay">
+    <div class="modal-header">
+      <h2>Owner Profile</h2>
+      <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p style="font-size: 0.9rem; font-weight:600;">Yung Cench 👑</p>
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Device Owner & Voice Registered</p>
+  </div>
+
+  <!-- Preferences Modal -->
   <div id="settings-panel" class="modal-overlay">
     <div class="modal-header">
       <h2>Preferences</h2>
       <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    
     <div class="setting-group">
       <label for="api-key">Gemini API Key</label>
       <input type="password" id="api-key" placeholder="Paste Gemini API Key here" />
     </div>
-    
     <div class="setting-group">
       <label for="model-select">Primary Model</label>
       <select id="model-select">
@@ -200,18 +265,16 @@
         <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
       </select>
     </div>
-
-    <!-- Voice Security Setup -->
     <div class="setting-group">
       <label>Voice Security (Owner Verification)</label>
       <button class="liquid-glass-btn save-config-btn" style="background: #06b6d4;" onclick="captureOwnerVoicePrint()">
         <i class="fa-solid fa-fingerprint" style="margin-right: 8px;"></i> Train / Register Owner Voice
       </button>
     </div>
-
     <button class="liquid-glass-btn save-config-btn" onclick="saveSettings()">Save Preferences</button>
   </div>
 
   <script src="app.js"></script>
 </body>
-</html>
+        </html>
+        
