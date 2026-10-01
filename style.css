@@ -344,7 +344,7 @@ header {
   color: #a855f7;
 }
 
-/* Modals */
+/* MODAL OVERLAYS & MOBILE KEYBOARD FIXES */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -352,16 +352,30 @@ header {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(5, 7, 20, 0.96);
+  height: 100dvh; /* Adapts dynamically when mobile keyboard appears */
+  background: rgba(5, 7, 20, 0.98);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   z-index: 999;
-  padding: 20px;
+  padding: 16px;
   box-sizing: border-box;
   flex-direction: column;
+  overflow: hidden; /* Stops whole body from jumping on keyboard focus */
 }
 
 .modal-overlay.active {
+  display: flex;
+}
+
+/* Chat Modal Flex Layout */
+#chat-modal {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100dvh;
+}
+
+#chat-modal.active {
   display: flex;
 }
 
@@ -369,9 +383,9 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--card-border);
+  flex-shrink: 0; /* Keeps top header static */
 }
 
 .chat-header-info h2 {
@@ -383,16 +397,19 @@ header {
   color: var(--cyan-accent);
 }
 
+/* Chat Messages Box */
 .chat-messages-box {
   flex: 1;
+  min-height: 0; /* Ensures container shrinks properly when soft keyboard opens */
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 16px;
+  padding: 12px 0;
 }
 
-/* Markdown Support in Chat Messages */
+/* Markdown Formatting */
 .chat-msg {
   max-width: 90%;
   padding: 14px 18px;
@@ -433,20 +450,31 @@ header {
   border-radius: 4px;
 }
 
+/* Fixed Bottom Chat Row */
 .chat-input-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+  background: var(--bg-color);
+  flex-shrink: 0; /* Prevents text field & send button from disappearing */
 }
 
-.chat-input-row input, .setting-group input, .setting-group select {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.06);
+.chat-input-row input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--card-border);
   padding: 12px 14px;
   border-radius: 12px;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   outline: none;
+}
+
+.chat-input-row input:focus {
+  border-color: var(--primary-accent);
 }
 
 .setting-group {
@@ -459,6 +487,17 @@ header {
 .setting-group label {
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+.setting-group input, .setting-group select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
 }
 
 .save-config-btn {
