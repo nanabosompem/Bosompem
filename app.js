@@ -19,7 +19,6 @@ const apiKeyInput = document.getElementById('api-key');
 const modelSelect = document.getElementById('model-select');
 const speakerSelect = document.getElementById('speaker-select');
 const speedSelect = document.getElementById('speed-select');
-const ttsToggle = document.getElementById('tts-toggle');
 const micBtn = document.getElementById('mic-btn');
 const liveBtn = document.getElementById('live-btn');
 const listeningIndicator = document.getElementById('listening-indicator');
@@ -98,7 +97,6 @@ window.addEventListener('DOMContentLoaded', () => {
   loadVoices();
   setTimeout(loadVoices, 500);
   
-  updateTtsIcon();
   updateStatus();
   renderGallery();
 });
@@ -136,23 +134,14 @@ function toggleSidebar() {
   document.getElementById('sidebar-overlay').classList.toggle('active');
 }
 
-function clearChat() {
+function startNewChat() {
   state.history = [];
   chatContainer.innerHTML = `
     <div class="message-wrapper assistant">
       <div class="message assistant">New conversation started. How can I help you today?</div>
     </div>`;
-}
-
-function toggleAudio() {
-  state.speechEnabled = !state.speechEnabled;
-  localStorage.setItem('bosompem_speech', state.speechEnabled);
-  if (!state.speechEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
-  updateTtsIcon();
-}
-
-function updateTtsIcon() {
-  ttsToggle.innerHTML = state.speechEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
+  toggleSidebar();
+  appendSystemMessage("Chat reset successfully.");
 }
 
 function toggleSettings() { 
@@ -171,7 +160,6 @@ function toggleLiveMode() {
   
   if (state.liveMode) {
     state.speechEnabled = true;
-    updateTtsIcon();
     appendSystemMessage("Live Voice Mode active.");
     if (SpeechRecognition) recognition.start();
   } else {
@@ -194,7 +182,7 @@ function saveSettings() {
 
   updateStatus();
   toggleSettings();
-  appendSystemMessage('Settings updated.');
+  appendSystemMessage('Preferences saved.');
 }
 
 function handleFileSelected(event) {
@@ -276,8 +264,78 @@ function appendAssistantMessage(text, imageUrl = null) {
   }
 
   wrapper.appendChild(msg);
+
+  // Response Action Bar (Speaker, Copy, Like, Dislike)
+  const actionBar = document.createElement('div');
+  actionBar.className = 'response-action-bar';
+
+  const rawText = text.replace(/<[^>]*>/g, '');
+
+  actionBar.innerHTML = `
+    <button class="glass-btn action-icon-btn" onclick="speakSpecificText('${encodeURIComponent(rawText)}', this)" title="Listen to text">
+      <i class="fa-solid fa-volume-high"></i>
+    </button>
+    <button class="glass-btn action-icon-btn" onclick="copyResponseText('${encodeURIComponent(rawText)}', this)" title="Copy text">
+      <i class="fa-regular fa-copy"></i>
+    </button>
+    <button class="glass-btn action-icon-btn" onclick="toggleFeedback(this, 'like')" title="Good response">
+      <i class="fa-regular fa-thumbs-up"></i>
+    </button>
+    <button class="glass-btn action-icon-btn" onclick="toggleFeedback(this, 'dislike')" title="Bad response">
+      <i class="fa-regular fa-thumbs-down"></i>
+    </button>
+  `;
+
+  wrapper.appendChild(actionBar);
   chatContainer.appendChild(wrapper);
   scrollToBottom();
+}
+
+function speakSpecificText(encodedText, btnNode) {
+  const text = decodeURIComponent(encodedText);
+  if (!('speechSynthesis' in window)) return;
+
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    btnNode.classList.remove('active');
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = state.speed || 1.0;
+  
+  const voices = window.speechSynthesis.getVoices();
+  const selectedVoice = voices.find(v => v.name === state.speaker);
+  if (selectedVoice) utterance.voice = selectedVoice;
+
+  btnNode.classList.add('active');
+
+  utterance.onend = () => { btnNode.classList.remove('active'); };
+  utterance.onerror = () => { btnNode.classList.remove('active'); };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+function copyResponseText(encodedText, btnNode) {
+  const text = decodeURIComponent(encodedText);
+  navigator.clipboard.writeText(text).then(() => {
+    const originalIcon = btnNode.innerHTML;
+    btnNode.innerHTML = `<i class="fa-solid fa-check" style="color: #10b981;"></i>`;
+    setTimeout(() => { btnNode.innerHTML = originalIcon; }, 2000);
+  });
+}
+
+function toggleFeedback(btnNode, type) {
+  const parent = btnNode.parentElement;
+  const buttons = parent.querySelectorAll('.action-icon-btn');
+  
+  buttons.forEach(btn => {
+    if (btn === btnNode) {
+      btn.classList.toggle('active');
+    } else if (btn.title.includes('Good') || btn.title.includes('Bad')) {
+      btn.classList.remove('active');
+    }
+  });
 }
 
 function saveToGallery(url) {
@@ -358,7 +416,6 @@ async function sendMessage() {
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
 
-  // HD Clean Image Generation / Photo Editing Engine
   if (isImageGenerationRequest(text) || (attached && isPhotoEditRequest(text, attached))) {
     try {
       const cleanPrompt = text ? text.replace(/(generate|create|draw|make|show me a photo of)/gi, '').trim() : 'professional studio photograph, crisp detail, cinematic studio lighting, high resolution';
@@ -410,4 +467,5 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-                                }
+    }
+                                                       
