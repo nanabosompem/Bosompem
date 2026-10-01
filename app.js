@@ -32,7 +32,6 @@ if (SpeechRecognition) {
   recognition.interimResults = true;
   
   recognition.onstart = () => {
-    micBtn.classList.add('recording');
     listeningIndicator.classList.add('active');
   };
   
@@ -60,7 +59,6 @@ if (SpeechRecognition) {
   };
   
   recognition.onend = () => {
-    micBtn.classList.remove('recording');
     listeningIndicator.classList.remove('active');
   };
 }
@@ -101,11 +99,18 @@ window.addEventListener('DOMContentLoaded', () => {
   renderGallery();
 });
 
+/* Explicit Working Developer Panel Toggle Function */
 function toggleDevPanel() {
   const panel = document.getElementById('dev-panel');
   const chevron = document.getElementById('dev-chevron');
-  panel.classList.toggle('active');
-  chevron.className = panel.classList.contains('active') ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+
+  if (panel.classList.contains('active')) {
+    panel.classList.remove('active');
+    chevron.className = 'fa-solid fa-chevron-down';
+  } else {
+    panel.classList.add('active');
+    chevron.className = 'fa-solid fa-chevron-up';
+  }
 }
 
 function autoExpandInput(element) {
@@ -265,23 +270,23 @@ function appendAssistantMessage(text, imageUrl = null) {
 
   wrapper.appendChild(msg);
 
-  // Response Action Bar (Speaker, Copy, Like, Dislike)
+  // Response Liquid Glass Action Bar
   const actionBar = document.createElement('div');
   actionBar.className = 'response-action-bar';
 
   const rawText = text.replace(/<[^>]*>/g, '');
 
   actionBar.innerHTML = `
-    <button class="glass-btn action-icon-btn" onclick="speakSpecificText('${encodeURIComponent(rawText)}', this)" title="Listen to text">
+    <button class="liquid-glass-btn action-icon-btn" onclick="speakSpecificText('${encodeURIComponent(rawText)}', this)" title="Listen to text">
       <i class="fa-solid fa-volume-high"></i>
     </button>
-    <button class="glass-btn action-icon-btn" onclick="copyResponseText('${encodeURIComponent(rawText)}', this)" title="Copy text">
+    <button class="liquid-glass-btn action-icon-btn" onclick="copyResponseText('${encodeURIComponent(rawText)}', this)" title="Copy text">
       <i class="fa-regular fa-copy"></i>
     </button>
-    <button class="glass-btn action-icon-btn" onclick="toggleFeedback(this, 'like')" title="Good response">
+    <button class="liquid-glass-btn action-icon-btn" onclick="toggleFeedback(this, 'like')" title="Good response">
       <i class="fa-regular fa-thumbs-up"></i>
     </button>
-    <button class="glass-btn action-icon-btn" onclick="toggleFeedback(this, 'dislike')" title="Bad response">
+    <button class="liquid-glass-btn action-icon-btn" onclick="toggleFeedback(this, 'dislike')" title="Bad response">
       <i class="fa-regular fa-thumbs-down"></i>
     </button>
   `;
@@ -467,5 +472,4 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-    }
-                                                       
+  }
