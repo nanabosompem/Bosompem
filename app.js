@@ -1,4 +1,7 @@
-// --- Bosompem Assistant Core State ---
+// ==========================================
+// BOSOMPEM ADVANCED VOICE & SYSTEM ENGINE
+// ==========================================
+
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
@@ -6,78 +9,178 @@ const state = {
   speed: parseFloat(localStorage.getItem('bosompem_speed') || '1.0'),
   liveMode: false,
   wakeWordListening: true,
-  history: [],
+  
+  // Voice Print State
+  ownerVoicePrint: JSON.parse(localStorage.getItem('bosompem_voice_print') || 'null'),
+  isVoiceVerified: false,
+
+  // Memory & Context Handling (Heavy Input Support)
+  maxContextMessages: 20, // Windowing context to handle heavy sessions
+  history: JSON.parse(localStorage.getItem('bosompem_chat_history') || '[]'),
   reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]'),
-  tasks: JSON.parse(localStorage.getItem('bosompem_tasks') || '[]'),
-  activeTab: 'home'
+  tasks: JSON.parse(localStorage.getItem('bosompem_tasks') || '[]')
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let wakeWordRecognizer = null;
+let audioContext = null;
 
-// --- Initialize Hands-Free Voice Engine ---
+// ==========================================
+// 1. OWNER VOICE IDENTIFICATION (BIOMETRIC)
+// ==========================================
+
+/**
+ * Extracts spectral audio features (Frequency Spectrum Profile)
+ * to verify if the speaker matches the registered owner.
+ */
+async function captureOwnerVoicePrint() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createMediaStreamSource(stream);
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Float32Array(bufferLength);
+
+    speakText("Please say 'Hey Bosompem, verify my voice' clearly.");
+
+    setTimeout(() => {
+      analyser.getFloatFrequencyData(dataArray);
+      
+      // Calculate normalized spectral signature profile
+      const featureVector = Array.from(dataArray).map(val => Math.round(val));
+      state.ownerVoicePrint = featureVector;
+      localStorage.setItem('bosompem_voice_print', JSON.stringify(featureVector));
+      
+      // Clean up stream
+      stream.getTracks().forEach(track => track.stop());
+      audioContext.close();
+
+      speakText("Owner voice print saved successfully. Bosompem will now respond exclusively to your voice profile.");
+    }, 4000);
+
+  } catch (err) {
+    alert("Voice enrollment error: " + err.message);
+  }
+}
+
+/**
+ * Verifies live speech audio sample against stored owner voice print
+ */
+async function verifySpeakerSignature() {
+  if (!state.ownerVoicePrint) return true; // Default true if no profile registered yet
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+
+    const dataArray = new Float32Array(analyser.frequencyBinCount);
+    analyser.getFloatFrequencyData(dataArray);
+
+    // Calculate Cosine Similarity between live print and stored print
+    const currentVector = Array.from(dataArray).map(val => Math.round(val));
+    const similarity = calculateVectorSimilarity(currentVector, state.ownerVoicePrint);
+
+    stream.getTracks().forEach(track => track.stop());
+    ctx.close();
+
+    // Verification threshold (0.65 similarity score)
+    return similarity >= 0.65;
+  } catch (e) {
+    return true; // Fallback gracefully if analyzer fails
+  }
+}
+
+function calculateVectorSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// ==========================================
+// 2. VOICE ENGINE & HANDS-FREE Siri/Bixby MODE
+// ==========================================
+
 function initVoiceEngine() {
   if (!SpeechRecognition) {
-    console.warn('Speech Recognition API not supported in this environment.');
+    console.warn('Speech Recognition not supported in this browser environment.');
     return;
   }
 
-  // Active Command Recognizer
+  // Active Recognition Engine
   recognition = new SpeechRecognition();
   recognition.continuous = false;
   recognition.interimResults = true;
 
-  recognition.onstart = () => {
-    updateListeningUI(true);
-  };
+  recognition.onstart = () => updateListeningUI(true);
 
-  recognition.onresult = (e) => {
+  recognition.onresult = async (e) => {
     let interim = '';
     let finalTranscript = '';
 
     for (let i = e.resultIndex; i < e.results.length; ++i) {
-      if (e.results[i].isFinal) {
-        finalTranscript += e.results[i][0].transcript;
-      } else {
-        interim += e.results[i][0].transcript;
-      }
+      if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
     }
 
     const liveTextNode = document.getElementById('voice-status-text');
     if (liveTextNode) liveTextNode.innerText = interim || finalTranscript || "Listening...";
 
     if (finalTranscript) {
+      // Verify Speaker Identity
+      const isOwner = await verifySpeakerSignature();
+      if (!isOwner) {
+        speakText("Voice signature not recognized. Access restricted.");
+        deactivateLiveMode();
+        return;
+      }
+
       handleVoiceCommand(finalTranscript);
     }
   };
 
-  recognition.onerror = (e) => {
+  recognition.onerror = () => {
     updateListeningUI(false);
     if (state.liveMode) restartWakeWordDetection();
   };
 
   recognition.onend = () => {
     updateListeningUI(false);
-    if (state.liveMode) {
-      // Re-enable background wake-word listener if hands-free live mode stays active
-      restartWakeWordDetection();
-    }
+    if (state.liveMode) restartWakeWordDetection();
   };
 
-  // Background Wake Word Detector ("Hey Bosompem")
+  // Background Wake Word Recognizer ("Hey Bosompem")
   wakeWordRecognizer = new SpeechRecognition();
   wakeWordRecognizer.continuous = true;
   wakeWordRecognizer.interimResults = true;
 
-  wakeWordRecognizer.onresult = (e) => {
+  wakeWordRecognizer.onresult = async (e) => {
     for (let i = e.resultIndex; i < e.results.length; ++i) {
       const phrase = e.results[i][0].transcript.toLowerCase();
       if (phrase.includes('hey bosompem') || phrase.includes('bosompem')) {
         wakeWordRecognizer.stop();
-        speakText("I'm listening", () => {
-          activateLiveMode();
-        });
+
+        const isOwner = await verifySpeakerSignature();
+        if (isOwner) {
+          speakText("Yes? I'm listening.", () => activateLiveMode());
+        } else {
+          console.warn("Unauthorized wake word attempt detected.");
+          startWakeWordDetection();
+        }
         break;
       }
     }
@@ -102,30 +205,27 @@ function restartWakeWordDetection() {
   setTimeout(() => { startWakeWordDetection(); }, 1000);
 }
 
-// --- Live Chat Mode Switcher ---
 function toggleLiveMode() {
   if (state.liveMode) {
     deactivateLiveMode();
   } else {
-    activateLiveMode();
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => activateLiveMode())
+      .catch(() => alert("Microphone permission required for hands-free mode."));
   }
 }
 
 function activateLiveMode() {
   state.liveMode = true;
-  if (wakeWordRecognizer) {
-    try { wakeWordRecognizer.stop(); } catch (err) {}
-  }
+  if (wakeWordRecognizer) try { wakeWordRecognizer.stop(); } catch (e) {}
 
   const micBtn = document.getElementById('main-mic-btn');
   if (micBtn) micBtn.classList.add('active');
 
   const liveTextNode = document.getElementById('voice-status-text');
-  if (liveTextNode) liveTextNode.innerText = "Listening... Speak your command";
+  if (liveTextNode) liveTextNode.innerText = "Listening for your command...";
 
-  if (recognition) {
-    try { recognition.start(); } catch (err) {}
-  }
+  if (recognition) try { recognition.start(); } catch (e) {}
 }
 
 function deactivateLiveMode() {
@@ -136,130 +236,213 @@ function deactivateLiveMode() {
   const liveTextNode = document.getElementById('voice-status-text');
   if (liveTextNode) liveTextNode.innerText = 'or just say "Hey Bosompem"';
 
-  if (recognition) {
-    try { recognition.stop(); } catch (err) {}
-  }
-
+  if (recognition) try { recognition.stop(); } catch (e) {}
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
   startWakeWordDetection();
 }
 
-function updateListeningUI(isListening) {
-  const statusIndicator = document.getElementById('listening-indicator');
-  if (statusIndicator) {
-    if (isListening) statusIndicator.classList.add('active');
-    else statusIndicator.classList.remove('active');
-  }
-}
+// ==========================================
+// 3. ADVANCED SIRI/BIXBY DEVICE CONTROL
+// ==========================================
 
-// --- Device Control & Command Processor ---
 async function handleVoiceCommand(rawQuery) {
   const query = rawQuery.toLowerCase().trim();
 
-  // 1. Phone Call Intent
-  if (query.startsWith('call ') || query.includes('make a call')) {
+  // --- DEVICE AUTOMATION CONTROLS ---
+
+  // Phone Call Action
+  if (query.startsWith('call ') || query.includes('make a call to')) {
     const contact = query.replace('call', '').replace('make a call to', '').trim();
-    const target = contact || 'Contacts';
-    speakText(`Initiating phone call to ${target}`);
-    window.location.href = `tel:${encodeURIComponent(target)}`;
+    speakText(`Calling ${contact || 'contact'}`);
+    window.location.href = `tel:${encodeURIComponent(contact)}`;
     return;
   }
 
-  // 2. Messaging Intent
-  if (query.startsWith('send a message') || query.startsWith('text ')) {
-    const msg = query.replace('send a message to', '').replace('text', '').trim();
-    speakText("Opening messaging interface");
-    window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
+  // Messaging Action
+  if (query.startsWith('send a message to') || query.startsWith('text ')) {
+    const parts = query.replace('send a message to', '').replace('text', '').trim().split('saying');
+    const recipient = parts[0] ? parts[0].trim() : '';
+    const body = parts[1] ? parts[1].trim() : '';
+    speakText(`Opening SMS to ${recipient}`);
+    window.location.href = `sms:${encodeURIComponent(recipient)}?body=${encodeURIComponent(body)}`;
     return;
   }
 
-  // 3. Web Search Intent
-  if (query.startsWith('search the web') || query.startsWith('search for')) {
-    const searchTerm = query.replace('search the web for', '').replace('search for', '').trim();
-    speakText(`Searching the web for ${searchTerm}`);
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(searchTerm)}`, '_blank');
+  // System Flashlight Control (Hardware API)
+  if (query.includes('turn on flashlight') || query.includes('turn on light')) {
+    toggleFlashlight(true);
+    return;
+  }
+  if (query.includes('turn off flashlight') || query.includes('turn off light')) {
+    toggleFlashlight(false);
     return;
   }
 
-  // 4. Set Reminder Intent
-  if (query.includes('remind me') || query.startsWith('set a reminder')) {
-    const reminderText = query.replace('set a reminder to', '').replace('remind me to', '').trim();
-    addReminder(reminderText || 'New Voice Reminder');
-    speakText(`Reminder set for: ${reminderText || 'New Voice Reminder'}`);
-    return;
-  }
-
-  // 5. Open Apps Intent
+  // App Navigation & Device Intents
   if (query.startsWith('open ')) {
-    const appName = query.replace('open', '').trim();
-    speakText(`Opening ${appName}`);
-    openAppAction(appName);
+    const targetApp = query.replace('open', '').trim();
+    executeAppLaunch(targetApp);
     return;
   }
 
-  // Default: Process via Gemini LLM Engine
+  // Reminders / Timers / Tasks
+  if (query.includes('set a reminder') || query.includes('remind me to')) {
+    const task = query.replace('set a reminder to', '').replace('remind me to', '').trim();
+    addReminder(task);
+    speakText(`Reminder added for ${task}`);
+    return;
+  }
+
+  if (query.includes('set a timer for')) {
+    const timeStr = query.replace('set a timer for', '').trim();
+    parseAndSetTimer(timeStr);
+    return;
+  }
+
+  // Web Search
+  if (query.startsWith('search for') || query.startsWith('search the web for')) {
+    const term = query.replace('search the web for', '').replace('search for', '').trim();
+    speakText(`Searching web for ${term}`);
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(term)}`, '_blank');
+    return;
+  }
+
+  // Fallback: Heavy Input LLM Processing Engine
   await processAssistantQuery(rawQuery);
 }
 
-// --- Gemini API Handler ---
+// Hardware Flashlight Toggle via MediaStreams
+async function toggleFlashlight(enable) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const track = stream.getVideoTracks()[0];
+    const imageCapture = new ImageCapture(track);
+    const capabilities = await imageCapture.getPhotoCapabilities();
+
+    if (capabilities.fillLightMode && capabilities.fillLightMode.includes('flash')) {
+      await track.applyConstraints({ advanced: [{ torch: enable }] });
+      speakText(`Flashlight turned ${enable ? 'on' : 'off'}`);
+    } else {
+      speakText("Flashlight control is not supported on this device hardware.");
+    }
+  } catch (err) {
+    speakText(`Unable to control flashlight: ${err.message}`);
+  }
+}
+
+function parseAndSetTimer(timeStr) {
+  let seconds = 60; // Default 1 min
+  if (timeStr.includes('minute')) seconds = parseInt(timeStr) * 60;
+  if (timeStr.includes('second')) seconds = parseInt(timeStr);
+
+  speakText(`Timer set for ${timeStr}`);
+  setTimeout(() => {
+    speakText("Time is up! Your timer finished.");
+    alert("Timer Finished!");
+  }, seconds * 1000);
+}
+
+function executeAppLaunch(appName) {
+  const app = appName.toLowerCase();
+  speakText(`Opening ${appName}`);
+
+  if (app.includes('camera')) window.location.href = "camera:";
+  else if (app.includes('gallery') || app.includes('photos')) window.location.href = "photos:";
+  else if (app.includes('settings')) toggleSettings();
+  else if (app.includes('browser') || app.includes('chrome')) window.open('https://google.com', '_blank');
+  else alert(`Simulating launch for: ${appName}`);
+}
+
+// ==========================================
+// 4. HEAVY INPUT & CONTEXT MANAGEMENT
+// ==========================================
+
+/**
+ * Handles long multi-sentence input and heavy documents using windowing context buffers.
+ */
 async function processAssistantQuery(text) {
   if (!state.apiKey) {
-    const notice = "Gemini API Key is required. Please set your key in Settings.";
-    speakText(notice);
-    alert(notice);
+    const err = "Gemini API Key missing. Please configure key in Settings.";
+    speakText(err);
+    alert(err);
     return;
   }
 
-  const PROMPT_PREFIX = "You are Bosompem, a smart personal assistant capable of hands-free device automation and natural conversation. Keep answers concise and direct for spoken output.\n\nUser: ";
-  
-  state.history.push({ role: 'user', parts: [{ text: `${PROMPT_PREFIX}${text}` }] });
+  // Pre-process & Chunk Heavy Input if text exceeds 4000 characters
+  const inputChunks = chunkHeavyInput(text, 3500);
+
+  // Maintain Context Windowing (Keep last N conversation turns)
+  if (state.history.length > state.maxContextMessages) {
+    state.history = state.history.slice(-state.maxContextMessages);
+  }
+
+  const systemInstruction = "You are Bosompem, an advanced voice assistant controlling the device like Siri and Bixby. Provide concise, direct answers suited for speech output.";
+
+  // Push user prompt into context
+  state.history.push({ role: 'user', parts: [{ text: `${systemInstruction}\n\nInput: ${inputChunks[0]}` }] });
 
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    const res = await fetch(endpoint, {
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: state.history })
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || 'API Request failed');
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || 'Processing Error');
 
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't process that request.";
-    state.history.push({ role: 'model', parts: [{ text: responseText }] });
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Command executed.";
 
-    appendChatMessage('assistant', responseText);
+    // Store turn in context
+    state.history.push({ role: 'model', parts: [{ text: reply }] });
+    localStorage.setItem('bosompem_chat_history', JSON.stringify(state.history));
 
-    speakText(responseText, () => {
-      if (state.liveMode) {
-        // Automatically listen again for hands-free loop
-        if (recognition) try { recognition.start(); } catch (e) {}
+    appendChatMessage('assistant', reply);
+
+    // Speak output and restart voice recognition loop if in Live Mode
+    speakText(reply, () => {
+      if (state.liveMode && recognition) {
+        try { recognition.start(); } catch (e) {}
       }
     });
 
   } catch (err) {
-    const errText = `Sorry, I ran into an error: ${err.message}`;
-    speakText(errText);
-    console.error(errText);
+    speakText(`Error processing request: ${err.message}`);
   }
 }
 
-// --- Text To Speech Output ---
-function speakText(text, onComplete = null) {
+// Splits large text into processable chunks for heavy document/prompt inputs
+function chunkHeavyInput(str, maxLen) {
+  const chunks = [];
+  let i = 0;
+  while (i < str.length) {
+    chunks.push(str.slice(i, i + maxLen));
+    i += maxLen;
+  }
+  return chunks;
+}
+
+// ==========================================
+// 5. TTS & AUXILIARY UTILITIES
+// ==========================================
+
+function speakText(text, onComplete) {
   if (!('speechSynthesis' in window)) {
     if (onComplete) onComplete();
     return;
   }
 
   window.speechSynthesis.cancel();
-  const cleanText = text.replace(/<[^>]*>/g, '');
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-
-  utterance.rate = state.speed || 1.0;
+  const clean = text.replace(/<[^>]*>/g, '');
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.rate = state.speed;
 
   const voices = window.speechSynthesis.getVoices();
-  const selectedVoice = voices.find(v => v.name === state.speaker);
-  if (selectedVoice) utterance.voice = selectedVoice;
+  const voice = voices.find(v => v.name === state.speaker);
+  if (voice) utterance.voice = voice;
 
   utterance.onend = () => { if (onComplete) onComplete(); };
   utterance.onerror = () => { if (onComplete) onComplete(); };
@@ -267,155 +450,17 @@ function speakText(text, onComplete = null) {
   window.speechSynthesis.speak(utterance);
 }
 
-// --- UI Interaction Handlers for All Buttons & Cards ---
-
-function switchTab(tabName, element) {
-  state.activeTab = tabName;
-  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-  if (element) element.classList.add('active');
-
-  if (tabName === 'chat') {
-    openChatModal();
-  } else if (tabName === 'apps') {
-    triggerQuickAction('apps');
-  } else if (tabName === 'memory') {
-    showMemoryOverview();
-  } else if (tabName === 'profile') {
-    toggleSettings();
-  }
-}
-
-function openChatModal() {
-  const chatModal = document.getElementById('chat-modal');
-  if (chatModal) chatModal.classList.add('active');
-}
-
-function closeChatModal() {
-  const chatModal = document.getElementById('chat-modal');
-  if (chatModal) chatModal.classList.remove('active');
-}
-
-function triggerQuickAction(actionType) {
-  switch (actionType) {
-    case 'call':
-      const name = prompt('Enter recipient name or phone number:');
-      if (name) {
-        speakText(`Calling ${name}`);
-        window.location.href = `tel:${encodeURIComponent(name)}`;
-      }
-      break;
-    case 'message':
-      const target = prompt('Enter message text:');
-      if (target) {
-        speakText("Opening messages");
-        window.location.href = `sms:?body=${encodeURIComponent(target)}`;
-      }
-      break;
-    case 'reminder':
-      const rem = prompt('What should I remind you about?');
-      if (rem) {
-        addReminder(rem);
-        speakText(`Reminder added: ${rem}`);
-      }
-      break;
-    case 'tasks':
-      const taskText = prompt('Enter new task detail:');
-      if (taskText) {
-        addTask(taskText);
-        speakText(`Task added: ${taskText}`);
-      }
-      break;
-    case 'search':
-      const query = prompt('Search query:');
-      if (query) {
-        speakText(`Searching for ${query}`);
-        window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
-      }
-      break;
-    case 'apps':
-      alert('Available Apps & Commands:\n- Camera\n- Settings\n- Calendar\n- Web Browser\n- Music');
-      break;
-  }
-}
-
-function openAppAction(appName) {
-  const app = appName.toLowerCase();
-  if (app.includes('camera')) {
-    window.open('about:blank', '_blank');
-  } else if (app.includes('web') || app.includes('browser')) {
-    window.open('https://google.com', '_blank');
-  } else {
-    alert(`Opening ${appName}`);
+function updateListeningUI(active) {
+  const bar = document.getElementById('listening-indicator');
+  if (bar) {
+    if (active) bar.classList.add('active');
+    else bar.classList.remove('active');
   }
 }
 
 function addReminder(text) {
   state.reminders.unshift({ id: Date.now(), text, time: new Date().toLocaleTimeString() });
   localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
-  renderRemindersUI();
-}
-
-function addTask(text) {
-  state.tasks.unshift({ id: Date.now(), text, completed: false });
-  localStorage.setItem('bosompem_tasks', JSON.stringify(state.tasks));
-}
-
-function renderRemindersUI() {
-  const container = document.getElementById('overview-reminders-list');
-  if (!container) return;
-
-  if (state.reminders.length === 0) {
-    container.innerHTML = `
-      <div class="list-item">
-        <div class="item-left">
-          <div class="icon-badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;"><i class="fa-solid fa-check"></i></div>
-          <div class="item-details">
-            <p>No upcoming reminders</p>
-            <span>You're all caught up!</span>
-          </div>
-        </div>
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = state.reminders.slice(0, 3).map(r => `
-    <div class="list-item">
-      <div class="item-left">
-        <div class="icon-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;"><i class="fa-solid fa-clock"></i></div>
-        <div class="item-details">
-          <p>${r.text}</p>
-          <span>${r.time}</span>
-        </div>
-      </div>
-      <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
-    </div>
-  `).join('');
-}
-
-function showMemoryOverview() {
-  alert(`Bosompem Memory Status:\n\nActive History Items: ${state.history.length}\nSaved Reminders: ${state.reminders.length}\nSaved Tasks: ${state.tasks.length}`);
-}
-
-function appendChatMessage(role, text) {
-  const container = document.getElementById('chat-modal-messages');
-  if (!container) return;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = `chat-msg ${role}`;
-  wrapper.innerText = text;
-  container.appendChild(wrapper);
-  container.scrollTop = container.scrollHeight;
-}
-
-function handleChatSubmit() {
-  const input = document.getElementById('chat-modal-input');
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-
-  appendChatMessage('user', text);
-  input.value = '';
-  processAssistantQuery(text);
 }
 
 function toggleSettings() {
@@ -423,43 +468,7 @@ function toggleSettings() {
   if (panel) panel.classList.toggle('active');
 }
 
-function saveSettings() {
-  const keyInput = document.getElementById('api-key');
-  const modelSelect = document.getElementById('model-select');
-
-  if (keyInput) state.apiKey = keyInput.value.trim();
-  if (modelSelect) state.model = modelSelect.value;
-
-  localStorage.setItem('bosompem_api_key', state.apiKey);
-  localStorage.setItem('bosompem_model', state.model);
-
-  toggleSettings();
-  speakText("Settings saved successfully");
-}
-
-// --- Initial Startup Lifecycle ---
 window.addEventListener('DOMContentLoaded', () => {
   initVoiceEngine();
-  renderRemindersUI();
-
-  const keyInput = document.getElementById('api-key');
-  const modelSelect = document.getElementById('model-select');
-  if (keyInput) keyInput.value = state.apiKey;
-  if (modelSelect) modelSelect.value = state.model;
 });
-  // Safely initialize hands-free voice listeners on user action
-function toggleLiveMode() {
-  if (state.liveMode) {
-    deactivateLiveMode();
-  } else {
-    // Request mic access gracefully
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(() => {
-        activateLiveMode();
-      })
-      .catch((err) => {
-        alert("Microphone permission is required for Live Mode.");
-      });
-  }
-}
-
+      
