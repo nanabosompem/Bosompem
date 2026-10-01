@@ -2,7 +2,7 @@ const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant capable of pho
 
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
-  model: localStorage.getItem('bosompem_model') || 'gemini-2.5-flash',
+  model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
   speechEnabled: localStorage.getItem('bosompem_speech') !== 'false',
   speaker: localStorage.getItem('bosompem_speaker') || '',
   speed: parseFloat(localStorage.getItem('bosompem_speed') || '1.0'),
@@ -488,4 +488,3 @@ async function sendMessage() {
     scrollToBottom();
   }
 }
-  
