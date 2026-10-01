@@ -1,41 +1,64 @@
 // ==========================================
-// BOSOMPEM AI - CORE ENGINE & DUAL LIVE CONTROLLER
+// BOSOMPEM AI - CORE ENGINE
 // ==========================================
 
+const SYSTEM_INSTRUCTION = "You are Bosompem, an intelligent, concise, highly professional, and helpful AI assistant. Answer queries accurately, logically, and structured with clear formatting.";
+
 const state = {
+  userName: localStorage.getItem('bosompem_user_name') || '',
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
   activeLiveMode: null, // 'device' or 'chat'
   
-  // Voice Verification
-  ownerVoicePrint: JSON.parse(localStorage.getItem('bosompem_voice_print') || 'null'),
-  
-  // App Storage
   history: JSON.parse(localStorage.getItem('bosompem_chat_history') || '[]'),
   reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || [
-    { id: 1, text: 'Call Cousin', time: '10:00 AM' },
-    { id: 2, text: 'Review App Design', time: '02:30 PM' }
-  ]),
-  tasks: JSON.parse(localStorage.getItem('bosompem_tasks') || [
-    { id: 1, text: 'Complete Bosompem Setup', done: false }
+    { id: 1, text: 'Review Project Scope', time: '10:00 AM' },
+    { id: 2, text: 'Check Voice Engine Updates', time: '02:30 PM' }
   ])
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
 let silenceTimer = null;
-const SILENCE_TIMEOUT_MS = 2000; // 2 Seconds response trigger
+const SILENCE_TIMEOUT_MS = 2000;
 
 // --- INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', () => {
   initVoiceEngine();
   renderReminders();
-  renderTasks();
   loadSavedSettings();
+  updateGreeting();
 });
 
 // ==========================================
-// 1. VOICE ENGINE (2-SECOND RESPONSE SILENCE DETECTOR)
+// 1. DYNAMIC GREETING & PROFILE
+// ==========================================
+
+function updateGreeting() {
+  const hour = new Date().getHours();
+  let timeStr = 'Good day';
+  if (hour < 12) timeStr = 'Good morning';
+  else if (hour < 18) timeStr = 'Good afternoon';
+  else timeStr = 'Good evening';
+
+  const nameStr = state.userName ? `, ${state.userName}` : '';
+  const greetingEl = document.getElementById('dynamic-greeting');
+  if (greetingEl) {
+    greetingEl.innerText = `${timeStr}${nameStr} 👑`;
+  }
+}
+
+function saveUserProfile() {
+  const inputVal = document.getElementById('user-name-input').value.trim();
+  state.userName = inputVal;
+  localStorage.setItem('bosompem_user_name', inputVal);
+  updateGreeting();
+  closeAllModals();
+  alert("Profile updated successfully!");
+}
+
+// ==========================================
+// 2. ULTRA-FAST VOICE ENGINE (2s SILENCE)
 // ==========================================
 
 function initVoiceEngine() {
@@ -48,7 +71,6 @@ function initVoiceEngine() {
   let currentTranscript = '';
 
   recognition.onresult = (e) => {
-    // Reset silence timer every time user is actively speaking
     clearTimeout(silenceTimer);
 
     let interim = '';
@@ -63,7 +85,6 @@ function initVoiceEngine() {
     const liveText = interim || currentTranscript || "Listening...";
     updateVoiceStatusText(liveText);
 
-    // Set 2-second timer: Executes response 2 seconds after speech pauses
     silenceTimer = setTimeout(() => {
       const queryToProcess = (currentTranscript + ' ' + interim).trim();
       if (queryToProcess.length > 0) {
@@ -107,24 +128,18 @@ function stopLiveMode() {
 
 async function processLiveQuery(query) {
   if (state.activeLiveMode === 'device') {
-    // Execute direct hardware/device tasks
     handleDeviceCommand(query);
   } else if (state.activeLiveMode === 'chat') {
-    // Execute instant AI streaming chat answer
     await sendChatMessage(query, true);
   }
 }
-
-// ==========================================
-// 2. DEVICE CONTROL ENGINE (LIVE MODE 1)
-// ==========================================
 
 function handleDeviceCommand(rawQuery) {
   const query = rawQuery.toLowerCase().trim();
 
   if (query.includes('call') || query.includes('dial')) {
     const target = query.replace('call', '').replace('dial', '').trim();
-    speakText(`Initiating call to ${target || 'contact'}`);
+    speakText(`Calling ${target || 'contact'}`);
     window.location.href = `tel:${encodeURIComponent(target)}`;
   } 
   else if (query.includes('message') || query.includes('text')) {
@@ -134,15 +149,6 @@ function handleDeviceCommand(rawQuery) {
     speakText(`Opening SMS to ${recipient}`);
     window.location.href = `sms:${encodeURIComponent(recipient)}?body=${encodeURIComponent(msg)}`;
   }
-  else if (query.includes('open chat') || query.includes('talk to ai')) {
-    speakText("Opening AI Chat");
-    openChatModal();
-  }
-  else if (query.includes('open app') || query.includes('launch')) {
-    const app = query.replace('open app', '').replace('open', '').replace('launch', '').trim();
-    speakText(`Opening ${app}`);
-    openAppCategory(app);
-  }
   else if (query.includes('reminder') || query.includes('remind me')) {
     const task = query.replace('set a reminder to', '').replace('remind me to', '').trim();
     addReminder(task);
@@ -150,49 +156,55 @@ function handleDeviceCommand(rawQuery) {
   }
   else if (query.includes('search')) {
     const term = query.replace('search for', '').replace('search the web for', '').replace('search', '').trim();
-    speakText(`Searching the web for ${term}`);
+    speakText(`Searching for ${term}`);
     window.open(`https://www.google.com/search?q=${encodeURIComponent(term)}`, '_blank');
   }
   else {
-    speakText(`Command received: ${rawQuery}. Processing device action.`);
+    speakText(`Command processed: ${rawQuery}`);
   }
 
-  // Resume listening after voice response finishes
   setTimeout(() => {
     if (state.activeLiveMode === 'device') startLiveMode('device');
   }, 3000);
 }
 
 // ==========================================
-// 3. AI CHAT ENGINE (LIVE MODE 2 & CHAT MODAL)
+// 3. PROFESSIONAL AI CHAT ENGINE
 // ==========================================
 
 async function sendChatMessage(text, isVoiceMode = false) {
   if (!text.trim()) return;
 
   if (!state.apiKey) {
-    alert("Please enter your Gemini API Key in Settings.");
+    alert("Please enter your Gemini API Key in Preferences.");
     toggleSettings();
     return;
   }
 
   appendChatMessage('user', text);
 
-  // Context windowing (keep recent turns)
-  if (state.history.length > 20) state.history = state.history.slice(-20);
-  
+  // Maintain context
+  if (state.history.length > 16) state.history = state.history.slice(-16);
   state.history.push({ role: 'user', parts: [{ text }] });
 
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    
+    const requestBody = {
+      contents: state.history,
+      systemInstruction: {
+        parts: [{ text: SYSTEM_INSTRUCTION }]
+      }
+    };
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: state.history })
+      body: JSON.stringify(requestBody)
     });
 
     const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm ready for your next question.";
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I am unable to formulate a response at the moment.";
 
     state.history.push({ role: 'model', parts: [{ text: reply }] });
     localStorage.setItem('bosompem_chat_history', JSON.stringify(state.history));
@@ -205,12 +217,12 @@ async function sendChatMessage(text, isVoiceMode = false) {
       });
     }
   } catch (e) {
-    appendChatMessage('assistant', 'Error fetching response. Please check your API key.');
+    appendChatMessage('assistant', 'Unable to reach Gemini API. Please check your network connection and API key.');
   }
 }
 
 // ==========================================
-// 4. UI MODALS & NAVIGATION ROUTER
+// 4. NAVIGATION ROUTER & MODALS
 // ==========================================
 
 function switchTab(tabName, element) {
@@ -218,20 +230,14 @@ function switchTab(tabName, element) {
   if (element) element.classList.add('active');
 
   if (tabName === 'chat') openChatModal();
-  else if (tabName === 'apps') openSectionModal('apps-modal');
   else if (tabName === 'memory') openSectionModal('memory-modal');
   else if (tabName === 'profile') openSectionModal('profile-modal');
   else closeAllModals();
 }
 
 function triggerQuickAction(action) {
-  if (action === 'chat') openChatModal();
-  else if (action === 'call') openCallModal();
+  if (action === 'call') openCallModal();
   else if (action === 'reminder') openSectionModal('reminders-modal');
-  else if (action === 'tasks') openSectionModal('tasks-modal');
-  else if (action === 'apps') openSectionModal('apps-modal');
-  else if (action === 'message') openMessageModal();
-  else if (action === 'search') openSearchModal();
 }
 
 function openChatModal() {
@@ -254,42 +260,23 @@ function closeAllModals() {
 }
 
 function toggleSettings() {
-  const panel = document.getElementById('settings-panel');
-  panel.classList.toggle('active');
+  document.getElementById('settings-panel').classList.toggle('active');
 }
 
-// --- QUICK MODAL ACTION HELPERS ---
 function openCallModal() {
-  const num = prompt("Enter phone number or contact name to call:");
+  const num = prompt("Enter phone number or contact to call:");
   if (num) window.location.href = `tel:${encodeURIComponent(num)}`;
 }
 
-function openMessageModal() {
-  const num = prompt("Recipient phone number:");
-  if (num) {
-    const body = prompt("Type your message:");
-    window.location.href = `sms:${encodeURIComponent(num)}?body=${encodeURIComponent(body || '')}`;
-  }
-}
-
-function openSearchModal() {
-  const term = prompt("Enter search query:");
-  if (term) window.open(`https://www.google.com/search?q=${encodeURIComponent(term)}`, '_blank');
-}
-
-function openAppCategory(appName) {
-  alert(`Launching ${appName}...`);
-}
-
 // ==========================================
-// 5. REMINDERS & TASKS STORAGE RENDERING
+// 5. REMINDERS MANAGEMENT
 // ==========================================
 
 function addReminder(textInput) {
   const text = textInput || prompt("Enter reminder details:");
   if (!text) return;
   
-  state.reminders.unshift({ id: Date.now(), text, time: 'Just now' });
+  state.reminders.unshift({ id: Date.now(), text, time: 'Scheduled' });
   localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
   renderReminders();
 }
@@ -300,7 +287,7 @@ function renderReminders() {
   if (!list) return;
 
   if (state.reminders.length === 0) {
-    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No upcoming reminders.</p>`;
+    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No active reminders.</p>`;
     if (modalList) modalList.innerHTML = list.innerHTML;
     return;
   }
@@ -321,36 +308,13 @@ function renderReminders() {
   if (modalList) modalList.innerHTML = html;
 }
 
-function addTask() {
-  const text = prompt("Enter task title:");
-  if (!text) return;
-  state.tasks.unshift({ id: Date.now(), text, done: false });
-  localStorage.setItem('bosompem_tasks', JSON.stringify(state.tasks));
-  renderTasks();
-}
-
-function renderTasks() {
-  const modalList = document.getElementById('full-tasks-list');
-  if (!modalList) return;
-
-  modalList.innerHTML = state.tasks.map(t => `
-    <div class="list-item">
-      <div class="item-left">
-        <div class="icon-badge" style="background: rgba(251, 146, 60, 0.15); color: #fb923c;"><i class="fa-solid fa-check"></i></div>
-        <div class="item-details"><p>${t.text}</p></div>
-      </div>
-    </div>
-  `).join('');
-}
-
 // ==========================================
-// 6. UI STATE HELPERS
+// 6. UI & UTILITY HELPERS
 // ==========================================
 
 function updateLiveCardUI(mode) {
   const btn1 = document.getElementById('live-device-btn');
   const btn2 = document.getElementById('live-chat-btn');
-  
   if (mode === 'device') {
     btn1.classList.add('active');
     btn2.classList.remove('active');
@@ -423,8 +387,9 @@ function saveSettings() {
 function loadSavedSettings() {
   if (document.getElementById('api-key')) document.getElementById('api-key').value = state.apiKey;
   if (document.getElementById('model-select')) document.getElementById('model-select').value = state.model;
+  if (document.getElementById('user-name-input')) document.getElementById('user-name-input').value = state.userName;
 }
 
-async function captureOwnerVoicePrint() {
-  alert("Voice biometric signature capture initialized. Say 'Hey Bosompem' when prompted.");
-           }
+function captureOwnerVoicePrint() {
+  alert("Voice biometric signature capture initialized. Speak clearly into the microphone.");
+                   }
