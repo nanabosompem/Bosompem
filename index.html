@@ -14,56 +14,57 @@
     html, body {
       height: 100%;
       height: 100dvh;
-      background: radial-gradient(circle at top right, #1a1d2d, #0b0d14);
+      background: radial-gradient(circle at top right, #202436, #0a0c12);
       color: #f3f4f6;
       overflow: hidden;
     }
 
     body { display: flex; flex-direction: column; position: relative; }
 
-    /* Rich Glass Button Styling */
-    .glass-btn {
-      background: rgba(255, 255, 255, 0.08);
+    /* Authentic Liquid Glass Icon Button Styling */
+    .liquid-glass-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.08) 60%, rgba(255, 255, 255, 0.03) 100%);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-      color: #f3f4f6;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .glass-btn:hover {
-      background: rgba(255, 255, 255, 0.16);
-      border-color: rgba(255, 255, 255, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 
+        0 8px 20px rgba(0, 0, 0, 0.4),
+        inset 0 2px 3px rgba(255, 255, 255, 0.5),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.3);
       color: #ffffff;
-      transform: translateY(-2px);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    }
-    .glass-btn:active { transform: translateY(0); scale: 0.96; }
-
-    /* Glass Icon Containers */
-    .glass-icon {
+      cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.06);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 10px;
-      padding: 8px;
+      font-size: 1.1rem;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0;
     }
 
-    /* Top Navigation Header Bar */
+    .liquid-glass-btn:hover {
+      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.15) 60%, rgba(255, 255, 255, 0.05) 100%);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 
+        0 12px 28px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.7),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .liquid-glass-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Top Navigation Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 12px 18px;
-      background: rgba(15, 18, 28, 0.75);
+      background: rgba(12, 14, 22, 0.7);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -71,16 +72,13 @@
       z-index: 10;
     }
 
-    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-left { display: flex; align-items: center; gap: 14px; }
     .brand { display: flex; align-items: center; gap: 10px; }
     .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; transition: all 0.4s ease; }
     .status-dot.active { background: #10b981; box-shadow: 0 0 12px rgba(16, 185, 129, 0.8); }
     .title { font-weight: 600; font-size: 1.05rem; letter-spacing: 0.4px; color: #ffffff; }
 
-    .header-actions { display: flex; gap: 8px; align-items: center; }
-    .icon-btn { width: 40px; height: 40px; border-radius: 12px; font-size: 0.95rem; }
-
-    /* Animated Slide-Out Sidebar Drawer Menu */
+    /* Animated Sidebar Navigation Drawer */
     .sidebar-overlay {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 200;
@@ -89,7 +87,7 @@
     .sidebar-overlay.active { display: block; opacity: 1; }
     .sidebar {
       position: fixed; top: 0; left: -300px; width: 290px; height: 100%;
-      background: rgba(15, 18, 28, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      background: rgba(12, 14, 22, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
       border-right: 1px solid rgba(255, 255, 255, 0.12); z-index: 201;
       transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1); padding: 24px; display: flex; flex-direction: column; gap: 20px;
     }
@@ -97,15 +95,15 @@
     .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px; }
     
     .menu-item {
-      display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 14px;
+      display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 20px;
       color: #e5e7eb; cursor: pointer; background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.08); transition: all 0.25s ease; font-weight: 500;
     }
     .menu-item:hover {
-      background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.2); transform: translateX(4px);
+      background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); transform: translateX(4px);
     }
 
-    /* Scrollable Chat Area */
+    /* Main Chat Display */
     #chat-container {
       flex: 1;
       overflow-y: auto;
@@ -154,25 +152,24 @@
       font-size: 0.85rem; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 20px; padding: 8px 16px;
     }
 
-    /* Response Action Bar (Speaker, Copy, Thumbs Up / Down) */
+    /* Response Liquid Action Bar */
     .response-action-bar {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       margin-top: 4px;
       padding-left: 4px;
     }
     .action-icon-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      font-size: 0.8rem;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #9ca3af;
+      width: 34px;
+      height: 34px;
+      font-size: 0.85rem;
     }
-    .action-icon-btn:hover { color: #ffffff; background: rgba(255, 255, 255, 0.12); }
-    .action-icon-btn.active { color: #10b981; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.15); }
+    .action-icon-btn.active { 
+      background: radial-gradient(circle at 35% 30%, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0.2) 100%);
+      border-color: rgba(16, 185, 129, 0.6); 
+      color: #10b981; 
+    }
 
     .attached-preview-img, .generated-img {
       max-width: 100%; border-radius: 14px; border: 1px solid rgba(255,255,255,0.18); margin-top: 8px; display: block;
@@ -180,7 +177,7 @@
     }
     .generated-img:hover { transform: scale(1.01); }
 
-    /* Active Voice Listening Bar Animation */
+    /* Live Listening Visualizer */
     .listening-bar {
       display: none; align-items: center; justify-content: center; gap: 6px;
       padding: 10px; background: rgba(16, 185, 129, 0.12); border-radius: 14px;
@@ -213,16 +210,25 @@
     .setting-group input:focus, .setting-group select:focus { border-color: rgba(99, 102, 241, 0.6); }
     .setting-group select option { background: #131722; color: #f3f4f6; }
 
-    /* Developer Collapsible Sub-Panel Trigger */
+    /* Working Collapsible Developer Button & Sub-Panel */
     .sub-panel-trigger {
-      width: 100%; padding: 14px; background: rgba(255,255,255,0.04);
-      border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; color: #818cf8;
+      width: 100%; padding: 14px; background: rgba(255,255,255,0.06);
+      border: 1px dashed rgba(255,255,255,0.25); border-radius: 14px; color: #818cf8;
       display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-      font-size: 0.9rem; margin-bottom: 20px; transition: all 0.25s ease;
+      font-size: 0.9rem; font-weight: 500; margin-bottom: 20px; transition: all 0.25s ease;
+      user-select: none;
     }
-    .sub-panel-trigger:hover { background: rgba(255,255,255,0.08); border-color: rgba(129, 140, 248, 0.5); }
-    .hidden-sub-panel { display: none; background: rgba(0,0,0,0.3); padding: 16px; border-radius: 14px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.08); }
-    .hidden-sub-panel.active { display: block; }
+    .sub-panel-trigger:hover { background: rgba(255,255,255,0.12); border-color: rgba(129, 140, 248, 0.6); }
+    
+    .hidden-sub-panel { 
+      display: none; 
+      background: rgba(0,0,0,0.35); 
+      padding: 16px; 
+      border-radius: 14px; 
+      margin-bottom: 20px; 
+      border: 1px solid rgba(255,255,255,0.1); 
+    }
+    .hidden-sub-panel.active { display: block !important; }
 
     .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-top: 16px; }
     .gallery-item { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); aspect-ratio: 1; transition: transform 0.25s ease; }
@@ -231,11 +237,11 @@
 
     /* Footer Input Area */
     footer {
-      padding: 12px 16px; background: rgba(15, 18, 28, 0.75);
+      padding: 12px 16px; background: rgba(12, 14, 22, 0.7);
       backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.08);
       display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
     }
-    .input-bar { display: flex; gap: 8px; align-items: flex-end; }
+    .input-bar { display: flex; gap: 10px; align-items: flex-end; }
     .input-wrapper { flex: 1; display: flex; align-items: center; }
     
     textarea#user-input {
@@ -246,7 +252,7 @@
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.12);
       color: #f3f4f6;
-      border-radius: 20px;
+      border-radius: 22px;
       outline: none;
       font-size: 0.95rem;
       line-height: 1.4;
@@ -256,15 +262,13 @@
     }
     textarea#user-input:focus { border-color: rgba(99, 102, 241, 0.6); }
 
-    .action-btn { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; }
-
     .live-mode-btn {
-      padding: 0 14px; height: 42px; border-radius: 21px; font-size: 0.85rem;
-      font-weight: 600; gap: 6px; background: rgba(99, 102, 241, 0.15);
-      border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; flex-shrink: 0;
+      padding: 0 16px; height: 44px; border-radius: 22px; font-size: 0.85rem;
+      font-weight: 600; gap: 8px; flex-shrink: 0;
     }
     .live-mode-btn.active {
-      background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.5); color: #10b981;
+      background: radial-gradient(circle at 35% 30%, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0.2) 100%);
+      border-color: rgba(16, 185, 129, 0.6); color: #10b981;
     }
   </style>
 </head>
@@ -275,33 +279,33 @@
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
       <div class="brand">
-        <div class="glass-icon"><i class="fa-solid fa-robot" style="color: #818cf8;"></i></div>
+        <button class="liquid-glass-btn" style="pointer-events: none;"><i class="fa-solid fa-robot"></i></button>
         <span class="title">Bosompem Menu</span>
       </div>
-      <button class="glass-btn icon-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="liquid-glass-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     
-    <!-- Working New Chat Button -->
+    <!-- Sidebar Items with Liquid Glass Icons -->
     <div class="menu-item" onclick="startNewChat()">
-      <div class="glass-icon"><i class="fa-solid fa-plus" style="color: #10b981;"></i></div>
+      <button class="liquid-glass-btn" style="width:36px; height:36px; font-size:0.9rem; pointer-events: none;"><i class="fa-solid fa-plus"></i></button>
       <span>New Chat</span>
     </div>
     
     <div class="menu-item" onclick="toggleGallery(); toggleSidebar();">
-      <div class="glass-icon"><i class="fa-regular fa-images" style="color: #38bdf8;"></i></div>
+      <button class="liquid-glass-btn" style="width:36px; height:36px; font-size:0.9rem; pointer-events: none;"><i class="fa-regular fa-images"></i></button>
       <span>Image Gallery</span>
     </div>
     
     <div class="menu-item" onclick="toggleSettings(); toggleSidebar();">
-      <div class="glass-icon"><i class="fa-solid fa-gear" style="color: #a78bfa;"></i></div>
+      <button class="liquid-glass-btn" style="width:36px; height:36px; font-size:0.9rem; pointer-events: none;"><i class="fa-solid fa-gear"></i></button>
       <span>Settings</span>
     </div>
   </aside>
 
-  <!-- Navigation Header Bar (Settings Button Removed) -->
+  <!-- Navigation Header Bar -->
   <header>
     <div class="header-left">
-      <button class="glass-btn icon-btn" onclick="toggleSidebar()" title="Open Menu">
+      <button class="liquid-glass-btn" onclick="toggleSidebar()" title="Open Menu">
         <i class="fa-solid fa-bars"></i>
       </button>
       <div class="brand">
@@ -310,7 +314,7 @@
       </div>
     </div>
     <div class="header-actions">
-      <button class="glass-btn icon-btn" onclick="toggleGallery()" title="Image Gallery">
+      <button class="liquid-glass-btn" onclick="toggleGallery()" title="Image Gallery">
         <i class="fa-regular fa-images"></i>
       </button>
     </div>
@@ -319,7 +323,7 @@
   <main id="chat-container">
     <div class="message-wrapper assistant">
       <div class="message assistant">
-        Hello! I am <strong>Bosompem AI</strong>. Tap <strong>LIVE</strong> for voice interaction, or ask me to generate or edit high-definition photo visuals!
+        Hello! I am <strong>Bosompem AI</strong>. Tap <strong>LIVE</strong> for immediate voice interaction, or ask me to generate or edit high-definition photo visuals!
       </div>
     </div>
   </main>
@@ -334,7 +338,7 @@
   <div id="gallery-panel" class="modal-overlay">
     <div class="modal-header">
       <h2>Image Library</h2>
-      <button class="glass-btn icon-btn" onclick="toggleGallery()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="liquid-glass-btn" onclick="toggleGallery()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="gallery-container" class="gallery-grid">
       <p style="color: #9ca3af; grid-column: 1/-1;">No saved images yet.</p>
@@ -344,7 +348,7 @@
   <div id="settings-panel" class="modal-overlay">
     <div class="modal-header">
       <h2>Preferences</h2>
-      <button class="glass-btn icon-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     
     <div class="setting-group">
@@ -359,8 +363,8 @@
       <input type="range" id="speed-select" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speed-val').innerText = this.value" />
     </div>
 
-    <!-- Collapsible Developer Sub-button -->
-    <div class="sub-panel-trigger" onclick="toggleDevPanel()">
+    <!-- Working Developer & API Button Trigger -->
+    <div id="dev-trigger-btn" class="sub-panel-trigger" onclick="toggleDevPanel()">
       <span><i class="fa-solid fa-code" style="margin-right: 8px;"></i> Developer & API Settings</span>
       <i id="dev-chevron" class="fa-solid fa-chevron-down"></i>
     </div>
@@ -368,7 +372,7 @@
     <div id="dev-panel" class="hidden-sub-panel">
       <div class="setting-group">
         <label for="api-key">Gemini API Key</label>
-        <input type="password" id="api-key" placeholder="Paste your secret key here" />
+        <input type="password" id="api-key" placeholder="Paste secret API key here" />
       </div>
       <div class="setting-group">
         <label for="model-select">Primary Model Selection</label>
@@ -379,37 +383,37 @@
       </div>
     </div>
 
-    <button class="glass-btn" style="width: 100%; padding: 14px; background: rgba(99, 102, 241, 0.4); border-color: rgba(99, 102, 241, 0.5); border-radius: 12px; font-weight: 600;" onclick="saveSettings()">Save Configuration</button>
+    <button class="liquid-glass-btn" style="width: 100%; height: auto; padding: 14px; border-radius: 14px; font-weight: 600; background: rgba(99, 102, 241, 0.35);" onclick="saveSettings()">Save Configuration</button>
   </div>
 
   <footer>
-    <div id="attachment-preview" style="display: none; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12);">
-      <img id="preview-thumb" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover;" src="" alt="preview" />
+    <div id="attachment-preview" style="display: none; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.12);">
+      <img id="preview-thumb" style="width: 36px; height: 36px; border-radius: 8px; object-fit: cover;" src="" alt="preview" />
       <span style="font-size: 0.85rem; flex: 1; color: #d1d5db;" id="attachment-name">Image attached</span>
-      <button class="glass-btn icon-btn" onclick="clearAttachment()"><i class="fa-solid fa-xmark"></i></button>
+      <button class="liquid-glass-btn" style="width:30px; height:30px; font-size:0.8rem;" onclick="clearAttachment()"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="input-bar">
       <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelected(event)" />
       
-      <button class="glass-btn icon-btn" style="width: 42px; height: 42px; border-radius: 50%; color: #818cf8;" onclick="document.getElementById('file-input').click()" title="Upload Image to Edit/Analyze">
+      <button class="liquid-glass-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">
         <i class="fa-solid fa-paperclip"></i>
       </button>
 
-      <button id="live-btn" class="glass-btn live-mode-btn" onclick="toggleLiveMode()" title="Talk Live to AI">
+      <button id="live-btn" class="liquid-glass-btn live-mode-btn" onclick="toggleLiveMode()" title="Talk Live to AI">
         <i class="fa-solid fa-headset"></i>
         <span>LIVE</span>
       </button>
 
       <div class="input-wrapper">
-        <textarea id="user-input" rows="1" placeholder="Type a message or edit prompt..." oninput="autoExpandInput(this)" onkeydown="handleKeyDown(event)"></textarea>
+        <textarea id="user-input" rows="1" placeholder="Type a message or photo edit prompt..." oninput="autoExpandInput(this)" onkeydown="handleKeyDown(event)"></textarea>
       </div>
 
-      <button id="mic-btn" class="glass-btn action-btn" onclick="toggleVoiceInput()" title="Voice Input">
+      <button id="mic-btn" class="liquid-glass-btn" onclick="toggleVoiceInput()" title="Voice Input">
         <i class="fa-solid fa-microphone"></i>
       </button>
 
-      <button id="send-btn" class="glass-btn action-btn" style="background: rgba(99, 102, 241, 0.5); border-color: rgba(99, 102, 241, 0.6);" onclick="sendMessage()" title="Send">
+      <button id="send-btn" class="liquid-glass-btn" style="background: radial-gradient(circle at 35% 30%, rgba(99, 102, 241, 0.7) 0%, rgba(79, 70, 229, 0.4) 100%);" onclick="sendMessage()" title="Send">
         <i class="fa-solid fa-arrow-up"></i>
       </button>
     </div>
@@ -417,4 +421,5 @@
 
   <script src="app.js"></script>
 </body>
-</html>
+                                                                                                                                                                                                                 </html>
+                                                                                                                                                                                                                 
