@@ -99,7 +99,7 @@ window.addEventListener('DOMContentLoaded', () => {
   renderGallery();
 });
 
-/* Explicit Working Developer Panel Toggle Function */
+/* Collapsible Developer Panel Toggle */
 function toggleDevPanel() {
   const panel = document.getElementById('dev-panel');
   const chevron = document.getElementById('dev-chevron');
@@ -113,9 +113,10 @@ function toggleDevPanel() {
   }
 }
 
+/* Dynamic Text Expansion */
 function autoExpandInput(element) {
   element.style.height = 'auto';
-  element.style.height = (element.scrollHeight) + 'px';
+  element.style.height = Math.min(element.scrollHeight, 200) + 'px';
 }
 
 function handleKeyDown(e) {
@@ -321,13 +322,27 @@ function speakSpecificText(encodedText, btnNode) {
   window.speechSynthesis.speak(utterance);
 }
 
-function copyResponseText(encodedText, btnNode) {
+/* Functional Clipboard Copy Handler */
+async function copyResponseText(encodedText, btnNode) {
   const text = decodeURIComponent(encodedText);
-  navigator.clipboard.writeText(text).then(() => {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+    
     const originalIcon = btnNode.innerHTML;
     btnNode.innerHTML = `<i class="fa-solid fa-check" style="color: #10b981;"></i>`;
     setTimeout(() => { btnNode.innerHTML = originalIcon; }, 2000);
-  });
+  } catch (err) {
+    console.error('Failed to copy: ', err);
+  }
 }
 
 function toggleFeedback(btnNode, type) {
@@ -472,4 +487,5 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-  }
+                            }
+      
