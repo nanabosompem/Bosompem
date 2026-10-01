@@ -4,160 +4,156 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Bosompem AI</title>
-  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
-  <!-- Slide-out Navigation Drawer Menu -->
-  <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
-  <aside id="sidebar" class="sidebar">
-    <div class="sidebar-header">
-      <div class="brand">
-        <button class="liquid-glass-btn" style="pointer-events: none;"><i class="fa-solid fa-robot"></i></button>
-        <span class="title">Bosompem Menu</span>
-      </div>
-      <button class="liquid-glass-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    
-    <!-- Sidebar Items -->
-    <div class="menu-item" onclick="startNewChat()">
-      <button class="liquid-glass-btn menu-icon-btn"><i class="fa-solid fa-plus"></i></button>
-      <span>New Chat</span>
-    </div>
-    
-    <div class="menu-item" onclick="toggleGallery(); toggleSidebar();">
-      <button class="liquid-glass-btn menu-icon-btn"><i class="fa-regular fa-images"></i></button>
-      <span>Image Gallery</span>
-    </div>
-    
-    <div class="menu-item" onclick="toggleSettings(); toggleSidebar();">
-      <button class="liquid-glass-btn menu-icon-btn"><i class="fa-solid fa-gear"></i></button>
-      <span>Settings</span>
-    </div>
-  </aside>
-
-  <!-- Navigation Header Bar -->
+  <!-- Header -->
   <header>
     <div class="header-left">
-      <button class="liquid-glass-btn" onclick="toggleSidebar()" title="Open Menu">
-        <i class="fa-solid fa-bars"></i>
-      </button>
-      <div class="brand">
-        <div id="status-indicator" class="status-dot"></div>
-        <span class="title">Bosompem AI</span>
+      <div class="brand-avatar">
+        <i class="fa-solid fa-robot"></i>
+      </div>
+      <div class="brand-info">
+        <h1>Bosompem</h1>
+        <p>Your Personal AI Assistant</p>
       </div>
     </div>
-    <div class="header-actions">
-      <button class="liquid-glass-btn" onclick="toggleGallery()" title="Image Gallery">
-        <i class="fa-regular fa-images"></i>
-      </button>
-    </div>
+    <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
   </header>
 
-  <main id="chat-container">
-    <div class="message-wrapper assistant">
-      <div class="message assistant">
-        Hello! I am <strong>Bosompem AI</strong>. Tap the headset icon for immediate voice interaction, or ask me to generate or edit high-definition photo visuals!
-      </div>
-    </div>
-  </main>
-
-  <div id="listening-indicator" class="listening-bar">
-    <div class="wave-bar"></div>
-    <div class="wave-bar"></div>
-    <div class="wave-bar"></div>
-    <span style="margin-left: 8px;">Bosompem is listening... Speak now</span>
-  </div>
-
-  <div id="gallery-panel" class="modal-overlay">
-    <div class="modal-header">
-      <h2>Image Library</h2>
-      <button class="liquid-glass-btn" onclick="toggleGallery()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div id="gallery-container" class="gallery-grid">
-      <p style="color: #9ca3af; grid-column: 1/-1;">No saved images yet.</p>
-    </div>
-  </div>
-
-  <div id="settings-panel" class="modal-overlay">
-    <div class="modal-header">
-      <h2>Preferences</h2>
-      <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
+  <main class="dashboard-container">
     
-    <div class="setting-group">
-      <label for="speaker-select">Voice Speaker Accent</label>
-      <select id="speaker-select">
-        <option value="">Loading speech voices...</option>
-      </select>
-    </div>
-    
-    <div class="setting-group">
-      <label for="speed-select">Talking Speed (<span id="speed-val">1.0</span>x)</label>
-      <input type="range" id="speed-select" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speed-val').innerText = this.value" />
-    </div>
-
-    <!-- Collapsible Developer Button & Sub-Panel -->
-    <div id="dev-trigger-btn" class="sub-panel-trigger" onclick="toggleDevPanel()">
-      <span><i class="fa-solid fa-code" style="margin-right: 8px;"></i> Developer & API Settings</span>
-      <i id="dev-chevron" class="fa-solid fa-chevron-down"></i>
-    </div>
-
-    <div id="dev-panel" class="hidden-sub-panel">
-      <div class="setting-group">
-        <label for="api-key">Gemini API Key</label>
-        <input type="password" id="api-key" placeholder="Paste secret API key here" />
+    <!-- Greeting & Feature Badge -->
+    <section class="welcome-card">
+      <div class="welcome-text">
+        <h2>Good evening, Yung Cench 👑</h2>
+        <p>I'm Bosompem. I'm always here — to help, plan, create, and get things done. What can I do for you today?</p>
       </div>
-      <div class="setting-group">
-        <label for="model-select">Primary Model Selection</label>
-        <select id="model-select">
-          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recommended)</option>
-          <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Fastest)</option>
-          <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Reasoning)</option>
-        </select>
+      <div class="promo-badge">
+        <i class="fa-solid fa-brain" style="font-size: 1.2rem;"></i>
+        <span>Smarter. More personal. Always with you.</span>
       </div>
-    </div>
+    </section>
 
-    <button class="liquid-glass-btn save-config-btn" onclick="saveSettings()">Save Configuration</button>
-  </div>
-
-  <footer>
-    <div id="attachment-preview" class="attachment-preview-box">
-      <img id="preview-thumb" class="preview-thumb" src="" alt="preview" />
-      <span class="attachment-name" id="attachment-name">Image attached</span>
-      <button class="liquid-glass-btn close-preview-btn" onclick="clearAttachment()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-
-    <div class="input-bar">
-      <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="handleFileSelected(event)" />
-      
-      <button class="liquid-glass-btn" onclick="document.getElementById('file-input').click()" title="Upload Image">
-        <i class="fa-solid fa-paperclip"></i>
-      </button>
-
-      <!-- LIVE Mode Button (Icon Only) -->
-      <button id="live-btn" class="liquid-glass-btn live-mode-btn" onclick="toggleLiveMode()" title="Talk Live to AI">
-        <i class="fa-solid fa-headset"></i>
-      </button>
-
-      <div class="input-wrapper">
-        <textarea id="user-input" rows="1" placeholder="Type a message or photo edit prompt..." oninput="autoExpandInput(this)" onkeydown="handleKeyDown(event)"></textarea>
-      </div>
-
-      <button id="mic-btn" class="liquid-glass-btn" onclick="toggleVoiceInput()" title="Voice Input">
+    <!-- Voice Tap Banner -->
+    <section class="voice-hero-card">
+      <button class="mic-pulse-btn" onclick="toggleLiveMode()">
         <i class="fa-solid fa-microphone"></i>
       </button>
+      <h3>Tap to speak</h3>
+      <p>or just say “Hey Bosompem”</p>
+    </section>
 
-      <button id="send-btn" class="liquid-glass-btn send-btn" onclick="sendMessage()" title="Send">
-        <i class="fa-solid fa-arrow-up"></i>
-      </button>
+    <!-- Category Feature Cards -->
+    <section class="feature-grid">
+      <div class="feature-item">
+        <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-comment"></i></div>
+        <span class="title">Chat</span>
+        <span class="sub">Ask anything</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
+        <span class="title">Calls</span>
+        <span class="sub">Make & receive</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;"><i class="fa-solid fa-calendar-days"></i></div>
+        <span class="title">Reminders</span>
+        <span class="sub">Never miss</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background: rgba(251, 146, 60, 0.15); color: #fb923c;"><i class="fa-solid fa-bolt"></i></div>
+        <span class="title">Tasks</span>
+        <span class="sub">Get things done</span>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;"><i class="fa-solid fa-border-all"></i></div>
+        <span class="title">Apps</span>
+        <span class="sub">Control phone</span>
+      </div>
+    </section>
+
+    <!-- Split Overview / Quick Actions -->
+    <div class="dashboard-split">
+      <div class="panel-card">
+        <div class="panel-header">
+          <h4><i class="fa-regular fa-calendar" style="color: #c084fc;"></i> Today's Overview</h4>
+          <a href="#">View all &rarr;</a>
+        </div>
+        <div class="list-group">
+          <div class="list-item">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;"><i class="fa-solid fa-check"></i></div>
+              <div class="item-details">
+                <p>No upcoming reminders</p>
+                <span>You're all caught up!</span>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="list-item">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;"><i class="fa-solid fa-list-check"></i></div>
+              <div class="item-details">
+                <p>1 task in progress</p>
+                <span>Check on laptop purchase plan</span>
+              </div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-header">
+          <h4><i class="fa-solid fa-bolt" style="color: #fb923c;"></i> Quick Actions</h4>
+        </div>
+        <div class="list-group">
+          <div class="list-item">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
+              <div class="item-details"><p>Call someone</p></div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="list-item">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i class="fa-solid fa-message"></i></div>
+              <div class="item-details"><p>Send a message</p></div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+        </div>
+      </div>
     </div>
-  </footer>
 
-  <script src="app.js"></script>
+  </main>
+
+  <!-- Navigation Bar -->
+  <nav class="bottom-nav">
+    <div class="nav-tab active">
+      <i class="fa-solid fa-house"></i>
+      <span>Home</span>
+    </div>
+    <div class="nav-tab">
+      <i class="fa-solid fa-comment"></i>
+      <span>Chat</span>
+    </div>
+    <div class="nav-tab">
+      <i class="fa-solid fa-border-all"></i>
+      <span>Apps</span>
+    </div>
+    <div class="nav-tab">
+      <i class="fa-solid fa-brain"></i>
+      <span>Memory</span>
+    </div>
+    <div class="nav-tab">
+      <i class="fa-solid fa-user"></i>
+      <span>Profile</span>
+    </div>
+  </nav>
+
 </body>
-  </html>
-  
+</html>
