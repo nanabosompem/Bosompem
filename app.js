@@ -1,4 +1,4 @@
-const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant. You can edit images, analyze visuals, write code, and communicate naturally.\n\nUser Prompt: ";
+const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant capable of photo editing, text generation, and clear conversation.\n\nUser Request: ";
 
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
@@ -29,7 +29,9 @@ let recognition = null;
 
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
+  // Set continuous to false for quick real-time speech capturing without delay
   recognition.continuous = false;
+  recognition.interimResults = true;
   
   recognition.onstart = () => {
     micBtn.classList.add('recording');
@@ -37,8 +39,22 @@ if (SpeechRecognition) {
   };
   
   recognition.onresult = (e) => {
-    userInput.value = e.results[0][0].transcript;
-    sendMessage();
+    let interim = '';
+    let finalTranscript = '';
+    
+    for (let i = e.resultIndex; i < e.results.length; ++i) {
+      if (e.results[i].isFinal) {
+        finalTranscript += e.results[i][0].transcript;
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+
+    if (interim) userInput.value = interim;
+    if (finalTranscript) {
+      userInput.value = finalTranscript;
+      sendMessage();
+    }
   };
 
   recognition.onerror = () => {
@@ -51,16 +67,22 @@ if (SpeechRecognition) {
   };
 }
 
+// Populate speech synthesizer voices dynamically
 function loadVoices() {
   if (!('speechSynthesis' in window)) return;
   const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return;
+
   speakerSelect.innerHTML = '';
   
   voices.forEach((v) => {
     const opt = document.createElement('option');
     opt.value = v.name;
     opt.innerText = `${v.name} (${v.lang})`;
-    if (v.name === state.speaker) opt.selected = true;
+    if (v.name === state.speaker || (!state.speaker && v.default)) {
+      opt.selected = true;
+      state.speaker = v.name;
+    }
     speakerSelect.appendChild(opt);
   });
 }
@@ -74,11 +96,26 @@ window.addEventListener('DOMContentLoaded', () => {
   modelSelect.value = state.model;
   speedSelect.value = state.speed;
   document.getElementById('speed-val').innerText = state.speed;
+  
   loadVoices();
+  setTimeout(loadVoices, 500); // Fallback for delayed browser voice loading
+  
   updateTtsIcon();
   updateStatus();
   renderGallery();
 });
+
+function autoExpandInput(element) {
+  element.style.height = 'auto';
+  element.style.height = (element.scrollHeight) + 'px';
+}
+
+function handleKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
 
 function scrollToBottom() {
   setTimeout(() => { chatContainer.scrollTop = chatContainer.scrollHeight; }, 50);
@@ -89,7 +126,19 @@ function updateStatus() {
   else statusIndicator.classList.remove('active');
 }
 
-function toggleSidebar() { alert("Sidebar Menu initialized."); }
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('active');
+  document.getElementById('sidebar-overlay').classList.toggle('active');
+}
+
+function clearChat() {
+  state.history = [];
+  chatContainer.innerHTML = `
+    <div class="message-wrapper assistant">
+      <div class="message assistant">New conversation started. How can I help you today?</div>
+    </div>`;
+}
+
 function toggleAudio() {
   state.speechEnabled = !state.speechEnabled;
   localStorage.setItem('bosompem_speech', state.speechEnabled);
@@ -101,8 +150,15 @@ function updateTtsIcon() {
   ttsToggle.innerHTML = state.speechEnabled ? '<i class="fa-solid fa-volume-high"></i>' : '<i class="fa-solid fa-volume-xmark"></i>';
 }
 
-function toggleSettings() { document.getElementById('settings-panel').classList.toggle('active'); }
-function toggleGallery() { renderGallery(); document.getElementById('gallery-panel').classList.toggle('active'); }
+function toggleSettings() { 
+  loadVoices();
+  document.getElementById('settings-panel').classList.toggle('active'); 
+}
+
+function toggleGallery() { 
+  renderGallery(); 
+  document.getElementById('gallery-panel').classList.toggle('active'); 
+}
 
 function toggleLiveMode() {
   state.liveMode = !state.liveMode;
@@ -133,7 +189,7 @@ function saveSettings() {
 
   updateStatus();
   toggleSettings();
-  appendSystemMessage('Voice and model configurations saved.');
+  appendSystemMessage('Settings saved.');
 }
 
 function handleFileSelected(event) {
@@ -257,11 +313,9 @@ function speakText(text, onComplete = null) {
 }
 
 function toggleVoiceInput() {
-  if (!SpeechRecognition) return alert('Speech recognition is not supported on this device/browser.');
+  if (!SpeechRecognition) return alert('Speech recognition is not supported on this browser.');
   recognition.start();
 }
-
-function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
 
 function isImageGenerationRequest(text) {
   const triggers = ['generate image', 'create an image', 'draw', 'make a picture', 'show me a photo of'];
@@ -293,17 +347,17 @@ async function sendMessage() {
 
   appendUserMessage(text, attached);
   userInput.value = '';
+  userInput.style.height = '44px'; // Reset input height
   clearAttachment();
 
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
 
-  // Image Generation / Editing Logic
   if (isImageGenerationRequest(text) || (attached && isPhotoEditRequest(text, attached))) {
     try {
       let prompt = text;
       if (attached) {
-        prompt = `Edit photo style: ${text || 'Enhance and modify lighting and composition'}`;
+        prompt = `Photo edit transformation: ${text || 'Sharpen details, adjust studio bulb lighting, and enhance resolution'}`;
       }
       
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true`;
@@ -323,7 +377,7 @@ async function sendMessage() {
 
   if (!state.apiKey) {
     sendBtn.disabled = false;
-    return appendSystemMessage('Please enter your Gemini API Key in Settings (⚙️️).');
+    return appendSystemMessage('Please enter your Gemini API Key in Settings (⚙).');
   }
 
   const parts = [];
@@ -348,5 +402,4 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-      }
-  
+                       }
