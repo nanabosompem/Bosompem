@@ -1,4 +1,4 @@
-const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant capable of photo editing, text generation, and clear conversation.\n\nUser Request: ";
+const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant capable of photo editing, high-definition text generation, and clear conversation.\n\nUser Request: ";
 
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
@@ -29,7 +29,6 @@ let recognition = null;
 
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
-  // Set continuous to false for quick real-time speech capturing without delay
   recognition.continuous = false;
   recognition.interimResults = true;
   
@@ -67,7 +66,6 @@ if (SpeechRecognition) {
   };
 }
 
-// Populate speech synthesizer voices dynamically
 function loadVoices() {
   if (!('speechSynthesis' in window)) return;
   const voices = window.speechSynthesis.getVoices();
@@ -98,12 +96,19 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('speed-val').innerText = state.speed;
   
   loadVoices();
-  setTimeout(loadVoices, 500); // Fallback for delayed browser voice loading
+  setTimeout(loadVoices, 500);
   
   updateTtsIcon();
   updateStatus();
   renderGallery();
 });
+
+function toggleDevPanel() {
+  const panel = document.getElementById('dev-panel');
+  const chevron = document.getElementById('dev-chevron');
+  panel.classList.toggle('active');
+  chevron.className = panel.classList.contains('active') ? 'fa-solid fa-chevron-up' : 'fa-solid fa-chevron-down';
+}
 
 function autoExpandInput(element) {
   element.style.height = 'auto';
@@ -189,7 +194,7 @@ function saveSettings() {
 
   updateStatus();
   toggleSettings();
-  appendSystemMessage('Settings saved.');
+  appendSystemMessage('Settings updated.');
 }
 
 function handleFileSelected(event) {
@@ -318,12 +323,12 @@ function toggleVoiceInput() {
 }
 
 function isImageGenerationRequest(text) {
-  const triggers = ['generate image', 'create an image', 'draw', 'make a picture', 'show me a photo of'];
+  const triggers = ['generate image', 'create an image', 'draw', 'make a picture', 'show me a photo of', 'picture of'];
   return triggers.some(t => text.toLowerCase().includes(t));
 }
 
 function isPhotoEditRequest(text, attached) {
-  const triggers = ['edit', 'change background', 'sharpen', 'add light', 'filter', 'modify', 'braid'];
+  const triggers = ['edit', 'change background', 'sharpen', 'add light', 'filter', 'modify', 'braid', 'enhance'];
   return attached || triggers.some(t => text.toLowerCase().includes(t));
 }
 
@@ -347,21 +352,24 @@ async function sendMessage() {
 
   appendUserMessage(text, attached);
   userInput.value = '';
-  userInput.style.height = '44px'; // Reset input height
+  userInput.style.height = '44px';
   clearAttachment();
 
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
 
+  // HD Clean Image Generation / Photo Editing Engine
   if (isImageGenerationRequest(text) || (attached && isPhotoEditRequest(text, attached))) {
     try {
-      let prompt = text;
-      if (attached) {
-        prompt = `Photo edit transformation: ${text || 'Sharpen details, adjust studio bulb lighting, and enhance resolution'}`;
-      }
+      const cleanPrompt = text ? text.replace(/(generate|create|draw|make|show me a photo of)/gi, '').trim() : 'professional studio photograph, crisp detail, cinematic studio lighting, high resolution';
+      const enhancedPrompt = attached 
+        ? `HD professional photograph edit, clear face, detailed lighting, sharp focus, ${cleanPrompt}`
+        : `ultra-clean realistic photograph, high resolution 8k, detailed composition, studio quality: ${cleanPrompt}`;
+
+      const seed = Math.floor(Math.random() * 1000000);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`;
       
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true`;
-      const reply = attached ? "Here is your edited photo:" : "Here is your generated image:";
+      const reply = attached ? "Here is your edited photo:" : "Here is your clean generated photo:";
       
       appendAssistantMessage(reply, imageUrl);
       speakText(reply, () => {
@@ -377,7 +385,7 @@ async function sendMessage() {
 
   if (!state.apiKey) {
     sendBtn.disabled = false;
-    return appendSystemMessage('Please enter your Gemini API Key in Settings (⚙).');
+    return appendSystemMessage('Please configure your Gemini API Key under Settings > Developer & API Settings.');
   }
 
   const parts = [];
@@ -402,4 +410,4 @@ async function sendMessage() {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-                       }
+                                }
