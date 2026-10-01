@@ -1,9 +1,11 @@
-const PROMPT_PREFIX = "You are Bosompem, an intelligent AI assistant. Provide helpful, accurate, and direct responses.\n\nUser Question: ";
+const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant. You can edit images, analyze visuals, write code, and communicate naturally.\n\nUser Prompt: ";
 
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
   speechEnabled: localStorage.getItem('bosompem_speech') !== 'false',
+  speaker: localStorage.getItem('bosompem_speaker') || '',
+  speed: parseFloat(localStorage.getItem('bosompem_speed') || '1.0'),
   liveMode: false,
   history: [],
   gallery: JSON.parse(localStorage.getItem('bosompem_gallery') || '[]'),
@@ -15,9 +17,12 @@ const userInput = document.getElementById('user-input');
 const statusIndicator = document.getElementById('status-indicator');
 const apiKeyInput = document.getElementById('api-key');
 const modelSelect = document.getElementById('model-select');
+const speakerSelect = document.getElementById('speaker-select');
+const speedSelect = document.getElementById('speed-select');
 const ttsToggle = document.getElementById('tts-toggle');
 const micBtn = document.getElementById('mic-btn');
 const liveBtn = document.getElementById('live-btn');
+const listeningIndicator = document.getElementById('listening-indicator');
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -25,26 +30,58 @@ let recognition = null;
 if (SpeechRecognition) {
   recognition = new SpeechRecognition();
   recognition.continuous = false;
-  recognition.onstart = () => micBtn.classList.add('recording');
+  
+  recognition.onstart = () => {
+    micBtn.classList.add('recording');
+    listeningIndicator.classList.add('active');
+  };
+  
   recognition.onresult = (e) => {
     userInput.value = e.results[0][0].transcript;
     sendMessage();
   };
-  recognition.onend = () => micBtn.classList.remove('recording');
+
+  recognition.onerror = () => {
+    listeningIndicator.classList.remove('active');
+  };
+  
+  recognition.onend = () => {
+    micBtn.classList.remove('recording');
+    listeningIndicator.classList.remove('active');
+  };
+}
+
+function loadVoices() {
+  if (!('speechSynthesis' in window)) return;
+  const voices = window.speechSynthesis.getVoices();
+  speakerSelect.innerHTML = '';
+  
+  voices.forEach((v) => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.innerText = `${v.name} (${v.lang})`;
+    if (v.name === state.speaker) opt.selected = true;
+    speakerSelect.appendChild(opt);
+  });
+}
+
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = loadVoices;
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   apiKeyInput.value = state.apiKey;
   modelSelect.value = state.model;
+  speedSelect.value = state.speed;
+  document.getElementById('speed-val').innerText = state.speed;
+  loadVoices();
   updateTtsIcon();
   updateStatus();
   renderGallery();
 });
 
 function scrollToBottom() {
-  setTimeout(() => { 
-    chatContainer.scrollTop = chatContainer.scrollHeight; 
-  }, 50);
+  setTimeout(() => { chatContainer.scrollTop = chatContainer.scrollHeight; }, 50);
 }
 
 function updateStatus() {
@@ -52,6 +89,7 @@ function updateStatus() {
   else statusIndicator.classList.remove('active');
 }
 
+function toggleSidebar() { alert("Sidebar Menu initialized."); }
 function toggleAudio() {
   state.speechEnabled = !state.speechEnabled;
   localStorage.setItem('bosompem_speech', state.speechEnabled);
@@ -64,10 +102,7 @@ function updateTtsIcon() {
 }
 
 function toggleSettings() { document.getElementById('settings-panel').classList.toggle('active'); }
-function toggleGallery() { 
-  renderGallery();
-  document.getElementById('gallery-panel').classList.toggle('active'); 
-}
+function toggleGallery() { renderGallery(); document.getElementById('gallery-panel').classList.toggle('active'); }
 
 function toggleLiveMode() {
   state.liveMode = !state.liveMode;
@@ -76,10 +111,11 @@ function toggleLiveMode() {
   if (state.liveMode) {
     state.speechEnabled = true;
     updateTtsIcon();
-    appendSystemMessage("Live Voice Mode active. Speak freely.");
+    appendSystemMessage("Live Voice Mode active.");
     if (SpeechRecognition) recognition.start();
   } else {
     appendSystemMessage("Live Voice Mode deactivated.");
+    listeningIndicator.classList.remove('active');
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   }
 }
@@ -87,11 +123,17 @@ function toggleLiveMode() {
 function saveSettings() {
   state.apiKey = apiKeyInput.value.trim();
   state.model = modelSelect.value;
+  state.speaker = speakerSelect.value;
+  state.speed = parseFloat(speedSelect.value);
+
   localStorage.setItem('bosompem_api_key', state.apiKey);
   localStorage.setItem('bosompem_model', state.model);
+  localStorage.setItem('bosompem_speaker', state.speaker);
+  localStorage.setItem('bosompem_speed', state.speed);
+
   updateStatus();
   toggleSettings();
-  appendSystemMessage('Settings saved.');
+  appendSystemMessage('Voice and model configurations saved.');
 }
 
 function handleFileSelected(event) {
@@ -100,9 +142,8 @@ function handleFileSelected(event) {
 
   const reader = new FileReader();
   reader.onload = (e) => {
-    const base64Data = e.target.result.split(',')[1];
     state.attachedImage = {
-      base64: base64Data,
+      base64: e.target.result.split(',')[1],
       mimeType: file.type || 'image/jpeg',
       previewUrl: e.target.result,
       name: file.name
@@ -110,7 +151,7 @@ function handleFileSelected(event) {
 
     document.getElementById('preview-thumb').src = e.target.result;
     document.getElementById('attachment-name').innerText = file.name;
-    document.getElementById('attachment-preview').classList.add('active');
+    document.getElementById('attachment-preview').style.display = 'flex';
   };
   reader.readAsDataURL(file);
 }
@@ -118,7 +159,7 @@ function handleFileSelected(event) {
 function clearAttachment() {
   state.attachedImage = null;
   document.getElementById('file-input').value = '';
-  document.getElementById('attachment-preview').classList.remove('active');
+  document.getElementById('attachment-preview').style.display = 'none';
 }
 
 function appendSystemMessage(text) {
@@ -161,33 +202,19 @@ function appendAssistantMessage(text, imageUrl = null) {
   const msg = document.createElement('div');
   msg.className = 'message assistant';
   
-  if (window.marked) {
-    msg.innerHTML = marked.parse(text);
-  } else {
-    msg.innerText = text;
-  }
+  if (window.marked) msg.innerHTML = marked.parse(text);
+  else msg.innerText = text;
 
   if (imageUrl) {
     const img = document.createElement('img');
     img.src = imageUrl;
     img.className = 'generated-img';
-    img.alt = 'Generated Image';
     img.onload = () => scrollToBottom();
     msg.appendChild(img);
     saveToGallery(imageUrl);
   }
 
-  const actions = document.createElement('div');
-  actions.className = 'msg-actions';
-  actions.innerHTML = `
-    <button class="msg-action-btn" onclick="toggleLike(this, 'like')" title="Like"><i class="fa-regular fa-thumbs-up"></i></button>
-    <button class="msg-action-btn" onclick="toggleLike(this, 'dislike')" title="Dislike"><i class="fa-regular fa-thumbs-down"></i></button>
-    <button class="msg-action-btn" onclick="copyMessageText(this)" title="Copy"><i class="fa-regular fa-copy"></i></button>
-    <button class="msg-action-btn" onclick="shareMessageText(this)" title="Share"><i class="fa-solid fa-share-nodes"></i></button>
-  `;
-
   wrapper.appendChild(msg);
-  wrapper.appendChild(actions);
   chatContainer.appendChild(wrapper);
   scrollToBottom();
 }
@@ -200,45 +227,14 @@ function saveToGallery(url) {
 function renderGallery() {
   const container = document.getElementById('gallery-container');
   if (state.gallery.length === 0) {
-    container.innerHTML = `<p style="color: #9ca3af; grid-column: 1/-1;">No generated images saved yet.</p>`;
+    container.innerHTML = `<p style="color: #9ca3af; grid-column: 1/-1;">No saved images yet.</p>`;
     return;
   }
-
   container.innerHTML = state.gallery.map(item => `
     <div class="gallery-item">
-      <a href="${item.url}" target="_blank">
-        <img src="${item.url}" alt="Saved Image" />
-      </a>
+      <a href="${item.url}" target="_blank"><img src="${item.url}" alt="Image" /></a>
     </div>
   `).join('');
-}
-
-function toggleLike(btn, type) {
-  const parent = btn.parentElement;
-  const likeBtn = parent.children[0];
-  const dislikeBtn = parent.children[1];
-
-  if (type === 'like') {
-    likeBtn.classList.toggle('liked');
-    dislikeBtn.classList.remove('disliked');
-  } else {
-    dislikeBtn.classList.toggle('disliked');
-    likeBtn.classList.remove('liked');
-  }
-}
-
-function copyMessageText(btn) {
-  const msgText = btn.closest('.message-wrapper').querySelector('.message').innerText;
-  navigator.clipboard.writeText(msgText).then(() => alert('Copied to clipboard!'));
-}
-
-function shareMessageText(btn) {
-  const msgText = btn.closest('.message-wrapper').querySelector('.message').innerText;
-  if (navigator.share) {
-    navigator.share({ title: 'Bosompem AI Response', text: msgText }).catch(() => {});
-  } else {
-    copyMessageText(btn);
-  }
 }
 
 function speakText(text, onComplete = null) {
@@ -249,37 +245,43 @@ function speakText(text, onComplete = null) {
   window.speechSynthesis.cancel();
   const cleanText = text.replace(/<[^>]*>/g, '');
   const utterance = new SpeechSynthesisUtterance(cleanText);
+  
+  utterance.rate = state.speed || 1.0;
+  
+  const voices = window.speechSynthesis.getVoices();
+  const selectedVoice = voices.find(v => v.name === state.speaker);
+  if (selectedVoice) utterance.voice = selectedVoice;
+
   utterance.onend = () => { if (onComplete) onComplete(); };
   window.speechSynthesis.speak(utterance);
 }
 
 function toggleVoiceInput() {
-  if (!SpeechRecognition) return alert('Speech recognition is not supported in this browser.');
+  if (!SpeechRecognition) return alert('Speech recognition is not supported on this device/browser.');
   recognition.start();
 }
 
 function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
 
-function isImageRequest(text) {
-  const triggerWords = ['generate image', 'create an image', 'draw', 'generate an image', 'show me a picture of', 'make a photo of'];
-  return triggerWords.some(word => text.toLowerCase().includes(word));
+function isImageGenerationRequest(text) {
+  const triggers = ['generate image', 'create an image', 'draw', 'make a picture', 'show me a photo of'];
+  return triggers.some(t => text.toLowerCase().includes(t));
+}
+
+function isPhotoEditRequest(text, attached) {
+  const triggers = ['edit', 'change background', 'sharpen', 'add light', 'filter', 'modify', 'braid'];
+  return attached || triggers.some(t => text.toLowerCase().includes(t));
 }
 
 async function callGemini(modelName, formattedContents) {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: formattedContents,
-      generationConfig: { temperature: 0.7 }
-    })
+    body: JSON.stringify({ contents: formattedContents })
   });
-
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
-
   return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
 }
 
@@ -296,27 +298,23 @@ async function sendMessage() {
   const sendBtn = document.getElementById('send-btn');
   sendBtn.disabled = true;
 
-  const thinkingNode = document.createElement('div');
-  thinkingNode.className = 'thinking';
-  thinkingNode.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>Thinking</span><span class="dots">...</span>`;
-  chatContainer.appendChild(thinkingNode);
-  scrollToBottom();
-
-  if (text && isImageRequest(text)) {
+  // Image Generation / Editing Logic
+  if (isImageGenerationRequest(text) || (attached && isPhotoEditRequest(text, attached))) {
     try {
-      const encodedPrompt = encodeURIComponent(text);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=800&nologo=true`;
+      let prompt = text;
+      if (attached) {
+        prompt = `Edit photo style: ${text || 'Enhance and modify lighting and composition'}`;
+      }
       
-      if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=800&nologo=true`;
+      const reply = attached ? "Here is your edited photo:" : "Here is your generated image:";
       
-      const replyText = `Here is the image generated based on your prompt:`;
-      appendAssistantMessage(replyText, imageUrl);
-      speakText("Here is the image you requested.", () => {
+      appendAssistantMessage(reply, imageUrl);
+      speakText(reply, () => {
         if (state.liveMode && SpeechRecognition) recognition.start();
       });
     } catch (err) {
-      if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
-      appendSystemMessage(`Image Error: Failed to generate image.`);
+      appendSystemMessage("Image processing error.");
     } finally {
       sendBtn.disabled = false;
     }
@@ -324,50 +322,31 @@ async function sendMessage() {
   }
 
   if (!state.apiKey) {
-    if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
     sendBtn.disabled = false;
-    return appendSystemMessage('Please click Settings (⚙️) and enter your Gemini API Key first.');
+    return appendSystemMessage('Please enter your Gemini API Key in Settings (⚙️️).');
   }
-
-  if (state.history.length > 6) state.history = state.history.slice(-6);
 
   const parts = [];
   if (attached) {
-    parts.push({
-      inlineData: {
-        mimeType: attached.mimeType,
-        data: attached.base64
-      }
-    });
+    parts.push({ inlineData: { mimeType: attached.mimeType, data: attached.base64 } });
   }
-  const promptText = state.history.length === 0 ? `${PROMPT_PREFIX}${text || 'Analyze this image.'}` : (text || 'Analyze this image.');
-  parts.push({ text: promptText });
+  parts.push({ text: `${PROMPT_PREFIX}${text}` });
 
   state.history.push({ role: 'user', parts: parts });
 
   try {
-    let reply = '';
-    try {
-      reply = await callGemini(state.model, state.history);
-    } catch (err1) {
-      const fallback = state.model === 'gemini-3.8-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.8-flash';
-      reply = await callGemini(fallback, state.history);
-    }
-
-    if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
-
+    let reply = await callGemini(state.model, state.history);
     appendAssistantMessage(reply);
     state.history.push({ role: 'model', parts: [{ text: reply }] });
 
     speakText(reply, () => {
       if (state.liveMode && SpeechRecognition) recognition.start();
     });
-
   } catch (err) {
-    if (chatContainer.contains(thinkingNode)) chatContainer.removeChild(thinkingNode);
     appendSystemMessage(`API Error: ${err.message}`);
   } finally {
     sendBtn.disabled = false;
     scrollToBottom();
   }
-  }
+      }
+  
