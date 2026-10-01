@@ -9,6 +9,14 @@
 </head>
 <body>
 
+  <!-- Listening Wave Indicator (Siri Style Bar) -->
+  <div id="listening-indicator" class="listening-bar">
+    <div class="wave-bar"></div>
+    <div class="wave-bar"></div>
+    <div class="wave-bar"></div>
+    <span style="margin-left: 8px;">Bosompem is listening...</span>
+  </div>
+
   <!-- Header -->
   <header>
     <div class="header-left">
@@ -20,7 +28,7 @@
         <p>Your Personal AI Assistant</p>
       </div>
     </div>
-    <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
+    <button class="liquid-glass-btn" onclick="toggleSettings()" title="Settings"><i class="fa-solid fa-gear"></i></button>
   </header>
 
   <main class="dashboard-container">
@@ -37,72 +45,53 @@
       </div>
     </section>
 
-    <!-- Voice Tap Banner -->
+    <!-- Voice Tap Banner (Hands-Free Live Voice Controller) -->
     <section class="voice-hero-card">
-      <button class="mic-pulse-btn" onclick="toggleLiveMode()">
+      <button id="main-mic-btn" class="mic-pulse-btn" onclick="toggleLiveMode()" title="Toggle Live Voice Mode">
         <i class="fa-solid fa-microphone"></i>
       </button>
-      <h3>Tap to speak</h3>
-      <p>or just say “Hey Bosompem”</p>
+      <h3 id="voice-hero-title">Tap to speak</h3>
+      <p id="voice-status-text">or just say “Hey Bosompem”</p>
     </section>
 
-    <!-- Category Feature Cards -->
+    <!-- Category Feature Cards (Fully Interactive) -->
     <section class="feature-grid">
-      <div class="feature-item">
+      <div class="feature-item" onclick="openChatModal()">
         <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-comment"></i></div>
         <span class="title">Chat</span>
         <span class="sub">Ask anything</span>
       </div>
-      <div class="feature-item">
+      <div class="feature-item" onclick="triggerQuickAction('call')">
         <div class="feature-icon" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
         <span class="title">Calls</span>
         <span class="sub">Make & receive</span>
       </div>
-      <div class="feature-item">
+      <div class="feature-item" onclick="triggerQuickAction('reminder')">
         <div class="feature-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;"><i class="fa-solid fa-calendar-days"></i></div>
         <span class="title">Reminders</span>
         <span class="sub">Never miss</span>
       </div>
-      <div class="feature-item">
+      <div class="feature-item" onclick="triggerQuickAction('tasks')">
         <div class="feature-icon" style="background: rgba(251, 146, 60, 0.15); color: #fb923c;"><i class="fa-solid fa-bolt"></i></div>
         <span class="title">Tasks</span>
         <span class="sub">Get things done</span>
       </div>
-      <div class="feature-item">
+      <div class="feature-item" onclick="triggerQuickAction('apps')">
         <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #a855f7;"><i class="fa-solid fa-border-all"></i></div>
         <span class="title">Apps</span>
         <span class="sub">Control phone</span>
       </div>
     </section>
 
-    <!-- Split Overview / Quick Actions -->
+    <!-- Split Overview / Quick Actions Panel -->
     <div class="dashboard-split">
       <div class="panel-card">
         <div class="panel-header">
           <h4><i class="fa-regular fa-calendar" style="color: #c084fc;"></i> Today's Overview</h4>
-          <a href="#">View all &rarr;</a>
+          <a href="#" onclick="triggerQuickAction('reminder'); return false;">View all &rarr;</a>
         </div>
-        <div class="list-group">
-          <div class="list-item">
-            <div class="item-left">
-              <div class="icon-badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;"><i class="fa-solid fa-check"></i></div>
-              <div class="item-details">
-                <p>No upcoming reminders</p>
-                <span>You're all caught up!</span>
-              </div>
-            </div>
-            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
-          </div>
-          <div class="list-item">
-            <div class="item-left">
-              <div class="icon-badge" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;"><i class="fa-solid fa-list-check"></i></div>
-              <div class="item-details">
-                <p>1 task in progress</p>
-                <span>Check on laptop purchase plan</span>
-              </div>
-            </div>
-            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
-          </div>
+        <div id="overview-reminders-list" class="list-group">
+          <!-- Dynamically populated from state -->
         </div>
       </div>
 
@@ -111,17 +100,38 @@
           <h4><i class="fa-solid fa-bolt" style="color: #fb923c;"></i> Quick Actions</h4>
         </div>
         <div class="list-group">
-          <div class="list-item">
+          <div class="list-item" onclick="triggerQuickAction('call')">
             <div class="item-left">
               <div class="icon-badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
               <div class="item-details"><p>Call someone</p></div>
             </div>
             <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
           </div>
-          <div class="list-item">
+          <div class="list-item" onclick="triggerQuickAction('message')">
             <div class="item-left">
               <div class="icon-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i class="fa-solid fa-message"></i></div>
               <div class="item-details"><p>Send a message</p></div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="list-item" onclick="triggerQuickAction('apps')">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-border-all"></i></div>
+              <div class="item-details"><p>Open an app</p></div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="list-item" onclick="triggerQuickAction('reminder')">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(251, 146, 60, 0.15); color: #fb923c;"><i class="fa-solid fa-clock"></i></div>
+              <div class="item-details"><p>Set a reminder</p></div>
+            </div>
+            <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+          </div>
+          <div class="list-item" onclick="triggerQuickAction('search')">
+            <div class="item-left">
+              <div class="icon-badge" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;"><i class="fa-solid fa-magnifying-glass"></i></div>
+              <div class="item-details"><p>Search the web</p></div>
             </div>
             <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
           </div>
@@ -131,29 +141,66 @@
 
   </main>
 
-  <!-- Navigation Bar -->
+  <!-- Interactive Navigation Bar -->
   <nav class="bottom-nav">
-    <div class="nav-tab active">
+    <div class="nav-tab active" onclick="switchTab('home', this)">
       <i class="fa-solid fa-house"></i>
       <span>Home</span>
     </div>
-    <div class="nav-tab">
+    <div class="nav-tab" onclick="switchTab('chat', this)">
       <i class="fa-solid fa-comment"></i>
       <span>Chat</span>
     </div>
-    <div class="nav-tab">
+    <div class="nav-tab" onclick="switchTab('apps', this)">
       <i class="fa-solid fa-border-all"></i>
       <span>Apps</span>
     </div>
-    <div class="nav-tab">
+    <div class="nav-tab" onclick="switchTab('memory', this)">
       <i class="fa-solid fa-brain"></i>
       <span>Memory</span>
     </div>
-    <div class="nav-tab">
+    <div class="nav-tab" onclick="switchTab('profile', this)">
       <i class="fa-solid fa-user"></i>
       <span>Profile</span>
     </div>
   </nav>
 
+  <!-- Functional Chat View Modal -->
+  <div id="chat-modal" class="modal-overlay">
+    <div class="modal-header">
+      <h2>Bosompem Chat</h2>
+      <button class="liquid-glass-btn" onclick="closeChatModal()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="chat-modal-messages" class="chat-messages-box">
+      <div class="chat-msg assistant">Hello! How can I assist you today?</div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-modal-input" placeholder="Type a command or ask anything..." onkeydown="if(event.key==='Enter') handleChatSubmit()" />
+      <button class="liquid-glass-btn" onclick="handleChatSubmit()"><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-panel" class="modal-overlay">
+    <div class="modal-header">
+      <h2>Preferences</h2>
+      <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="setting-group">
+      <label for="api-key">Gemini API Key</label>
+      <input type="password" id="api-key" placeholder="Paste Gemini API Key here" />
+    </div>
+    <div class="setting-group">
+      <label for="model-select">Primary Model</label>
+      <select id="model-select">
+        <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+        <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+        <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
+      </select>
+    </div>
+    <button class="liquid-glass-btn save-config-btn" onclick="saveSettings()">Save Preferences</button>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
