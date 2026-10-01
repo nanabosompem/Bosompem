@@ -6,271 +6,8 @@
   <title>Bosompem AI</title>
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-    
-    html, body {
-      height: 100%;
-      height: 100dvh;
-      background: radial-gradient(circle at top right, #202436, #0a0c12);
-      color: #f3f4f6;
-      overflow: hidden;
-    }
-
-    body { display: flex; flex-direction: column; position: relative; }
-
-    /* Authentic Liquid Glass Icon Button Styling */
-    .liquid-glass-btn {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.08) 60%, rgba(255, 255, 255, 0.03) 100%);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      box-shadow: 
-        0 8px 20px rgba(0, 0, 0, 0.4),
-        inset 0 2px 3px rgba(255, 255, 255, 0.5),
-        inset 0 -3px 6px rgba(0, 0, 0, 0.3);
-      color: #ffffff;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      flex-shrink: 0;
-    }
-
-    .liquid-glass-btn:hover {
-      background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.15) 60%, rgba(255, 255, 255, 0.05) 100%);
-      border-color: rgba(255, 255, 255, 0.5);
-      transform: translateY(-2px) scale(1.05);
-      box-shadow: 
-        0 12px 28px rgba(0, 0, 0, 0.5),
-        inset 0 2px 4px rgba(255, 255, 255, 0.7),
-        inset 0 -3px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .liquid-glass-btn:active {
-      transform: scale(0.95);
-    }
-
-    /* Top Navigation Header */
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 18px;
-      background: rgba(12, 14, 22, 0.7);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      flex-shrink: 0;
-      z-index: 10;
-    }
-
-    .header-left { display: flex; align-items: center; gap: 14px; }
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #ef4444; transition: all 0.4s ease; }
-    .status-dot.active { background: #10b981; box-shadow: 0 0 12px rgba(16, 185, 129, 0.8); }
-    .title { font-weight: 600; font-size: 1.05rem; letter-spacing: 0.4px; color: #ffffff; }
-
-    /* Animated Sidebar Navigation Drawer */
-    .sidebar-overlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 200;
-      opacity: 0; transition: opacity 0.3s ease;
-    }
-    .sidebar-overlay.active { display: block; opacity: 1; }
-    .sidebar {
-      position: fixed; top: 0; left: -300px; width: 290px; height: 100%;
-      background: rgba(12, 14, 22, 0.92); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-      border-right: 1px solid rgba(255, 255, 255, 0.12); z-index: 201;
-      transition: left 0.35s cubic-bezier(0.16, 1, 0.3, 1); padding: 24px; display: flex; flex-direction: column; gap: 20px;
-    }
-    .sidebar.active { left: 0; }
-    .sidebar-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 16px; }
-    
-    .menu-item {
-      display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 20px;
-      color: #e5e7eb; cursor: pointer; background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08); transition: all 0.25s ease; font-weight: 500;
-    }
-    .menu-item:hover {
-      background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); transform: translateX(4px);
-    }
-
-    /* Main Chat Display */
-    #chat-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      scroll-behavior: smooth;
-    }
-
-    .message-wrapper {
-      display: flex; flex-direction: column; gap: 8px; max-width: 90%;
-      animation: fadeInUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    .message-wrapper.user { align-self: flex-end; }
-    .message-wrapper.assistant { align-self: flex-start; }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(12px) scale(0.98); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .message {
-      padding: 14px 18px;
-      border-radius: 18px;
-      font-size: 0.95rem;
-      line-height: 1.6;
-      word-break: break-word;
-    }
-    .message.user {
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.85), rgba(79, 70, 229, 0.95));
-      color: #ffffff;
-      border-bottom-right-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
-    }
-    .message.assistant {
-      background: rgba(22, 27, 40, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      color: #d1d5db;
-      border-bottom-left-radius: 4px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    }
-    .message.system {
-      align-self: center; background: rgba(239, 68, 68, 0.12); color: #f87171;
-      font-size: 0.85rem; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 20px; padding: 8px 16px;
-    }
-
-    /* Response Liquid Action Bar */
-    .response-action-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 4px;
-      padding-left: 4px;
-    }
-    .action-icon-btn {
-      width: 34px;
-      height: 34px;
-      font-size: 0.85rem;
-    }
-    .action-icon-btn.active { 
-      background: radial-gradient(circle at 35% 30%, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0.2) 100%);
-      border-color: rgba(16, 185, 129, 0.6); 
-      color: #10b981; 
-    }
-
-    .attached-preview-img, .generated-img {
-      max-width: 100%; border-radius: 14px; border: 1px solid rgba(255,255,255,0.18); margin-top: 8px; display: block;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: transform 0.3s ease;
-    }
-    .generated-img:hover { transform: scale(1.01); }
-
-    /* Live Listening Visualizer */
-    .listening-bar {
-      display: none; align-items: center; justify-content: center; gap: 6px;
-      padding: 10px; background: rgba(16, 185, 129, 0.12); border-radius: 14px;
-      border: 1px solid rgba(16, 185, 129, 0.35); color: #10b981; font-size: 0.85rem; font-weight: 500; margin: 0 16px 8px 16px;
-      backdrop-filter: blur(12px); animation: pulseGlow 2s infinite ease-in-out;
-    }
-    .listening-bar.active { display: flex; }
-    .wave-bar { width: 4px; height: 16px; background: #10b981; border-radius: 2px; animation: wave 0.8s infinite ease-in-out; }
-    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
-    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
-    @keyframes wave { 0%, 100% { height: 8px; } 50% { height: 22px; } }
-    @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.1); } 50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); } }
-
-    /* Modals & Sub-Panels */
-    .modal-overlay {
-      display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(11, 13, 20, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-      z-index: 100; padding: 24px; overflow-y: auto; opacity: 0; transition: opacity 0.3s ease;
-    }
-    .modal-overlay.active { display: block; opacity: 1; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-
-    .setting-group { margin-bottom: 20px; }
-    .setting-group label { display: block; font-size: 0.85rem; color: #9ca3af; margin-bottom: 8px; }
-    .setting-group input, .setting-group select {
-      width: 100%; padding: 12px 14px; background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12); color: #f3f4f6; border-radius: 12px; outline: none;
-      transition: border-color 0.2s ease;
-    }
-    .setting-group input:focus, .setting-group select:focus { border-color: rgba(99, 102, 241, 0.6); }
-    .setting-group select option { background: #131722; color: #f3f4f6; }
-
-    /* Working Collapsible Developer Button & Sub-Panel */
-    .sub-panel-trigger {
-      width: 100%; padding: 14px; background: rgba(255,255,255,0.06);
-      border: 1px dashed rgba(255,255,255,0.25); border-radius: 14px; color: #818cf8;
-      display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-      font-size: 0.9rem; font-weight: 500; margin-bottom: 20px; transition: all 0.25s ease;
-      user-select: none;
-    }
-    .sub-panel-trigger:hover { background: rgba(255,255,255,0.12); border-color: rgba(129, 140, 248, 0.6); }
-    
-    .hidden-sub-panel { 
-      display: none; 
-      background: rgba(0,0,0,0.35); 
-      padding: 16px; 
-      border-radius: 14px; 
-      margin-bottom: 20px; 
-      border: 1px solid rgba(255,255,255,0.1); 
-    }
-    .hidden-sub-panel.active { display: block !important; }
-
-    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; margin-top: 16px; }
-    .gallery-item { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.15); aspect-ratio: 1; transition: transform 0.25s ease; }
-    .gallery-item:hover { transform: scale(1.03); }
-    .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
-
-    /* Footer Input Area */
-    footer {
-      padding: 12px 16px; background: rgba(12, 14, 22, 0.7);
-      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid rgba(255, 255, 255, 0.08);
-      display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
-    }
-    .input-bar { display: flex; gap: 10px; align-items: flex-end; }
-    .input-wrapper { flex: 1; display: flex; align-items: center; }
-    
-    textarea#user-input {
-      width: 100%;
-      min-height: 44px;
-      max-height: 140px;
-      padding: 12px 16px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #f3f4f6;
-      border-radius: 22px;
-      outline: none;
-      font-size: 0.95rem;
-      line-height: 1.4;
-      resize: none;
-      overflow-y: auto;
-      transition: border-color 0.25s ease;
-    }
-    textarea#user-input:focus { border-color: rgba(99, 102, 241, 0.6); }
-
-    .live-mode-btn {
-      padding: 0 16px; height: 44px; border-radius: 22px; font-size: 0.85rem;
-      font-weight: 600; gap: 8px; flex-shrink: 0;
-    }
-    .live-mode-btn.active {
-      background: radial-gradient(circle at 35% 30%, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0.2) 100%);
-      border-color: rgba(16, 185, 129, 0.6); color: #10b981;
-    }
-  </style>
 </head>
 <body>
 
@@ -285,19 +22,19 @@
       <button class="liquid-glass-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     
-    <!-- Sidebar Items with Liquid Glass Icons -->
+    <!-- Sidebar Items -->
     <div class="menu-item" onclick="startNewChat()">
-      <button class="liquid-glass-btn" style="width:36px; height:36px; font-size:0.9rem; pointer-events: none;"><i class="fa-solid fa-plus"></i></button>
+      <button class="liquid-glass-btn menu-icon-btn"><i class="fa-solid fa-plus"></i></button>
       <span>New Chat</span>
     </div>
     
     <div class="menu-item" onclick="toggleGallery(); toggleSidebar();">
-      <button class="liquid-glass-btn" style="width:36px; height:36px; font-size:0.9rem; pointer-events: none;"><i class="fa-regular fa-images"></i></button>
+      <button class="liquid-glass-btn menu-icon-btn"><i class="fa-regular fa-images"></i></button>
       <span>Image Gallery</span>
     </div>
     
     <div class="menu-item" onclick="toggleSettings(); toggleSidebar();">
-      <button class="liquid-glass-btn" style="width:36px; height:36px; font-size:0.9rem; pointer-events: none;"><i class="fa-solid fa-gear"></i></button>
+      <button class="liquid-glass-btn menu-icon-btn"><i class="fa-solid fa-gear"></i></button>
       <span>Settings</span>
     </div>
   </aside>
@@ -323,7 +60,7 @@
   <main id="chat-container">
     <div class="message-wrapper assistant">
       <div class="message assistant">
-        Hello! I am <strong>Bosompem AI</strong>. Tap <strong>LIVE</strong> for immediate voice interaction, or ask me to generate or edit high-definition photo visuals!
+        Hello! I am <strong>Bosompem AI</strong>. Tap the headset icon for immediate voice interaction, or ask me to generate or edit high-definition photo visuals!
       </div>
     </div>
   </main>
@@ -363,7 +100,7 @@
       <input type="range" id="speed-select" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speed-val').innerText = this.value" />
     </div>
 
-    <!-- Working Developer & API Button Trigger -->
+    <!-- Collapsible Developer Button & Sub-Panel -->
     <div id="dev-trigger-btn" class="sub-panel-trigger" onclick="toggleDevPanel()">
       <span><i class="fa-solid fa-code" style="margin-right: 8px;"></i> Developer & API Settings</span>
       <i id="dev-chevron" class="fa-solid fa-chevron-down"></i>
@@ -383,14 +120,14 @@
       </div>
     </div>
 
-    <button class="liquid-glass-btn" style="width: 100%; height: auto; padding: 14px; border-radius: 14px; font-weight: 600; background: rgba(99, 102, 241, 0.35);" onclick="saveSettings()">Save Configuration</button>
+    <button class="liquid-glass-btn save-config-btn" onclick="saveSettings()">Save Configuration</button>
   </div>
 
   <footer>
-    <div id="attachment-preview" style="display: none; align-items: center; gap: 10px; background: rgba(255, 255, 255, 0.05); padding: 8px 12px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.12);">
-      <img id="preview-thumb" style="width: 36px; height: 36px; border-radius: 8px; object-fit: cover;" src="" alt="preview" />
-      <span style="font-size: 0.85rem; flex: 1; color: #d1d5db;" id="attachment-name">Image attached</span>
-      <button class="liquid-glass-btn" style="width:30px; height:30px; font-size:0.8rem;" onclick="clearAttachment()"><i class="fa-solid fa-xmark"></i></button>
+    <div id="attachment-preview" class="attachment-preview-box">
+      <img id="preview-thumb" class="preview-thumb" src="" alt="preview" />
+      <span class="attachment-name" id="attachment-name">Image attached</span>
+      <button class="liquid-glass-btn close-preview-btn" onclick="clearAttachment()"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
     <div class="input-bar">
@@ -400,9 +137,9 @@
         <i class="fa-solid fa-paperclip"></i>
       </button>
 
+      <!-- LIVE Mode Button (Icon Only) -->
       <button id="live-btn" class="liquid-glass-btn live-mode-btn" onclick="toggleLiveMode()" title="Talk Live to AI">
         <i class="fa-solid fa-headset"></i>
-        <span>LIVE</span>
       </button>
 
       <div class="input-wrapper">
@@ -413,7 +150,7 @@
         <i class="fa-solid fa-microphone"></i>
       </button>
 
-      <button id="send-btn" class="liquid-glass-btn" style="background: radial-gradient(circle at 35% 30%, rgba(99, 102, 241, 0.7) 0%, rgba(79, 70, 229, 0.4) 100%);" onclick="sendMessage()" title="Send">
+      <button id="send-btn" class="liquid-glass-btn send-btn" onclick="sendMessage()" title="Send">
         <i class="fa-solid fa-arrow-up"></i>
       </button>
     </div>
@@ -421,5 +158,4 @@
 
   <script src="app.js"></script>
 </body>
-                                                                                                                                                                                                                 </html>
-                                                                                                                                                                                                                 
+</html>
