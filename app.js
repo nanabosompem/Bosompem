@@ -1,8 +1,7 @@
 // ==========================================
-// BOSOMPEM AI - ADVANCED RESEARCH & REASONING ENGINE
+// BOSOMPEM AI - ADVANCED RESEARCH ENGINE
 // ==========================================
 
-// System Instruction designed for high-level research and reasoning
 const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an elite AI research assistant and problem-solver. 
 When answering queries, strictly adhere to these standards:
 1. Provide accurate, thoroughly reasoned, and deeply analytical answers.
@@ -15,7 +14,7 @@ const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
   deepResearchMode: localStorage.getItem('bosompem_research_mode') === 'true',
-  activeLiveMode: null, // 'device' or 'chat'
+  activeLiveMode: null,
   
   history: JSON.parse(localStorage.getItem('bosompem_chat_history') || '[]'),
   reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || [
@@ -35,6 +34,17 @@ window.addEventListener('DOMContentLoaded', () => {
   loadSavedSettings();
   updateGreeting();
   renderChatHistory();
+
+  // Scroll to bottom on focus when virtual keyboard triggers
+  const inputEl = document.getElementById('chat-modal-input');
+  if (inputEl) {
+    inputEl.addEventListener('focus', () => {
+      setTimeout(() => {
+        const box = document.getElementById('chat-modal-messages');
+        if (box) box.scrollTop = box.scrollHeight;
+      }, 300);
+    });
+  }
 });
 
 // ==========================================
@@ -79,17 +89,14 @@ async function sendChatMessage(text, isVoiceMode = false) {
 
   appendChatMessage('user', text);
 
-  // Show thinking indicator
   const thinkingId = appendThinkingIndicator();
 
-  // Keep sufficient history context for deep research continuity
   if (state.history.length > 20) state.history = state.history.slice(-20);
   state.history.push({ role: 'user', parts: [{ text }] });
 
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
     
-    // Adjust generation parameters based on Deep Research Mode
     const generationConfig = {
       temperature: state.deepResearchMode ? 0.2 : 0.7,
       topP: 0.95,
@@ -121,7 +128,6 @@ async function sendChatMessage(text, isVoiceMode = false) {
     appendChatMessage('assistant', reply);
 
     if (isVoiceMode) {
-      // Speak a concise summary if in voice mode
       const spokenText = reply.length > 300 ? reply.substring(0, 300) + "... I have displayed the full research breakdown on screen." : reply;
       speakText(spokenText, () => {
         if (state.activeLiveMode === 'chat') startLiveMode('chat');
@@ -133,15 +139,14 @@ async function sendChatMessage(text, isVoiceMode = false) {
   }
 }
 
-// Render formatted Markdown (Bold, Lists, Code)
 function formatMarkdown(str) {
   return str
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>') // Code blocks
-    .replace(/`([^`]+)`/g, '<code>$1</code>')                 // Inline code
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')         // Bold
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')                     // Italics
-    .replace(/\n\n/g, '<br><br>')                             // Paragraph breaks
-    .replace(/\n- /g, '<br>• ');                              // Bullets
+    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n- /g, '<br>• ');
 }
 
 function appendChatMessage(sender, text) {
@@ -158,7 +163,10 @@ function appendChatMessage(sender, text) {
   }
 
   box.appendChild(msg);
-  box.scrollTop = box.scrollHeight;
+  
+  setTimeout(() => {
+    box.scrollTop = box.scrollHeight;
+  }, 100);
 }
 
 function appendThinkingIndicator() {
@@ -171,7 +179,11 @@ function appendThinkingIndicator() {
   indicator.id = id;
   indicator.innerHTML = `<i class="fa-solid fa-brain fa-spin"></i> Researching and analyzing...`;
   box.appendChild(indicator);
-  box.scrollTop = box.scrollHeight;
+  
+  setTimeout(() => {
+    box.scrollTop = box.scrollHeight;
+  }, 100);
+
   return id;
 }
 
@@ -343,6 +355,10 @@ function triggerQuickAction(action) {
 function openChatModal() {
   closeAllModals();
   document.getElementById('chat-modal').classList.add('active');
+  setTimeout(() => {
+    const box = document.getElementById('chat-modal-messages');
+    if (box) box.scrollTop = box.scrollHeight;
+  }, 100);
 }
 
 function closeChatModal() {
@@ -490,4 +506,3 @@ function loadSavedSettings() {
 function captureOwnerVoicePrint() {
   alert("Voice biometric signature capture initialized. Speak clearly into the microphone.");
       }
-    
