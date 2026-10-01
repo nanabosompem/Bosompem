@@ -4,10 +4,9 @@
   --card-border: rgba(255, 255, 255, 0.08);
   --primary-accent: #7c3aed;
   --cyan-accent: #06b6d4;
-  --pink-accent: #d946ef;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --nav-bg: rgba(10, 13, 28, 0.9);
+  --nav-bg: rgba(10, 13, 28, 0.92);
   --radius-xl: 20px;
   --radius-lg: 14px;
 }
@@ -16,23 +15,22 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
+html, body {
+  width: 100%;
+  overflow-x: hidden;
   background-color: var(--bg-color);
   color: var(--text-main);
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow-x: hidden;
-  padding-bottom: 75px;
+  padding-bottom: 80px;
 }
 
-/* Glassmorphism utility */
+/* Glassmorphism Buttons */
 .liquid-glass-btn {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--card-border);
@@ -44,12 +42,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.liquid-glass-btn:active {
-  transform: scale(0.94);
-  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
 }
 
 /* Header */
@@ -74,13 +67,11 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
 }
 
 .brand-info h1 {
   font-size: 1.2rem;
   font-weight: 700;
-  color: #fff;
 }
 
 .brand-info p {
@@ -88,15 +79,17 @@ header {
   color: var(--text-muted);
 }
 
-/* Main Content Container */
+/* Main Dashboard */
 .dashboard-container {
-  padding: 0 20px;
+  padding: 0 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-/* Welcome Section */
+/* Welcome Card */
 .welcome-card {
   display: flex;
   justify-content: space-between;
@@ -105,78 +98,69 @@ header {
 }
 
 .welcome-text h2 {
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.35rem;
   margin-bottom: 6px;
 }
 
 .welcome-text p {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   line-height: 1.4;
-  max-width: 280px;
 }
 
 .promo-badge {
   background: linear-gradient(135deg, rgba(88, 28, 135, 0.4), rgba(30, 27, 75, 0.6));
   border: 1px solid rgba(168, 85, 247, 0.2);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 14px;
+  padding: 10px;
   display: flex;
-  gap: 10px;
-  font-size: 0.75rem;
+  gap: 8px;
+  font-size: 0.72rem;
   color: #c084fc;
-  max-width: 140px;
+  min-width: 120px;
 }
 
-/* Central Voice Mic Banner */
+/* Mic Hero Card */
 .voice-hero-card {
   background: linear-gradient(135deg, #0e072b 0%, #0a1128 100%);
   border: 1px solid rgba(124, 58, 237, 0.25);
   border-radius: var(--radius-xl);
-  padding: 28px 20px;
+  padding: 24px 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  box-shadow: inset 0 0 30px rgba(124, 58, 237, 0.15);
-}
-
-.voice-hero-card::before {
-  content: "";
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, transparent 70%);
-  pointer-events: none;
+  text-align: center;
 }
 
 .mic-pulse-btn {
-  width: 72px;
-  height: 72px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   background: linear-gradient(135deg, #6366f1, #06b6d4);
-  border: 4px solid rgba(255, 255, 255, 0.15);
+  border: 3px solid rgba(255, 255, 255, 0.2);
   color: #fff;
   font-size: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 25px rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
   cursor: pointer;
-  margin-bottom: 12px;
-  transition: transform 0.2s ease;
+  margin-bottom: 10px;
 }
 
-.mic-pulse-btn:active {
-  transform: scale(0.92);
+.mic-pulse-btn.active {
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.8);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
 }
 
 .voice-hero-card h3 {
   font-size: 0.95rem;
-  font-weight: 600;
 }
 
 .voice-hero-card p {
@@ -185,57 +169,51 @@ header {
   margin-top: 4px;
 }
 
-/* Feature Category Grid */
+/* Grid Options */
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 .feature-item {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
-  padding: 14px 6px;
+  padding: 12px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
 }
 
 .feature-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
+  font-size: 0.9rem;
 }
 
 .feature-item span.title {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .feature-item span.sub {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   color: var(--text-muted);
 }
 
-/* Split Content Section (Overview & Quick Actions) */
+/* Overview & Quick Actions Panels */
 .dashboard-split {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 14px;
-}
-
-@media (max-width: 600px) {
-  .dashboard-split {
-    grid-template-columns: 1fr;
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .panel-card {
@@ -249,12 +227,11 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .panel-header h4 {
   font-size: 0.9rem;
-  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -269,19 +246,17 @@ header {
 .list-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .list-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.list-item:last-child {
-  border-bottom: none;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
 }
 
 .item-left {
@@ -291,26 +266,27 @@ header {
 }
 
 .icon-badge {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .item-details p {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 500;
 }
 
 .item-details span {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
 }
 
-/* Bottom Navigation Bar */
+/* Bottom Navigation */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -324,7 +300,7 @@ header {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  z-index: 100;
+  z-index: 90;
 }
 
 .nav-tab {
@@ -334,7 +310,6 @@ header {
   gap: 4px;
   color: var(--text-muted);
   font-size: 0.7rem;
-  text-decoration: none;
   cursor: pointer;
 }
 
@@ -342,6 +317,132 @@ header {
   color: #a855f7;
 }
 
-.nav-tab i {
-  font-size: 1.1rem;
+/* Fixed Overlay Modals (Chat & Settings) */
+.modal-overlay {
+  display: none; /* Hidden by default */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(5, 7, 20, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 999;
+  padding: 20px;
+  box-sizing: border-box;
+  flex-direction: column;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.chat-messages-box {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.chat-msg {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.chat-msg.assistant {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  align-self: flex-start;
+}
+
+.chat-msg.user {
+  background: var(--primary-accent);
+  color: #fff;
+  align-self: flex-end;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input-row input, .setting-group input, .setting-group select {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.setting-group label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.save-config-btn {
+  width: 100%;
+  border-radius: 12px;
+  height: 48px;
+  background: var(--primary-accent);
+  border: none;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+/* Top Siri Listening Indicator */
+.listening-bar {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: rgba(124, 58, 237, 0.2);
+  border-bottom: 1px solid rgba(168, 85, 247, 0.3);
+  font-size: 0.75rem;
+  color: #c084fc;
+  gap: 6px;
+}
+
+.listening-bar.active {
+  display: flex;
+}
+
+.wave-bar {
+  width: 3px;
+  height: 12px;
+  background: #c084fc;
+  border-radius: 2px;
+  animation: wave 1s infinite ease-in-out;
+}
+
+.wave-bar:nth-child(2) { animation-delay: 0.2s; }
+.wave-bar:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes wave {
+  0%, 100% { height: 6px; }
+  50% { height: 16px; }
 }
