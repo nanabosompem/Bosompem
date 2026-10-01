@@ -1,44 +1,41 @@
-const PROMPT_PREFIX = "You are Bosompem, an advanced AI assistant capable of photo editing, high-definition text generation, and clear conversation.\n\nUser Request: ";
-
+// --- Bosompem Assistant Core State ---
 const state = {
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
-  speechEnabled: localStorage.getItem('bosompem_speech') !== 'false',
   speaker: localStorage.getItem('bosompem_speaker') || '',
   speed: parseFloat(localStorage.getItem('bosompem_speed') || '1.0'),
   liveMode: false,
+  wakeWordListening: true,
   history: [],
-  gallery: JSON.parse(localStorage.getItem('bosompem_gallery') || '[]'),
-  attachedImage: null
+  reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]'),
+  tasks: JSON.parse(localStorage.getItem('bosompem_tasks') || '[]'),
+  activeTab: 'home'
 };
-
-const chatContainer = document.getElementById('chat-container');
-const userInput = document.getElementById('user-input');
-const statusIndicator = document.getElementById('status-indicator');
-const apiKeyInput = document.getElementById('api-key');
-const modelSelect = document.getElementById('model-select');
-const speakerSelect = document.getElementById('speaker-select');
-const speedSelect = document.getElementById('speed-select');
-const micBtn = document.getElementById('mic-btn');
-const liveBtn = document.getElementById('live-btn');
-const listeningIndicator = document.getElementById('listening-indicator');
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
+let wakeWordRecognizer = null;
 
-if (SpeechRecognition) {
+// --- Initialize Hands-Free Voice Engine ---
+function initVoiceEngine() {
+  if (!SpeechRecognition) {
+    console.warn('Speech Recognition API not supported in this environment.');
+    return;
+  }
+
+  // Active Command Recognizer
   recognition = new SpeechRecognition();
   recognition.continuous = false;
   recognition.interimResults = true;
-  
+
   recognition.onstart = () => {
-    listeningIndicator.classList.add('active');
+    updateListeningUI(true);
   };
-  
+
   recognition.onresult = (e) => {
     let interim = '';
     let finalTranscript = '';
-    
+
     for (let i = e.resultIndex; i < e.results.length; ++i) {
       if (e.results[i].isFinal) {
         finalTranscript += e.results[i][0].transcript;
@@ -47,444 +44,407 @@ if (SpeechRecognition) {
       }
     }
 
-    if (interim) userInput.value = interim;
+    const liveTextNode = document.getElementById('voice-status-text');
+    if (liveTextNode) liveTextNode.innerText = interim || finalTranscript || "Listening...";
+
     if (finalTranscript) {
-      userInput.value = finalTranscript;
-      sendMessage();
+      handleVoiceCommand(finalTranscript);
     }
   };
 
-  recognition.onerror = () => {
-    listeningIndicator.classList.remove('active');
+  recognition.onerror = (e) => {
+    updateListeningUI(false);
+    if (state.liveMode) restartWakeWordDetection();
   };
-  
+
   recognition.onend = () => {
-    listeningIndicator.classList.remove('active');
-  };
-}
-
-function loadVoices() {
-  if (!('speechSynthesis' in window)) return;
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return;
-
-  speakerSelect.innerHTML = '';
-  
-  voices.forEach((v) => {
-    const opt = document.createElement('option');
-    opt.value = v.name;
-    opt.innerText = `${v.name} (${v.lang})`;
-    if (v.name === state.speaker || (!state.speaker && v.default)) {
-      opt.selected = true;
-      state.speaker = v.name;
+    updateListeningUI(false);
+    if (state.liveMode) {
+      // Re-enable background wake-word listener if hands-free live mode stays active
+      restartWakeWordDetection();
     }
-    speakerSelect.appendChild(opt);
-  });
+  };
+
+  // Background Wake Word Detector ("Hey Bosompem")
+  wakeWordRecognizer = new SpeechRecognition();
+  wakeWordRecognizer.continuous = true;
+  wakeWordRecognizer.interimResults = true;
+
+  wakeWordRecognizer.onresult = (e) => {
+    for (let i = e.resultIndex; i < e.results.length; ++i) {
+      const phrase = e.results[i][0].transcript.toLowerCase();
+      if (phrase.includes('hey bosompem') || phrase.includes('bosompem')) {
+        wakeWordRecognizer.stop();
+        speakText("I'm listening", () => {
+          activateLiveMode();
+        });
+        break;
+      }
+    }
+  };
+
+  wakeWordRecognizer.onend = () => {
+    if (state.wakeWordListening && !state.liveMode) {
+      try { wakeWordRecognizer.start(); } catch (err) {}
+    }
+  };
+
+  startWakeWordDetection();
 }
 
-if ('speechSynthesis' in window) {
-  window.speechSynthesis.onvoiceschanged = loadVoices;
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  apiKeyInput.value = state.apiKey;
-  modelSelect.value = state.model;
-  speedSelect.value = state.speed;
-  document.getElementById('speed-val').innerText = state.speed;
-  
-  loadVoices();
-  setTimeout(loadVoices, 500);
-  
-  updateStatus();
-  renderGallery();
-});
-
-/* Collapsible Developer Panel Toggle */
-function toggleDevPanel() {
-  const panel = document.getElementById('dev-panel');
-  const chevron = document.getElementById('dev-chevron');
-
-  if (panel.classList.contains('active')) {
-    panel.classList.remove('active');
-    chevron.className = 'fa-solid fa-chevron-down';
-  } else {
-    panel.classList.add('active');
-    chevron.className = 'fa-solid fa-chevron-up';
+function startWakeWordDetection() {
+  if (wakeWordRecognizer && state.wakeWordListening && !state.liveMode) {
+    try { wakeWordRecognizer.start(); } catch (err) {}
   }
 }
 
-/* Dynamic Text Expansion */
-function autoExpandInput(element) {
-  element.style.height = 'auto';
-  element.style.height = Math.min(element.scrollHeight, 200) + 'px';
+function restartWakeWordDetection() {
+  setTimeout(() => { startWakeWordDetection(); }, 1000);
 }
 
-function handleKeyDown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-}
-
-function scrollToBottom() {
-  setTimeout(() => { chatContainer.scrollTop = chatContainer.scrollHeight; }, 50);
-}
-
-function updateStatus() {
-  if (state.apiKey && state.apiKey.length > 10) statusIndicator.classList.add('active');
-  else statusIndicator.classList.remove('active');
-}
-
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('active');
-  document.getElementById('sidebar-overlay').classList.toggle('active');
-}
-
-function startNewChat() {
-  state.history = [];
-  chatContainer.innerHTML = `
-    <div class="message-wrapper assistant">
-      <div class="message assistant">New conversation started. How can I help you today?</div>
-    </div>`;
-  toggleSidebar();
-  appendSystemMessage("Chat reset successfully.");
-}
-
-function toggleSettings() { 
-  loadVoices();
-  document.getElementById('settings-panel').classList.toggle('active'); 
-}
-
-function toggleGallery() { 
-  renderGallery(); 
-  document.getElementById('gallery-panel').classList.toggle('active'); 
-}
-
+// --- Live Chat Mode Switcher ---
 function toggleLiveMode() {
-  state.liveMode = !state.liveMode;
-  liveBtn.classList.toggle('active', state.liveMode);
-  
   if (state.liveMode) {
-    state.speechEnabled = true;
-    appendSystemMessage("Live Voice Mode active.");
-    if (SpeechRecognition) recognition.start();
+    deactivateLiveMode();
   } else {
-    appendSystemMessage("Live Voice Mode deactivated.");
-    listeningIndicator.classList.remove('active');
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    activateLiveMode();
   }
 }
 
-function saveSettings() {
-  state.apiKey = apiKeyInput.value.trim();
-  state.model = modelSelect.value;
-  state.speaker = speakerSelect.value;
-  state.speed = parseFloat(speedSelect.value);
-
-  localStorage.setItem('bosompem_api_key', state.apiKey);
-  localStorage.setItem('bosompem_model', state.model);
-  localStorage.setItem('bosompem_speaker', state.speaker);
-  localStorage.setItem('bosompem_speed', state.speed);
-
-  updateStatus();
-  toggleSettings();
-  appendSystemMessage('Preferences saved.');
-}
-
-function handleFileSelected(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    state.attachedImage = {
-      base64: e.target.result.split(',')[1],
-      mimeType: file.type || 'image/jpeg',
-      previewUrl: e.target.result,
-      name: file.name
-    };
-
-    document.getElementById('preview-thumb').src = e.target.result;
-    document.getElementById('attachment-name').innerText = file.name;
-    document.getElementById('attachment-preview').style.display = 'flex';
-  };
-  reader.readAsDataURL(file);
-}
-
-function clearAttachment() {
-  state.attachedImage = null;
-  document.getElementById('file-input').value = '';
-  document.getElementById('attachment-preview').style.display = 'none';
-}
-
-function appendSystemMessage(text) {
-  const msgNode = document.createElement('div');
-  msgNode.className = 'message system';
-  msgNode.innerText = text;
-  chatContainer.appendChild(msgNode);
-  scrollToBottom();
-}
-
-function appendUserMessage(text, attachedImg = null) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message-wrapper user';
-
-  const msg = document.createElement('div');
-  msg.className = 'message user';
-
-  if (attachedImg) {
-    const img = document.createElement('img');
-    img.src = attachedImg.previewUrl;
-    img.className = 'attached-preview-img';
-    msg.appendChild(img);
+function activateLiveMode() {
+  state.liveMode = true;
+  if (wakeWordRecognizer) {
+    try { wakeWordRecognizer.stop(); } catch (err) {}
   }
 
-  if (text) {
-    const textSpan = document.createElement('span');
-    textSpan.innerText = text;
-    msg.appendChild(textSpan);
-  }
+  const micBtn = document.getElementById('main-mic-btn');
+  if (micBtn) micBtn.classList.add('active');
 
-  wrapper.appendChild(msg);
-  chatContainer.appendChild(wrapper);
-  scrollToBottom();
+  const liveTextNode = document.getElementById('voice-status-text');
+  if (liveTextNode) liveTextNode.innerText = "Listening... Speak your command";
+
+  if (recognition) {
+    try { recognition.start(); } catch (err) {}
+  }
 }
 
-function appendAssistantMessage(text, imageUrl = null) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message-wrapper assistant';
+function deactivateLiveMode() {
+  state.liveMode = false;
+  const micBtn = document.getElementById('main-mic-btn');
+  if (micBtn) micBtn.classList.remove('active');
 
-  const msg = document.createElement('div');
-  msg.className = 'message assistant';
-  
-  if (window.marked) msg.innerHTML = marked.parse(text);
-  else msg.innerText = text;
+  const liveTextNode = document.getElementById('voice-status-text');
+  if (liveTextNode) liveTextNode.innerText = 'or just say "Hey Bosompem"';
 
-  if (imageUrl) {
-    const img = document.createElement('img');
-    img.src = imageUrl;
-    img.className = 'generated-img';
-    img.onload = () => scrollToBottom();
-    msg.appendChild(img);
-    saveToGallery(imageUrl);
+  if (recognition) {
+    try { recognition.stop(); } catch (err) {}
   }
 
-  wrapper.appendChild(msg);
-
-  // Response Liquid Glass Action Bar
-  const actionBar = document.createElement('div');
-  actionBar.className = 'response-action-bar';
-
-  const rawText = text.replace(/<[^>]*>/g, '');
-
-  actionBar.innerHTML = `
-    <button class="liquid-glass-btn action-icon-btn" onclick="speakSpecificText('${encodeURIComponent(rawText)}', this)" title="Listen to text">
-      <i class="fa-solid fa-volume-high"></i>
-    </button>
-    <button class="liquid-glass-btn action-icon-btn" onclick="copyResponseText('${encodeURIComponent(rawText)}', this)" title="Copy text">
-      <i class="fa-regular fa-copy"></i>
-    </button>
-    <button class="liquid-glass-btn action-icon-btn" onclick="toggleFeedback(this, 'like')" title="Good response">
-      <i class="fa-regular fa-thumbs-up"></i>
-    </button>
-    <button class="liquid-glass-btn action-icon-btn" onclick="toggleFeedback(this, 'dislike')" title="Bad response">
-      <i class="fa-regular fa-thumbs-down"></i>
-    </button>
-  `;
-
-  wrapper.appendChild(actionBar);
-  chatContainer.appendChild(wrapper);
-  scrollToBottom();
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  startWakeWordDetection();
 }
 
-function speakSpecificText(encodedText, btnNode) {
-  const text = decodeURIComponent(encodedText);
-  if (!('speechSynthesis' in window)) return;
+function updateListeningUI(isListening) {
+  const statusIndicator = document.getElementById('listening-indicator');
+  if (statusIndicator) {
+    if (isListening) statusIndicator.classList.add('active');
+    else statusIndicator.classList.remove('active');
+  }
+}
 
-  if (window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel();
-    btnNode.classList.remove('active');
+// --- Device Control & Command Processor ---
+async function handleVoiceCommand(rawQuery) {
+  const query = rawQuery.toLowerCase().trim();
+
+  // 1. Phone Call Intent
+  if (query.startsWith('call ') || query.includes('make a call')) {
+    const contact = query.replace('call', '').replace('make a call to', '').trim();
+    const target = contact || 'Contacts';
+    speakText(`Initiating phone call to ${target}`);
+    window.location.href = `tel:${encodeURIComponent(target)}`;
     return;
   }
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = state.speed || 1.0;
-  
-  const voices = window.speechSynthesis.getVoices();
-  const selectedVoice = voices.find(v => v.name === state.speaker);
-  if (selectedVoice) utterance.voice = selectedVoice;
+  // 2. Messaging Intent
+  if (query.startsWith('send a message') || query.startsWith('text ')) {
+    const msg = query.replace('send a message to', '').replace('text', '').trim();
+    speakText("Opening messaging interface");
+    window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
+    return;
+  }
 
-  btnNode.classList.add('active');
+  // 3. Web Search Intent
+  if (query.startsWith('search the web') || query.startsWith('search for')) {
+    const searchTerm = query.replace('search the web for', '').replace('search for', '').trim();
+    speakText(`Searching the web for ${searchTerm}`);
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(searchTerm)}`, '_blank');
+    return;
+  }
 
-  utterance.onend = () => { btnNode.classList.remove('active'); };
-  utterance.onerror = () => { btnNode.classList.remove('active'); };
+  // 4. Set Reminder Intent
+  if (query.includes('remind me') || query.startsWith('set a reminder')) {
+    const reminderText = query.replace('set a reminder to', '').replace('remind me to', '').trim();
+    addReminder(reminderText || 'New Voice Reminder');
+    speakText(`Reminder set for: ${reminderText || 'New Voice Reminder'}`);
+    return;
+  }
 
-  window.speechSynthesis.speak(utterance);
+  // 5. Open Apps Intent
+  if (query.startsWith('open ')) {
+    const appName = query.replace('open', '').trim();
+    speakText(`Opening ${appName}`);
+    openAppAction(appName);
+    return;
+  }
+
+  // Default: Process via Gemini LLM Engine
+  await processAssistantQuery(rawQuery);
 }
 
-/* Functional Clipboard Copy Handler */
-async function copyResponseText(encodedText, btnNode) {
-  const text = decodeURIComponent(encodedText);
+// --- Gemini API Handler ---
+async function processAssistantQuery(text) {
+  if (!state.apiKey) {
+    const notice = "Gemini API Key is required. Please set your key in Settings.";
+    speakText(notice);
+    alert(notice);
+    return;
+  }
+
+  const PROMPT_PREFIX = "You are Bosompem, a smart personal assistant capable of hands-free device automation and natural conversation. Keep answers concise and direct for spoken output.\n\nUser: ";
+  
+  state.history.push({ role: 'user', parts: [{ text: `${PROMPT_PREFIX}${text}` }] });
+
   try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-    }
-    
-    const originalIcon = btnNode.innerHTML;
-    btnNode.innerHTML = `<i class="fa-solid fa-check" style="color: #10b981;"></i>`;
-    setTimeout(() => { btnNode.innerHTML = originalIcon; }, 2000);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: state.history })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'API Request failed');
+
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't process that request.";
+    state.history.push({ role: 'model', parts: [{ text: responseText }] });
+
+    appendChatMessage('assistant', responseText);
+
+    speakText(responseText, () => {
+      if (state.liveMode) {
+        // Automatically listen again for hands-free loop
+        if (recognition) try { recognition.start(); } catch (e) {}
+      }
+    });
+
   } catch (err) {
-    console.error('Failed to copy: ', err);
+    const errText = `Sorry, I ran into an error: ${err.message}`;
+    speakText(errText);
+    console.error(errText);
   }
 }
 
-function toggleFeedback(btnNode, type) {
-  const parent = btnNode.parentElement;
-  const buttons = parent.querySelectorAll('.action-icon-btn');
-  
-  buttons.forEach(btn => {
-    if (btn === btnNode) {
-      btn.classList.toggle('active');
-    } else if (btn.title.includes('Good') || btn.title.includes('Bad')) {
-      btn.classList.remove('active');
-    }
-  });
-}
-
-function saveToGallery(url) {
-  state.gallery.unshift({ url, timestamp: new Date().toISOString() });
-  localStorage.setItem('bosompem_gallery', JSON.stringify(state.gallery));
-}
-
-function renderGallery() {
-  const container = document.getElementById('gallery-container');
-  if (state.gallery.length === 0) {
-    container.innerHTML = `<p style="color: #9ca3af; grid-column: 1/-1;">No saved images yet.</p>`;
-    return;
-  }
-  container.innerHTML = state.gallery.map(item => `
-    <div class="gallery-item">
-      <a href="${item.url}" target="_blank"><img src="${item.url}" alt="Image" /></a>
-    </div>
-  `).join('');
-}
-
+// --- Text To Speech Output ---
 function speakText(text, onComplete = null) {
-  if (!state.speechEnabled || !('speechSynthesis' in window)) {
+  if (!('speechSynthesis' in window)) {
     if (onComplete) onComplete();
     return;
   }
+
   window.speechSynthesis.cancel();
   const cleanText = text.replace(/<[^>]*>/g, '');
   const utterance = new SpeechSynthesisUtterance(cleanText);
-  
+
   utterance.rate = state.speed || 1.0;
-  
+
   const voices = window.speechSynthesis.getVoices();
   const selectedVoice = voices.find(v => v.name === state.speaker);
   if (selectedVoice) utterance.voice = selectedVoice;
 
   utterance.onend = () => { if (onComplete) onComplete(); };
+  utterance.onerror = () => { if (onComplete) onComplete(); };
+
   window.speechSynthesis.speak(utterance);
 }
 
-function toggleVoiceInput() {
-  if (!SpeechRecognition) return alert('Speech recognition is not supported on this browser.');
-  recognition.start();
+// --- UI Interaction Handlers for All Buttons & Cards ---
+
+function switchTab(tabName, element) {
+  state.activeTab = tabName;
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  if (element) element.classList.add('active');
+
+  if (tabName === 'chat') {
+    openChatModal();
+  } else if (tabName === 'apps') {
+    triggerQuickAction('apps');
+  } else if (tabName === 'memory') {
+    showMemoryOverview();
+  } else if (tabName === 'profile') {
+    toggleSettings();
+  }
 }
 
-function isImageGenerationRequest(text) {
-  const triggers = ['generate image', 'create an image', 'draw', 'make a picture', 'show me a photo of', 'picture of'];
-  return triggers.some(t => text.toLowerCase().includes(t));
+function openChatModal() {
+  const chatModal = document.getElementById('chat-modal');
+  if (chatModal) chatModal.classList.add('active');
 }
 
-function isPhotoEditRequest(text, attached) {
-  const triggers = ['edit', 'change background', 'sharpen', 'add light', 'filter', 'modify', 'braid', 'enhance'];
-  return attached || triggers.some(t => text.toLowerCase().includes(t));
+function closeChatModal() {
+  const chatModal = document.getElementById('chat-modal');
+  if (chatModal) chatModal.classList.remove('active');
 }
 
-async function callGemini(modelName, formattedContents) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: formattedContents })
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response received.';
+function triggerQuickAction(actionType) {
+  switch (actionType) {
+    case 'call':
+      const name = prompt('Enter recipient name or phone number:');
+      if (name) {
+        speakText(`Calling ${name}`);
+        window.location.href = `tel:${encodeURIComponent(name)}`;
+      }
+      break;
+    case 'message':
+      const target = prompt('Enter message text:');
+      if (target) {
+        speakText("Opening messages");
+        window.location.href = `sms:?body=${encodeURIComponent(target)}`;
+      }
+      break;
+    case 'reminder':
+      const rem = prompt('What should I remind you about?');
+      if (rem) {
+        addReminder(rem);
+        speakText(`Reminder added: ${rem}`);
+      }
+      break;
+    case 'tasks':
+      const taskText = prompt('Enter new task detail:');
+      if (taskText) {
+        addTask(taskText);
+        speakText(`Task added: ${taskText}`);
+      }
+      break;
+    case 'search':
+      const query = prompt('Search query:');
+      if (query) {
+        speakText(`Searching for ${query}`);
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+      }
+      break;
+    case 'apps':
+      alert('Available Apps & Commands:\n- Camera\n- Settings\n- Calendar\n- Web Browser\n- Music');
+      break;
+  }
 }
 
-async function sendMessage() {
-  const text = userInput.value.trim();
-  const attached = state.attachedImage;
+function openAppAction(appName) {
+  const app = appName.toLowerCase();
+  if (app.includes('camera')) {
+    window.open('about:blank', '_blank');
+  } else if (app.includes('web') || app.includes('browser')) {
+    window.open('https://google.com', '_blank');
+  } else {
+    alert(`Opening ${appName}`);
+  }
+}
 
-  if (!text && !attached) return;
+function addReminder(text) {
+  state.reminders.unshift({ id: Date.now(), text, time: new Date().toLocaleTimeString() });
+  localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
+  renderRemindersUI();
+}
 
-  appendUserMessage(text, attached);
-  userInput.value = '';
-  userInput.style.height = '44px';
-  clearAttachment();
+function addTask(text) {
+  state.tasks.unshift({ id: Date.now(), text, completed: false });
+  localStorage.setItem('bosompem_tasks', JSON.stringify(state.tasks));
+}
 
-  const sendBtn = document.getElementById('send-btn');
-  sendBtn.disabled = true;
+function renderRemindersUI() {
+  const container = document.getElementById('overview-reminders-list');
+  if (!container) return;
 
-  if (isImageGenerationRequest(text) || (attached && isPhotoEditRequest(text, attached))) {
-    try {
-      const cleanPrompt = text ? text.replace(/(generate|create|draw|make|show me a photo of)/gi, '').trim() : 'professional studio photograph, crisp detail, cinematic studio lighting, high resolution';
-      const enhancedPrompt = attached 
-        ? `HD professional photograph edit, clear face, detailed lighting, sharp focus, ${cleanPrompt}`
-        : `ultra-clean realistic photograph, high resolution 8k, detailed composition, studio quality: ${cleanPrompt}`;
-
-      const seed = Math.floor(Math.random() * 1000000);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1024&height=1024&seed=${seed}&nologo=true&enhance=true`;
-      
-      const reply = attached ? "Here is your edited photo:" : "Here is your clean generated photo:";
-      
-      appendAssistantMessage(reply, imageUrl);
-      speakText(reply, () => {
-        if (state.liveMode && SpeechRecognition) recognition.start();
-      });
-    } catch (err) {
-      appendSystemMessage("Image processing error.");
-    } finally {
-      sendBtn.disabled = false;
-    }
+  if (state.reminders.length === 0) {
+    container.innerHTML = `
+      <div class="list-item">
+        <div class="item-left">
+          <div class="icon-badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;"><i class="fa-solid fa-check"></i></div>
+          <div class="item-details">
+            <p>No upcoming reminders</p>
+            <span>You're all caught up!</span>
+          </div>
+        </div>
+      </div>`;
     return;
   }
 
-  if (!state.apiKey) {
-    sendBtn.disabled = false;
-    return appendSystemMessage('Please configure your Gemini API Key under Settings > Developer & API Settings.');
-  }
-
-  const parts = [];
-  if (attached) {
-    parts.push({ inlineData: { mimeType: attached.mimeType, data: attached.base64 } });
-  }
-  parts.push({ text: `${PROMPT_PREFIX}${text}` });
-
-  state.history.push({ role: 'user', parts: parts });
-
-  try {
-    let reply = await callGemini(state.model, state.history);
-    appendAssistantMessage(reply);
-    state.history.push({ role: 'model', parts: [{ text: reply }] });
-
-    speakText(reply, () => {
-      if (state.liveMode && SpeechRecognition) recognition.start();
-    });
-  } catch (err) {
-    appendSystemMessage(`API Error: ${err.message}`);
-  } finally {
-    sendBtn.disabled = false;
-    scrollToBottom();
-  }
+  container.innerHTML = state.reminders.slice(0, 3).map(r => `
+    <div class="list-item">
+      <div class="item-left">
+        <div class="icon-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;"><i class="fa-solid fa-clock"></i></div>
+        <div class="item-details">
+          <p>${r.text}</p>
+          <span>${r.time}</span>
+        </div>
+      </div>
+      <i class="fa-solid fa-chevron-right" style="font-size: 0.7rem; color: var(--text-muted);"></i>
+    </div>
+  `).join('');
 }
+
+function showMemoryOverview() {
+  alert(`Bosompem Memory Status:\n\nActive History Items: ${state.history.length}\nSaved Reminders: ${state.reminders.length}\nSaved Tasks: ${state.tasks.length}`);
+}
+
+function appendChatMessage(role, text) {
+  const container = document.getElementById('chat-modal-messages');
+  if (!container) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = `chat-msg ${role}`;
+  wrapper.innerText = text;
+  container.appendChild(wrapper);
+  container.scrollTop = container.scrollHeight;
+}
+
+function handleChatSubmit() {
+  const input = document.getElementById('chat-modal-input');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  appendChatMessage('user', text);
+  input.value = '';
+  processAssistantQuery(text);
+}
+
+function toggleSettings() {
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.classList.toggle('active');
+}
+
+function saveSettings() {
+  const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
+
+  if (keyInput) state.apiKey = keyInput.value.trim();
+  if (modelSelect) state.model = modelSelect.value;
+
+  localStorage.setItem('bosompem_api_key', state.apiKey);
+  localStorage.setItem('bosompem_model', state.model);
+
+  toggleSettings();
+  speakText("Settings saved successfully");
+}
+
+// --- Initial Startup Lifecycle ---
+window.addEventListener('DOMContentLoaded', () => {
+  initVoiceEngine();
+  renderRemindersUI();
+
+  const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
+  if (keyInput) keyInput.value = state.apiKey;
+  if (modelSelect) modelSelect.value = state.model;
+});
+      
