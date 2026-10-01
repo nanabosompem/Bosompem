@@ -380,7 +380,7 @@ header {
 
 .online-indicator {
   font-size: 0.72rem;
-  color: var(--green-accent);
+  color: var(--cyan-accent);
 }
 
 .chat-messages-box {
@@ -392,12 +392,13 @@ header {
   margin-bottom: 16px;
 }
 
+/* Markdown Support in Chat Messages */
 .chat-msg {
-  max-width: 85%;
-  padding: 12px 16px;
+  max-width: 90%;
+  padding: 14px 18px;
   border-radius: 16px;
   font-size: 0.88rem;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .chat-msg.assistant {
@@ -406,10 +407,30 @@ header {
   align-self: flex-start;
 }
 
+.chat-msg.assistant.thinking {
+  color: var(--cyan-accent);
+  font-style: italic;
+}
+
 .chat-msg.user {
   background: var(--primary-accent);
   color: #fff;
   align-self: flex-end;
+}
+
+.chat-msg pre {
+  background: rgba(0,0,0,0.4);
+  padding: 10px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-family: monospace;
+}
+
+.chat-msg code {
+  background: rgba(255,255,255,0.1);
+  padding: 2px 5px;
+  border-radius: 4px;
 }
 
 .chat-input-row {
@@ -480,4 +501,4 @@ header {
 @keyframes wave {
   0%, 100% { height: 6px; }
   50% { height: 16px; }
-}
+  }
