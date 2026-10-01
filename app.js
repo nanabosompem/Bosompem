@@ -447,4 +447,19 @@ window.addEventListener('DOMContentLoaded', () => {
   if (keyInput) keyInput.value = state.apiKey;
   if (modelSelect) modelSelect.value = state.model;
 });
-      
+  // Safely initialize hands-free voice listeners on user action
+function toggleLiveMode() {
+  if (state.liveMode) {
+    deactivateLiveMode();
+  } else {
+    // Request mic access gracefully
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => {
+        activateLiveMode();
+      })
+      .catch((err) => {
+        alert("Microphone permission is required for Live Mode.");
+      });
+  }
+}
+
