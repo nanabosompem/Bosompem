@@ -4,9 +4,10 @@
   --card-border: rgba(255, 255, 255, 0.08);
   --primary-accent: #7c3aed;
   --cyan-accent: #06b6d4;
+  --green-accent: #22c55e;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --nav-bg: rgba(10, 13, 28, 0.92);
+  --nav-bg: rgba(10, 13, 28, 0.95);
   --radius-xl: 20px;
   --radius-lg: 14px;
 }
@@ -25,10 +26,10 @@ html, body {
   background-color: var(--bg-color);
   color: var(--text-main);
   min-height: 100vh;
-  padding-bottom: 80px;
+  padding-bottom: 90px;
 }
 
-/* Glassmorphism Buttons */
+/* Glass Buttons */
 .liquid-glass-btn {
   background: rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(12px);
@@ -36,8 +37,8 @@ html, body {
   border: 1px solid var(--card-border);
   color: var(--text-main);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -45,7 +46,6 @@ html, body {
   flex-shrink: 0;
 }
 
-/* Header */
 header {
   padding: 16px 20px;
   display: flex;
@@ -79,7 +79,6 @@ header {
   color: var(--text-muted);
 }
 
-/* Main Dashboard */
 .dashboard-container {
   padding: 0 16px;
   display: flex;
@@ -89,17 +88,19 @@ header {
   margin: 0 auto;
 }
 
-/* Welcome Card */
+/* Welcome Header Card */
 .welcome-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
+  padding: 16px;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .welcome-text h2 {
-  font-size: 1.35rem;
-  margin-bottom: 6px;
+  font-size: 1.25rem;
 }
 
 .welcome-text p {
@@ -108,68 +109,79 @@ header {
   line-height: 1.4;
 }
 
-.promo-badge {
-  background: linear-gradient(135deg, rgba(88, 28, 135, 0.4), rgba(30, 27, 75, 0.6));
-  border: 1px solid rgba(168, 85, 247, 0.2);
-  border-radius: 14px;
-  padding: 10px;
-  display: flex;
-  gap: 8px;
-  font-size: 0.72rem;
-  color: #c084fc;
-  min-width: 120px;
-}
-
-/* Mic Hero Card */
-.voice-hero-card {
+/* DUAL LIVE MODES SECTION */
+.dual-live-card {
   background: linear-gradient(135deg, #0e072b 0%, #0a1128 100%);
-  border: 1px solid rgba(124, 58, 237, 0.25);
+  border: 1px solid rgba(124, 58, 237, 0.3);
   border-radius: var(--radius-xl);
-  padding: 24px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 20px 16px;
   text-align: center;
 }
 
-.mic-pulse-btn {
-  width: 68px;
-  height: 68px;
+.live-card-title {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.live-buttons-row {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.live-mode-box {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.live-mode-box.active {
+  border-color: var(--cyan-accent);
+  background: rgba(6, 182, 212, 0.15);
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+}
+
+.mic-btn-small {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #06b6d4);
-  border: 3px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
-  cursor: pointer;
-  margin-bottom: 10px;
+  font-size: 1.2rem;
+  color: #fff;
 }
 
-.mic-pulse-btn.active {
-  box-shadow: 0 0 30px rgba(168, 85, 247, 0.8);
-  animation: pulse 1.5s infinite;
+.live-mode-box span.mode-title {
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); }
-}
-
-.voice-hero-card h3 {
-  font-size: 0.95rem;
-}
-
-.voice-hero-card p {
-  font-size: 0.78rem;
+.live-mode-box span.mode-desc {
+  font-size: 0.68rem;
   color: var(--text-muted);
-  margin-top: 4px;
 }
 
-/* Grid Options */
+.live-status-label {
+  font-size: 0.8rem;
+  color: var(--cyan-accent);
+  min-height: 20px;
+}
+
+/* Feature Grid */
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -190,13 +202,13 @@ header {
 }
 
 .feature-icon {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .feature-item span.title {
@@ -209,7 +221,7 @@ header {
   color: var(--text-muted);
 }
 
-/* Overview & Quick Actions Panels */
+/* Panels */
 .dashboard-split {
   display: flex;
   flex-direction: column;
@@ -266,13 +278,13 @@ header {
 }
 
 .icon-badge {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   flex-shrink: 0;
 }
 
@@ -286,7 +298,7 @@ header {
   color: var(--text-muted);
 }
 
-/* Bottom Navigation */
+/* Bottom Nav */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -317,15 +329,15 @@ header {
   color: #a855f7;
 }
 
-/* Fixed Overlay Modals (Chat & Settings) */
+/* Modals */
 .modal-overlay {
-  display: none; /* Hidden by default */
+  display: none;
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(5, 7, 20, 0.95);
+  background: rgba(5, 7, 20, 0.96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   z-index: 999;
@@ -357,7 +369,7 @@ header {
 }
 
 .chat-msg {
-  max-width: 80%;
+  max-width: 85%;
   padding: 12px 16px;
   border-radius: 16px;
   font-size: 0.88rem;
@@ -414,7 +426,6 @@ header {
   margin-top: 10px;
 }
 
-/* Top Siri Listening Indicator */
 .listening-bar {
   display: none;
   align-items: center;
