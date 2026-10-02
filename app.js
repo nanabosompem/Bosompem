@@ -2,13 +2,13 @@
 // BOSOMPEM AI PRO - ENGINE & CONTROLLERS
 // ==========================================
 
-const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an advanced AI application.
+const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an advanced AI assistant.
 Answer thoroughly, accurately, and directly using clean Markdown formatting.`;
 
 const state = {
   userName: localStorage.getItem('bosompem_user_name') || '',
   apiKey: localStorage.getItem('bosompem_api_key') || '',
-  model: localStorage.getItem('bosompem_model') || 'gemini-1.5-flash',
+  model: localStorage.getItem('bosompem_model') || 'gemini-2.5-flash',
   deepResearchMode: localStorage.getItem('bosompem_research_mode') === 'true',
   
   sessions: JSON.parse(localStorage.getItem('bosompem_sessions') || '[]'),
@@ -39,15 +39,14 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- SIDEBAR TOGGLE ---
-
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('open');
+  if (sidebar) sidebar.classList.toggle('open');
 }
 
 // --- AUTO-EXPANDING TEXTAREA ---
-
 function autoExpandTextarea(el) {
+  if (!el) return;
   el.style.height = 'auto';
   const newHeight = Math.min(el.scrollHeight, 160);
   el.style.height = newHeight + 'px';
@@ -66,7 +65,6 @@ function handleTextareaKeyDown(e) {
 }
 
 // --- SESSION MANAGEMENT ---
-
 function createNewChatSession() {
   const newSession = {
     id: 'session-' + Date.now(),
@@ -78,7 +76,8 @@ function createNewChatSession() {
   saveSessionsToStorage();
   loadSession(newSession.id);
   
-  document.getElementById('sidebar').classList.remove('open');
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.classList.remove('open');
 }
 
 function loadSession(sessionId) {
@@ -90,12 +89,14 @@ function loadSession(sessionId) {
   const messagesBox = document.getElementById('chat-messages-container');
 
   if (!session || session.messages.length === 0) {
-    welcomeScreen.style.display = 'flex';
-    messagesBox.style.display = 'none';
-    messagesBox.innerHTML = '';
+    if (welcomeScreen) welcomeScreen.style.display = 'flex';
+    if (messagesBox) {
+      messagesBox.style.display = 'none';
+      messagesBox.innerHTML = '';
+    }
   } else {
-    welcomeScreen.style.display = 'none';
-    messagesBox.style.display = 'flex';
+    if (welcomeScreen) welcomeScreen.style.display = 'none';
+    if (messagesBox) messagesBox.style.display = 'flex';
     renderMessages();
   }
 }
@@ -131,12 +132,11 @@ function clearCurrentChat() {
 }
 
 // --- CHAT API & MESSAGING ---
-
 async function sendChatMessage(text) {
   if (!text.trim()) return;
 
   if (!state.apiKey) {
-    alert("Please set your Gemini API Key in System Preferences first.");
+    alert("Please set your Gemini API Key in Settings first.");
     toggleSettings();
     return;
   }
@@ -148,9 +148,11 @@ async function sendChatMessage(text) {
     session.title = text.length > 28 ? text.substring(0, 28) + '...' : text;
   }
 
-  document.getElementById('welcome-screen').style.display = 'none';
+  const welcomeScreen = document.getElementById('welcome-screen');
+  if (welcomeScreen) welcomeScreen.style.display = 'none';
+
   const messagesBox = document.getElementById('chat-messages-container');
-  messagesBox.style.display = 'flex';
+  if (messagesBox) messagesBox.style.display = 'flex';
 
   session.messages.push({ role: 'user', text });
   renderMessages();
@@ -160,8 +162,10 @@ async function sendChatMessage(text) {
 
   // Reset textarea
   const textarea = document.getElementById('chat-input');
-  textarea.value = '';
-  autoExpandTextarea(textarea);
+  if (textarea) {
+    textarea.value = '';
+    autoExpandTextarea(textarea);
+  }
 
   const contentsPayload = session.messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
@@ -169,13 +173,10 @@ async function sendChatMessage(text) {
   }));
 
   try {
-    // Map UI selection to valid API endpoint models
-    let apiModel = 'gemini-1.5-flash';
-    if (state.model.includes('pro')) {
-      apiModel = 'gemini-1.5-pro';
-    }
+    // Dynamic Model Selection based on dropdown/state
+    const selectedModel = state.model || 'gemini-2.5-flash';
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
     
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -192,7 +193,7 @@ async function sendChatMessage(text) {
     if (data.error) {
       session.messages.push({ 
         role: 'assistant', 
-        text: `API Error (${data.error.code || 'Unknown'}): ${data.error.message || 'Please check your API key and permissions.'}` 
+        text: `API Error (${data.error.code || '404'}): ${data.error.message || 'Model not found or request denied.'}` 
       });
     } else {
       const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content received.";
@@ -210,7 +211,7 @@ async function sendChatMessage(text) {
     removeThinkingIndicator(thinkingId);
     session.messages.push({ 
       role: 'assistant', 
-      text: "Network error calling Gemini API. Please check internet connection." 
+      text: "Network error calling Gemini API. Please check your connection or API key." 
     });
     saveSessionsToStorage();
     renderMessages();
@@ -235,26 +236,27 @@ function renderMessages() {
 
 function handleChatSubmit() {
   const textarea = document.getElementById('chat-input');
+  if (!textarea) return;
   const text = textarea.value;
   if (!text.trim()) return;
   sendChatMessage(text);
 }
 
 function usePromptPreset(type) {
-  if (type === 'code') sendChatMessage("Write a clean code snippet and explain the structure:");
-  else if (type === 'deep') sendChatMessage("Provide a deep research breakdown on:");
-  else if (type === 'summarize') sendChatMessage("Extract actionable insights and summary points for:");
+  if (type === 'code') sendChatMessage("Write a clean code snippet and explain its structure:");
+  else if (type === 'deep') sendChatMessage("Provide a deep technical breakdown on:");
+  else if (type === 'summarize') sendChatMessage("Extract actionable summary points for:");
 }
 
 function insertPromptTemplate(type) {
   const input = document.getElementById('chat-input');
+  if (!input) return;
   if (type === 'deep') input.value = "Conduct deep technical research on: ";
   input.focus();
   autoExpandTextarea(input);
 }
 
 // --- VOICE RECOGNITION ---
-
 function initVoiceEngines() {
   if (!SpeechRecognition) return;
 
@@ -273,12 +275,15 @@ function initVoiceEngines() {
   voiceNoteRecognition.onresult = (e) => {
     const transcript = e.results[0][0].transcript;
     const input = document.getElementById('chat-input');
-    input.value += (input.value ? ' ' : '') + transcript;
-    autoExpandTextarea(input);
+    if (input) {
+      input.value += (input.value ? ' ' : '') + transcript;
+      autoExpandTextarea(input);
+    }
   };
   voiceNoteRecognition.onend = () => {
     state.isVoiceNoteRecording = false;
-    document.getElementById('voice-note-btn').classList.remove('recording');
+    const btn = document.getElementById('voice-note-btn');
+    if (btn) btn.classList.remove('recording');
   };
 }
 
@@ -293,12 +298,12 @@ function toggleLiveVoiceMode() {
   const bar = document.getElementById('listening-indicator');
 
   if (state.isLiveVoiceActive) {
-    chip.classList.add('active');
-    bar.classList.add('active');
+    if (chip) chip.classList.add('active');
+    if (bar) bar.classList.add('active');
     liveRecognition.start();
   } else {
-    chip.classList.remove('active');
-    bar.classList.remove('active');
+    if (chip) chip.classList.remove('active');
+    if (bar) bar.classList.remove('active');
     liveRecognition.stop();
   }
 }
@@ -314,42 +319,55 @@ function toggleVoiceNoteRecording() {
     voiceNoteRecognition.stop();
   } else {
     state.isVoiceNoteRecording = true;
-    btn.classList.add('recording');
+    if (btn) btn.classList.add('recording');
     voiceNoteRecognition.start();
   }
 }
 
 // --- MODALS & SETTINGS ---
-
 function saveSettings() {
   const keyInput = document.getElementById('api-key');
   const modelSelect = document.getElementById('model-select');
   const deepToggle = document.getElementById('deep-research-toggle');
 
-  state.apiKey = keyInput.value.trim();
-  state.model = modelSelect.value;
-  state.deepResearchMode = deepToggle.checked;
+  if (keyInput) state.apiKey = keyInput.value.trim();
+  if (modelSelect) state.model = modelSelect.value;
+  if (deepToggle) state.deepResearchMode = deepToggle.checked;
 
   localStorage.setItem('bosompem_api_key', state.apiKey);
   localStorage.setItem('bosompem_model', state.model);
   localStorage.setItem('bosompem_research_mode', state.deepResearchMode);
 
-  document.getElementById('active-model-label').innerText = modelSelect.options[modelSelect.selectedIndex].text.split('(')[0];
+  const label = document.getElementById('active-model-label');
+  if (label && modelSelect) {
+    label.innerText = modelSelect.options[modelSelect.selectedIndex].text.split('(')[0];
+  }
+
   toggleSettings();
   alert("Preferences saved successfully!");
 }
 
 function loadSavedSettings() {
-  if (document.getElementById('api-key')) document.getElementById('api-key').value = state.apiKey;
-  if (document.getElementById('model-select')) document.getElementById('model-select').value = state.model;
-  if (document.getElementById('deep-research-toggle')) document.getElementById('deep-research-toggle').checked = state.deepResearchMode;
-  if (document.getElementById('user-name-input')) document.getElementById('user-name-input').value = state.userName;
+  const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
+  const deepToggle = document.getElementById('deep-research-toggle');
+  const nameInput = document.getElementById('user-name-input');
+  const label = document.getElementById('active-model-label');
+
+  if (keyInput) keyInput.value = state.apiKey;
+  if (modelSelect) modelSelect.value = state.model;
+  if (deepToggle) deepToggle.checked = state.deepResearchMode;
+  if (nameInput) nameInput.value = state.userName;
+  if (label && modelSelect && modelSelect.selectedIndex >= 0) {
+    label.innerText = modelSelect.options[modelSelect.selectedIndex].text.split('(')[0];
+  }
 }
 
 function switchModel(val) {
   state.model = val;
   localStorage.setItem('bosompem_model', val);
-  document.getElementById('active-model-label').innerText = val;
+  const label = document.getElementById('active-model-label');
+  if (label) label.innerText = val;
 }
 
 function updateGreeting() {
@@ -360,16 +378,20 @@ function updateGreeting() {
 }
 
 function saveUserProfile() {
-  const val = document.getElementById('user-name-input').value.trim();
-  state.userName = val;
-  localStorage.setItem('bosompem_user_name', val);
-  updateGreeting();
+  const nameInput = document.getElementById('user-name-input');
+  if (nameInput) {
+    const val = nameInput.value.trim();
+    state.userName = val;
+    localStorage.setItem('bosompem_user_name', val);
+    updateGreeting();
+  }
   closeAllModals();
 }
 
 function openModal(id) {
   closeAllModals();
-  document.getElementById(id).classList.add('active');
+  const target = document.getElementById(id);
+  if (target) target.classList.add('active');
 }
 
 function closeAllModals() {
@@ -378,7 +400,7 @@ function closeAllModals() {
 
 function toggleSettings() {
   const panel = document.getElementById('settings-panel');
-  panel.classList.toggle('active');
+  if (panel) panel.classList.toggle('active');
 }
 
 function scrollToBottom() {
@@ -388,6 +410,7 @@ function scrollToBottom() {
 
 function appendThinkingIndicator() {
   const box = document.getElementById('chat-messages-container');
+  if (!box) return null;
   const id = 'thinking-' + Date.now();
   const el = document.createElement('div');
   el.className = 'chat-bubble assistant';
@@ -399,62 +422,12 @@ function appendThinkingIndicator() {
 }
 
 function removeThinkingIndicator(id) {
+  if (!id) return;
   const el = document.getElementById(id);
   if (el) el.remove();
 }
 
 function formatMarkdown(str) {
   return str
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n- /g, '<br>• ');
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function webSearchFallback() {
-  const val = document.getElementById('chat-input').value;
-  if (val) window.open(`https://www.google.com/search?q=${encodeURIComponent(val)}`, '_blank');
-}
-
-function triggerDeviceAction(action) {
-  if (action === 'call') {
-    const num = prompt("Enter phone number to call:");
-    if (num) window.location.href = `tel:${encodeURIComponent(num)}`;
-  }
-}
-
-function addReminder() {
-  const text = prompt("Enter new task:");
-  if (text) {
-    state.reminders.unshift({ id: Date.now(), text });
-    localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
-    renderReminders();
-  }
-}
-
-function renderReminders() {
-  const list = document.getElementById('full-reminders-list');
-  if (!list) return;
-  if (state.reminders.length === 0) {
-    list.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted);">No scheduled tasks.</p>`;
-    return;
-  }
-  list.innerHTML = state.reminders.map(r => `
-    <div style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size:0.85rem; margin-bottom: 6px;">
-      <strong>${escapeHtml(r.text)}</strong>
-    </div>
-  `).join('');
-}
-
-function speakText(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.speak(u);
-        }
+    .replace(/```([\s\S]*?)
+  
