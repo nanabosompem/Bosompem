@@ -1,53 +1,281 @@
 // ==========================================
-// BOSOMPEM AI PRO - ADVANCED ENGINE
+// BOSOMPEM AI PRO - FULL APP ENGINE
 // ==========================================
 
-const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an elite AI research assistant and problem-solver. 
-When answering queries, strictly adhere to these standards:
-1. Provide accurate, thoroughly reasoned, and deeply analytical answers.
-2. Structure responses logically using standard Markdown (Headers, Bold text, Bullet points, numbered lists, and Code blocks).
-3. Be direct, authoritative, and eliminate introductory fluff.
-4. Work step-by-step for complex calculations or code logic.`;
+const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an elite standalone AI assistant.
+Answer thoroughly, accurately, and directly using standard Markdown (Headers, Code blocks, bullet points).
+Execute technical logic step-by-step.`;
 
 const state = {
   userName: localStorage.getItem('bosompem_user_name') || '',
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
   deepResearchMode: localStorage.getItem('bosompem_research_mode') === 'true',
-  activeLiveMode: null,
   
-  history: JSON.parse(localStorage.getItem('bosompem_chat_history') || '[]'),
+  sessions: JSON.parse(localStorage.getItem('bosompem_sessions') || '[]'),
+  activeSessionId: null,
+  
+  isVoiceActive: false,
   reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]')
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
-let silenceTimer = null;
-const SILENCE_TIMEOUT_MS = 2000;
 
 // --- INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', () => {
   initVoiceEngine();
-  renderReminders();
   loadSavedSettings();
   updateGreeting();
-  renderChatHistory();
+  renderReminders();
 
-  // Scroll fix for soft keyboards on mobile
-  const inputEl = document.getElementById('chat-modal-input');
-  if (inputEl) {
-    inputEl.addEventListener('focus', () => {
-      setTimeout(() => {
-        const box = document.getElementById('chat-modal-messages');
-        if (box) box.scrollTop = box.scrollHeight;
-      }, 300);
-    });
+  if (state.sessions.length === 0) {
+    createNewChatSession();
+  } else {
+    loadSession(state.sessions[0].id);
   }
 });
 
-// ==========================================
-// 1. DYNAMIC GREETING & PROFILE
-// ==========================================
+// --- SESSION MANAGEMENT ---
+
+function createNewChatSession() {
+  const newSession = {
+    id: 'session-' + Date.now(),
+    title: 'New Conversation',
+    messages: []
+  };
+
+  state.sessions.unshift(newSession);
+  saveSessionsToStorage();
+  loadSession(newSession.id);
+}
+
+function loadSession(sessionId) {
+  state.activeSessionId = sessionId;
+  renderHistorySidebar();
+
+  const session = getActiveSession();
+  const welcomeScreen = document.getElementById('welcome-screen');
+  const messagesBox = document.getElementById('chat-messages-container');
+
+  if (!session || session.messages.length === 0) {
+    welcomeScreen.style.display = 'flex';
+    messagesBox.style.display = 'none';
+    messagesBox.innerHTML = '';
+  } else {
+    welcomeScreen.style.display = 'none';
+    messagesBox.style.display = 'flex';
+    renderMessages();
+  }
+}
+
+function getActiveSession() {
+  return state.sessions.find(s => s.id === state.activeSessionId);
+}
+
+function saveSessionsToStorage() {
+  localStorage.setItem('bosompem_sessions', JSON.stringify(state.sessions));
+}
+
+function renderHistorySidebar() {
+  const container = document.getElementById('history-list');
+  if (!container) return;
+
+  container.innerHTML = state.sessions.map(s => `
+    <div class="history-item ${s.id === state.activeSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
+      <i class="fa-regular fa-message"></i>
+      <span>${s.title}</span>
+    </div>
+  `).join('');
+}
+
+function clearCurrentChat() {
+  const session = getActiveSession();
+  if (session && confirm("Clear current thread history?")) {
+    session.messages = [];
+    session.title = "New Conversation";
+    saveSessionsToStorage();
+    loadSession(session.id);
+  }
+}
+
+// --- CHAT API & MESSAGING ---
+
+async function sendChatMessage(text) {
+  if (!text.trim()) return;
+
+  if (!state.apiKey) {
+    alert("Please set your Gemini API Key in System Preferences first.");
+    toggleSettings();
+    return;
+  }
+
+  const session = getActiveSession();
+  if (!session) return;
+
+  // Set session title from first prompt
+  if (session.messages.length === 0) {
+    session.title = text.length > 28 ? text.substring(0, 28) + '...' : text;
+  }
+
+  // Hide welcome view
+  document.getElementById('welcome-screen').style.display = 'none';
+  const messagesBox = document.getElementById('chat-messages-container');
+  messagesBox.style.display = 'flex';
+
+  // Push user message
+  session.messages.push({ role: 'user', text });
+  renderMessages();
+  saveSessionsToStorage();
+
+  const thinkingId = appendThinkingIndicator();
+
+  // Build payload history
+  const contentsPayload = session.messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.text }]
+  }));
+
+  try {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: contentsPayload,
+        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        generationConfig: { temperature: state.deepResearchMode ? 0.2 : 0.7 }
+      })
+    });
+
+    const data = await response.json();
+    removeThinkingIndicator(thinkingId);
+
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to get response from Gemini API.";
+
+    session.messages.push({ role: 'assistant', text: reply });
+    saveSessionsToStorage();
+    renderMessages();
+
+    if (state.isVoiceActive) {
+      speakText(reply.length > 250 ? reply.substring(0, 250) + "..." : reply);
+    }
+
+  } catch (err) {
+    removeThinkingIndicator(thinkingId);
+    session.messages.push({ role: 'assistant', text: "Error calling Gemini API. Please check your network and API key." });
+    renderMessages();
+  }
+}
+
+function renderMessages() {
+  const box = document.getElementById('chat-messages-container');
+  const session = getActiveSession();
+  if (!box || !session) return;
+
+  box.innerHTML = session.messages.map(m => `
+    <div class="chat-bubble ${m.role}">
+      <div class="bubble-content">
+        ${m.role === 'assistant' ? formatMarkdown(m.text) : escapeHtml(m.text)}
+      </div>
+    </div>
+  `).join('');
+
+  scrollToBottom();
+}
+
+function handleChatSubmit() {
+  const input = document.getElementById('chat-input');
+  const text = input.value;
+  if (!text) return;
+  input.value = '';
+  sendChatMessage(text);
+}
+
+function usePromptPreset(type) {
+  if (type === 'code') sendChatMessage("Review and optimize this code structure:");
+  else if (type === 'deep') sendChatMessage("Provide a deep logical research analysis on:");
+  else if (type === 'summarize') sendChatMessage("Provide an executive summary for:");
+}
+
+function insertPromptTemplate(type) {
+  const input = document.getElementById('chat-input');
+  if (type === 'deep') input.value = "Conduct deep technical research on: ";
+  input.focus();
+}
+
+// --- VOICE ENGINE ---
+
+function initVoiceEngine() {
+  if (!SpeechRecognition) return;
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    if (transcript) sendChatMessage(transcript);
+  };
+
+  recognition.onstart = () => updateVoiceUI(true);
+  recognition.onend = () => updateVoiceUI(false);
+}
+
+function toggleLiveVoiceMode() {
+  if (state.isVoiceActive) {
+    state.isVoiceActive = false;
+    if (recognition) recognition.stop();
+  } else {
+    state.isVoiceActive = true;
+    if (recognition) recognition.start();
+  }
+}
+
+function updateVoiceUI(active) {
+  const chip = document.getElementById('voice-mode-trigger');
+  const bar = document.getElementById('listening-indicator');
+  if (active) {
+    chip.classList.add('active');
+    bar.classList.add('active');
+  } else {
+    chip.classList.remove('active');
+    bar.classList.remove('active');
+  }
+}
+
+// --- SETTINGS & HELPERS ---
+
+function saveSettings() {
+  const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
+  const deepToggle = document.getElementById('deep-research-toggle');
+
+  state.apiKey = keyInput.value.trim();
+  state.model = modelSelect.value;
+  state.deepResearchMode = deepToggle.checked;
+
+  localStorage.setItem('bosompem_api_key', state.apiKey);
+  localStorage.setItem('bosompem_model', state.model);
+  localStorage.setItem('bosompem_research_mode', state.deepResearchMode);
+
+  document.getElementById('active-model-label').innerText = modelSelect.options[modelSelect.selectedIndex].text.split('(')[0];
+  toggleSettings();
+  alert("Preferences saved successfully!");
+}
+
+function loadSavedSettings() {
+  document.getElementById('api-key').value = state.apiKey;
+  document.getElementById('model-select').value = state.model;
+  document.getElementById('deep-research-toggle').checked = state.deepResearchMode;
+  document.getElementById('user-name-input').value = state.userName;
+}
+
+function switchModel(val) {
+  state.model = val;
+  localStorage.setItem('bosompem_model', val);
+  document.getElementById('active-model-label').innerText = val;
+}
 
 function updateGreeting() {
   const hour = new Date().getHours();
@@ -56,129 +284,58 @@ function updateGreeting() {
   else if (hour < 18) timeStr = 'Good afternoon';
   else timeStr = 'Good evening';
 
-  const nameStr = state.userName ? `, ${state.userName}` : '';
   const greetingEl = document.getElementById('dynamic-greeting');
   if (greetingEl) {
-    greetingEl.innerText = `${timeStr}${nameStr} 👑`;
+    greetingEl.innerText = `${timeStr}${state.userName ? ', ' + state.userName : ''} 👑`;
   }
 }
 
 function saveUserProfile() {
-  const inputVal = document.getElementById('user-name-input').value.trim();
-  state.userName = inputVal;
-  localStorage.setItem('bosompem_user_name', inputVal);
+  const val = document.getElementById('user-name-input').value.trim();
+  state.userName = val;
+  localStorage.setItem('bosompem_user_name', val);
   updateGreeting();
   closeAllModals();
-  alert("Profile updated successfully!");
 }
 
-// ==========================================
-// 2. CHAT ENGINE & PREFERENCES FIX
-// ==========================================
-
-function saveSettings() {
-  const keyInput = document.getElementById('api-key');
-  const modelSelect = document.getElementById('model-select');
-  const deepToggle = document.getElementById('deep-research-toggle');
-
-  if (!keyInput) return;
-
-  const key = keyInput.value.trim();
-  const model = modelSelect ? modelSelect.value : 'gemini-3.8-flash';
-  const deepRes = deepToggle ? deepToggle.checked : false;
-
-  state.apiKey = key;
-  state.model = model;
-  state.deepResearchMode = deepRes;
-
-  localStorage.setItem('bosompem_api_key', key);
-  localStorage.setItem('bosompem_model', model);
-  localStorage.setItem('bosompem_research_mode', deepRes);
-
-  toggleSettings();
-  alert("Preferences and API Key saved successfully!");
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
 }
 
-function loadSavedSettings() {
-  const keyInput = document.getElementById('api-key');
-  const modelSelect = document.getElementById('model-select');
-  const nameInput = document.getElementById('user-name-input');
-  const deepToggle = document.getElementById('deep-research-toggle');
-
-  if (keyInput) keyInput.value = state.apiKey;
-  if (modelSelect) modelSelect.value = state.model;
-  if (nameInput) nameInput.value = state.userName;
-  if (deepToggle) deepToggle.checked = state.deepResearchMode;
+function openModal(id) {
+  closeAllModals();
+  document.getElementById(id).classList.add('active');
 }
 
-async function sendChatMessage(text, isVoiceMode = false) {
-  if (!text.trim()) return;
-
-  if (!state.apiKey) {
-    alert("Please enter your Gemini API Key in Preferences first.");
-    toggleSettings();
-    return;
-  }
-
-  appendChatMessage('user', text);
-
-  const thinkingId = appendThinkingIndicator();
-
-  if (state.history.length > 20) state.history = state.history.slice(-20);
-  state.history.push({ role: 'user', parts: [{ text }] });
-
-  try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    
-    const requestBody = {
-      contents: state.history,
-      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: {
-        temperature: state.deepResearchMode ? 0.2 : 0.7,
-        maxOutputTokens: 8192
-      }
-    };
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
-
-    const data = await response.json();
-    removeThinkingIndicator(thinkingId);
-
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to retrieve response. Check API configuration.";
-
-    state.history.push({ role: 'model', parts: [{ text: reply }] });
-    localStorage.setItem('bosompem_chat_history', JSON.stringify(state.history));
-
-    appendChatMessage('assistant', reply);
-
-    if (isVoiceMode) {
-      const spokenText = reply.length > 300 ? reply.substring(0, 300) + "... I have displayed the detailed answer on screen." : reply;
-      speakText(spokenText, () => {
-        if (state.activeLiveMode === 'chat') startLiveMode('chat');
-      });
-    }
-  } catch (e) {
-    removeThinkingIndicator(thinkingId);
-    appendChatMessage('assistant', 'Error communicating with Gemini API. Check your network connection and API key.');
-  }
+function closeAllModals() {
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
 }
 
-function insertPromptTemplate(templateType) {
-  const input = document.getElementById('chat-modal-input');
-  if (!input) return;
+function toggleSettings() {
+  const panel = document.getElementById('settings-panel');
+  panel.classList.toggle('active');
+}
 
-  if (templateType === 'code') {
-    input.value = "Review and optimize the following code for efficiency and security: ";
-  } else if (templateType === 'summarize') {
-    input.value = "Provide a concise executive summary and key takeaways for: ";
-  } else if (templateType === 'deep') {
-    input.value = "Perform a deep technical research analysis on: ";
-  }
-  input.focus();
+function scrollToBottom() {
+  const box = document.getElementById('chat-viewport');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function appendThinkingIndicator() {
+  const box = document.getElementById('chat-messages-container');
+  const id = 'thinking-' + Date.now();
+  const el = document.createElement('div');
+  el.className = 'chat-bubble assistant';
+  el.id = id;
+  el.innerHTML = `<div class="bubble-content" style="color: var(--accent-cyan);"><i class="fa-solid fa-brain fa-spin"></i> Reasoning...</div>`;
+  box.appendChild(el);
+  scrollToBottom();
+  return id;
+}
+
+function removeThinkingIndicator(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
 }
 
 function formatMarkdown(str) {
@@ -191,318 +348,48 @@ function formatMarkdown(str) {
     .replace(/\n- /g, '<br>• ');
 }
 
-function appendChatMessage(sender, text) {
-  const box = document.getElementById('chat-modal-messages');
-  if (!box) return;
-
-  const msg = document.createElement('div');
-  msg.className = `chat-msg ${sender}`;
-  
-  if (sender === 'assistant') {
-    msg.innerHTML = formatMarkdown(text);
-  } else {
-    msg.innerText = text;
-  }
-
-  box.appendChild(msg);
-  
-  setTimeout(() => {
-    box.scrollTop = box.scrollHeight;
-  }, 100);
-}
-
-function appendThinkingIndicator() {
-  const box = document.getElementById('chat-modal-messages');
-  if (!box) return null;
-
-  const id = 'thinking-' + Date.now();
-  const indicator = document.createElement('div');
-  indicator.className = 'chat-msg assistant thinking';
-  indicator.id = id;
-  indicator.innerHTML = `<i class="fa-solid fa-brain fa-spin"></i> Analyzing context...`;
-  box.appendChild(indicator);
-  
-  setTimeout(() => {
-    box.scrollTop = box.scrollHeight;
-  }, 100);
-
-  return id;
-}
-
-function removeThinkingIndicator(id) {
-  if (!id) return;
-  const el = document.getElementById(id);
-  if (el) el.remove();
-}
-
-function renderChatHistory() {
-  const box = document.getElementById('chat-modal-messages');
-  if (!box) return;
-  box.innerHTML = `<div class="chat-msg assistant">Welcome to Bosompem Pro AI. I am ready to conduct research, write code, or execute complex commands. How can I assist you today?</div>`;
-  
-  state.history.forEach(item => {
-    const role = item.role === 'model' ? 'assistant' : 'user';
-    const text = item.parts[0]?.text || '';
-    if (text) appendChatMessage(role, text);
-  });
-}
-
-function clearChatHistory() {
-  if (confirm("Clear current conversation history?")) {
-    state.history = [];
-    localStorage.removeItem('bosompem_chat_history');
-    renderChatHistory();
-  }
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function webSearchFallback() {
-  const input = document.getElementById('chat-modal-input').value;
-  if (!input) {
-    alert("Type a search topic in the input field first.");
-    return;
-  }
-  window.open(`https://www.google.com/search?q=${encodeURIComponent(input)}`, '_blank');
+  const val = document.getElementById('chat-input').value;
+  if (val) window.open(`https://www.google.com/search?q=${encodeURIComponent(val)}`, '_blank');
 }
 
-// ==========================================
-// 3. VOICE ENGINE
-// ==========================================
-
-function initVoiceEngine() {
-  if (!SpeechRecognition) return;
-
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  let currentTranscript = '';
-
-  recognition.onresult = (e) => {
-    clearTimeout(silenceTimer);
-
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; ++i) {
-      if (e.results[i].isFinal) {
-        currentTranscript += e.results[i][0].transcript + ' ';
-      } else {
-        interim += e.results[i][0].transcript;
-      }
-    }
-
-    const liveText = interim || currentTranscript || "Listening...";
-    updateVoiceStatusText(liveText);
-
-    silenceTimer = setTimeout(() => {
-      const queryToProcess = (currentTranscript + ' ' + interim).trim();
-      if (queryToProcess.length > 0) {
-        recognition.stop();
-        processLiveQuery(queryToProcess);
-        currentTranscript = '';
-      }
-    }, SILENCE_TIMEOUT_MS);
-  };
-
-  recognition.onstart = () => updateListeningUI(true);
-  recognition.onend = () => updateListeningUI(false);
-}
-
-function startLiveMode(modeType) {
-  if (!state.apiKey && modeType === 'chat') {
-    alert("Please set your Gemini API key in Preferences first.");
-    toggleSettings();
-    return;
-  }
-
-  state.activeLiveMode = modeType;
-  updateLiveCardUI(modeType);
-
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(() => {
-      if (recognition) {
-        try { recognition.start(); } catch (e) {}
-      }
-    })
-    .catch(() => alert("Microphone access is required for voice commands."));
-}
-
-function stopLiveMode() {
-  state.activeLiveMode = null;
-  if (recognition) try { recognition.stop(); } catch (e) {}
-  clearTimeout(silenceTimer);
-  resetLiveCardUI();
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-}
-
-async function processLiveQuery(query) {
-  if (state.activeLiveMode === 'device') {
-    handleDeviceCommand(query);
-  } else if (state.activeLiveMode === 'chat') {
-    await sendChatMessage(query, true);
+function triggerDeviceAction(action) {
+  if (action === 'call') {
+    const num = prompt("Enter phone number or contact name:");
+    if (num) window.location.href = `tel:${encodeURIComponent(num)}`;
   }
 }
 
-function handleDeviceCommand(rawQuery) {
-  const query = rawQuery.toLowerCase().trim();
-
-  if (query.includes('call') || query.includes('dial')) {
-    const target = query.replace('call', '').replace('dial', '').trim();
-    speakText(`Calling ${target || 'contact'}`);
-    window.location.href = `tel:${encodeURIComponent(target)}`;
-  } else if (query.includes('reminder') || query.includes('remind me')) {
-    const task = query.replace('set a reminder to', '').replace('remind me to', '').trim();
-    addReminder(task);
-    speakText(`Reminder set for ${task}`);
-  } else {
-    speakText(`Command processed: ${rawQuery}`);
+function addReminder() {
+  const text = prompt("Enter new task:");
+  if (text) {
+    state.reminders.unshift({ id: Date.now(), text, time: 'Scheduled' });
+    localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
+    renderReminders();
   }
-
-  setTimeout(() => {
-    if (state.activeLiveMode === 'device') startLiveMode('device');
-  }, 3000);
-}
-
-// ==========================================
-// 4. ROUTING & MODALS
-// ==========================================
-
-function switchTab(tabName, element) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  if (element) element.classList.add('active');
-
-  if (tabName === 'chat') openChatModal();
-  else if (tabName === 'memory') openSectionModal('memory-modal');
-  else if (tabName === 'profile') openSectionModal('profile-modal');
-  else closeAllModals();
-}
-
-function triggerQuickAction(action) {
-  if (action === 'call') openCallModal();
-  else if (action === 'reminder') openSectionModal('reminders-modal');
-}
-
-function openChatModal() {
-  closeAllModals();
-  document.getElementById('chat-modal').classList.add('active');
-  setTimeout(() => {
-    const box = document.getElementById('chat-modal-messages');
-    if (box) box.scrollTop = box.scrollHeight;
-  }, 100);
-}
-
-function closeChatModal() {
-  document.getElementById('chat-modal').classList.remove('active');
-}
-
-function openSectionModal(modalId) {
-  closeAllModals();
-  const el = document.getElementById(modalId);
-  if (el) el.classList.add('active');
-}
-
-function closeAllModals() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-}
-
-function toggleSettings() {
-  document.getElementById('settings-panel').classList.toggle('active');
-}
-
-function openCallModal() {
-  const num = prompt("Enter phone number or contact name:");
-  if (num) window.location.href = `tel:${encodeURIComponent(num)}`;
-}
-
-// ==========================================
-// 5. REMINDERS & UTILITIES
-// ==========================================
-
-function addReminder(textInput) {
-  const text = textInput || prompt("Enter reminder:");
-  if (!text) return;
-  
-  state.reminders.unshift({ id: Date.now(), text, time: 'Scheduled' });
-  localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
-  renderReminders();
 }
 
 function renderReminders() {
-  const list = document.getElementById('overview-reminders-list');
-  const modalList = document.getElementById('full-reminders-list');
+  const list = document.getElementById('full-reminders-list');
   if (!list) return;
-
   if (state.reminders.length === 0) {
-    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No active reminders scheduled.</p>`;
-    if (modalList) modalList.innerHTML = list.innerHTML;
+    list.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted);">No active tasks.</p>`;
     return;
   }
-
-  const html = state.reminders.map(r => `
-    <div class="list-item">
-      <div class="item-left">
-        <div class="icon-badge" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;"><i class="fa-solid fa-clock"></i></div>
-        <div class="item-details">
-          <p>${r.text}</p>
-          <span>${r.time}</span>
-        </div>
-      </div>
+  list.innerHTML = state.reminders.map(r => `
+    <div style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size:0.85rem; margin-bottom: 6px;">
+      <strong>${r.text}</strong>
     </div>
   `).join('');
-
-  list.innerHTML = html;
-  if (modalList) modalList.innerHTML = html;
 }
 
-function updateLiveCardUI(mode) {
-  const btn1 = document.getElementById('live-device-btn');
-  const btn2 = document.getElementById('live-chat-btn');
-  if (mode === 'device') {
-    btn1.classList.add('active');
-    btn2.classList.remove('active');
-  } else {
-    btn2.classList.add('active');
-    btn1.classList.remove('active');
-  }
-}
-
-function resetLiveCardUI() {
-  document.getElementById('live-device-btn').classList.remove('active');
-  document.getElementById('live-chat-btn').classList.remove('active');
-  document.getElementById('voice-status-text').innerText = "Select a Live mode above to speak";
-}
-
-function updateVoiceStatusText(msg) {
-  const el = document.getElementById('voice-status-text');
-  if (el) el.innerText = msg;
-}
-
-function updateListeningUI(active) {
-  const bar = document.getElementById('listening-indicator');
-  if (bar) {
-    if (active) bar.classList.add('active');
-    else bar.classList.remove('active');
-  }
-}
-
-function handleChatSubmit() {
-  const input = document.getElementById('chat-modal-input');
-  const text = input.value;
-  if (!text) return;
-  input.value = '';
-  sendChatMessage(text, false);
-}
-
-function speakText(text, onEndCallback) {
-  if (!('speechSynthesis' in window)) {
-    if (onEndCallback) onEndCallback();
-    return;
-  }
+function speakText(text) {
+  if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.onend = () => { if (onEndCallback) onEndCallback(); };
-  utterance.onerror = () => { if (onEndCallback) onEndCallback(); };
-  window.speechSynthesis.speak(utterance);
-}
-
-function captureOwnerVoicePrint() {
-  alert("Voice biometric signature recorded successfully.");
-                                                              }
+  const u = new SpeechSynthesisUtterance(text);
+  window.speechSynthesis.speak(u);
+                             }
