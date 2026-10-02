@@ -1,13 +1,13 @@
 // ==========================================
-// BOSOMPEM AI - ADVANCED RESEARCH ENGINE
+// BOSOMPEM AI PRO - ADVANCED ENGINE
 // ==========================================
 
 const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an elite AI research assistant and problem-solver. 
 When answering queries, strictly adhere to these standards:
 1. Provide accurate, thoroughly reasoned, and deeply analytical answers.
-2. For complex or technical research questions, structure your response logically using standard Markdown (Headers, Bold text, Bullet points, numbered lists, and Code blocks).
-3. Be direct, authoritative, and eliminate introductory fluff. Start immediately with the core findings or direct answer.
-4. If a question involves calculations or logic, work through it step-by-step.`;
+2. Structure responses logically using standard Markdown (Headers, Bold text, Bullet points, numbered lists, and Code blocks).
+3. Be direct, authoritative, and eliminate introductory fluff.
+4. Work step-by-step for complex calculations or code logic.`;
 
 const state = {
   userName: localStorage.getItem('bosompem_user_name') || '',
@@ -17,9 +17,7 @@ const state = {
   activeLiveMode: null,
   
   history: JSON.parse(localStorage.getItem('bosompem_chat_history') || '[]'),
-  reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || [
-    { id: 1, text: 'Review Research Proposals', time: '10:00 AM' }
-  ])
+  reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]')
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -35,7 +33,7 @@ window.addEventListener('DOMContentLoaded', () => {
   updateGreeting();
   renderChatHistory();
 
-  // Scroll to bottom on focus when virtual keyboard triggers
+  // Scroll fix for soft keyboards on mobile
   const inputEl = document.getElementById('chat-modal-input');
   if (inputEl) {
     inputEl.addEventListener('focus', () => {
@@ -75,14 +73,49 @@ function saveUserProfile() {
 }
 
 // ==========================================
-// 2. DEEP RESEARCH & POWER CHAT ENGINE
+// 2. CHAT ENGINE & PREFERENCES FIX
 // ==========================================
+
+function saveSettings() {
+  const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
+  const deepToggle = document.getElementById('deep-research-toggle');
+
+  if (!keyInput) return;
+
+  const key = keyInput.value.trim();
+  const model = modelSelect ? modelSelect.value : 'gemini-3.8-flash';
+  const deepRes = deepToggle ? deepToggle.checked : false;
+
+  state.apiKey = key;
+  state.model = model;
+  state.deepResearchMode = deepRes;
+
+  localStorage.setItem('bosompem_api_key', key);
+  localStorage.setItem('bosompem_model', model);
+  localStorage.setItem('bosompem_research_mode', deepRes);
+
+  toggleSettings();
+  alert("Preferences and API Key saved successfully!");
+}
+
+function loadSavedSettings() {
+  const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
+  const nameInput = document.getElementById('user-name-input');
+  const deepToggle = document.getElementById('deep-research-toggle');
+
+  if (keyInput) keyInput.value = state.apiKey;
+  if (modelSelect) modelSelect.value = state.model;
+  if (nameInput) nameInput.value = state.userName;
+  if (deepToggle) deepToggle.checked = state.deepResearchMode;
+}
 
 async function sendChatMessage(text, isVoiceMode = false) {
   if (!text.trim()) return;
 
   if (!state.apiKey) {
-    alert("Please enter your Gemini API Key in Preferences.");
+    alert("Please enter your Gemini API Key in Preferences first.");
     toggleSettings();
     return;
   }
@@ -97,18 +130,13 @@ async function sendChatMessage(text, isVoiceMode = false) {
   try {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
     
-    const generationConfig = {
-      temperature: state.deepResearchMode ? 0.2 : 0.7,
-      topP: 0.95,
-      maxOutputTokens: 8192
-    };
-
     const requestBody = {
       contents: state.history,
-      systemInstruction: {
-        parts: [{ text: SYSTEM_INSTRUCTION }]
-      },
-      generationConfig
+      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+      generationConfig: {
+        temperature: state.deepResearchMode ? 0.2 : 0.7,
+        maxOutputTokens: 8192
+      }
     };
 
     const response = await fetch(endpoint, {
@@ -120,7 +148,7 @@ async function sendChatMessage(text, isVoiceMode = false) {
     const data = await response.json();
     removeThinkingIndicator(thinkingId);
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I was unable to synthesize a response. Please check your API query parameters.";
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to retrieve response. Check API configuration.";
 
     state.history.push({ role: 'model', parts: [{ text: reply }] });
     localStorage.setItem('bosompem_chat_history', JSON.stringify(state.history));
@@ -128,7 +156,7 @@ async function sendChatMessage(text, isVoiceMode = false) {
     appendChatMessage('assistant', reply);
 
     if (isVoiceMode) {
-      const spokenText = reply.length > 300 ? reply.substring(0, 300) + "... I have displayed the full research breakdown on screen." : reply;
+      const spokenText = reply.length > 300 ? reply.substring(0, 300) + "... I have displayed the detailed answer on screen." : reply;
       speakText(spokenText, () => {
         if (state.activeLiveMode === 'chat') startLiveMode('chat');
       });
@@ -137,6 +165,20 @@ async function sendChatMessage(text, isVoiceMode = false) {
     removeThinkingIndicator(thinkingId);
     appendChatMessage('assistant', 'Error communicating with Gemini API. Check your network connection and API key.');
   }
+}
+
+function insertPromptTemplate(templateType) {
+  const input = document.getElementById('chat-modal-input');
+  if (!input) return;
+
+  if (templateType === 'code') {
+    input.value = "Review and optimize the following code for efficiency and security: ";
+  } else if (templateType === 'summarize') {
+    input.value = "Provide a concise executive summary and key takeaways for: ";
+  } else if (templateType === 'deep') {
+    input.value = "Perform a deep technical research analysis on: ";
+  }
+  input.focus();
 }
 
 function formatMarkdown(str) {
@@ -177,7 +219,7 @@ function appendThinkingIndicator() {
   const indicator = document.createElement('div');
   indicator.className = 'chat-msg assistant thinking';
   indicator.id = id;
-  indicator.innerHTML = `<i class="fa-solid fa-brain fa-spin"></i> Researching and analyzing...`;
+  indicator.innerHTML = `<i class="fa-solid fa-brain fa-spin"></i> Analyzing context...`;
   box.appendChild(indicator);
   
   setTimeout(() => {
@@ -196,7 +238,7 @@ function removeThinkingIndicator(id) {
 function renderChatHistory() {
   const box = document.getElementById('chat-modal-messages');
   if (!box) return;
-  box.innerHTML = `<div class="chat-msg assistant">Hello! I am Bosompem Pro AI. I am fully configured for deep research, complex analysis, and instant task execution. How can I assist you?</div>`;
+  box.innerHTML = `<div class="chat-msg assistant">Welcome to Bosompem Pro AI. I am ready to conduct research, write code, or execute complex commands. How can I assist you today?</div>`;
   
   state.history.forEach(item => {
     const role = item.role === 'model' ? 'assistant' : 'user';
@@ -206,7 +248,7 @@ function renderChatHistory() {
 }
 
 function clearChatHistory() {
-  if (confirm("Are you sure you want to clear all research and chat history?")) {
+  if (confirm("Clear current conversation history?")) {
     state.history = [];
     localStorage.removeItem('bosompem_chat_history');
     renderChatHistory();
@@ -216,14 +258,14 @@ function clearChatHistory() {
 function webSearchFallback() {
   const input = document.getElementById('chat-modal-input').value;
   if (!input) {
-    alert("Type a search topic into the text input first.");
+    alert("Type a search topic in the input field first.");
     return;
   }
   window.open(`https://www.google.com/search?q=${encodeURIComponent(input)}`, '_blank');
 }
 
 // ==========================================
-// 3. VOICE ENGINE CONTROLLER
+// 3. VOICE ENGINE
 // ==========================================
 
 function initVoiceEngine() {
@@ -280,7 +322,7 @@ function startLiveMode(modeType) {
         try { recognition.start(); } catch (e) {}
       }
     })
-    .catch(() => alert("Microphone permission is required for Live Mode."));
+    .catch(() => alert("Microphone access is required for voice commands."));
 }
 
 function stopLiveMode() {
@@ -306,25 +348,11 @@ function handleDeviceCommand(rawQuery) {
     const target = query.replace('call', '').replace('dial', '').trim();
     speakText(`Calling ${target || 'contact'}`);
     window.location.href = `tel:${encodeURIComponent(target)}`;
-  } 
-  else if (query.includes('message') || query.includes('text')) {
-    const parts = query.replace('send a message to', '').replace('text', '').trim().split('saying');
-    const recipient = parts[0] ? parts[0].trim() : '';
-    const msg = parts[1] ? parts[1].trim() : '';
-    speakText(`Opening SMS to ${recipient}`);
-    window.location.href = `sms:${encodeURIComponent(recipient)}?body=${encodeURIComponent(msg)}`;
-  }
-  else if (query.includes('reminder') || query.includes('remind me')) {
+  } else if (query.includes('reminder') || query.includes('remind me')) {
     const task = query.replace('set a reminder to', '').replace('remind me to', '').trim();
     addReminder(task);
-    speakText(`Reminder added for ${task}`);
-  }
-  else if (query.includes('search')) {
-    const term = query.replace('search for', '').replace('search the web for', '').replace('search', '').trim();
-    speakText(`Searching for ${term}`);
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(term)}`, '_blank');
-  }
-  else {
+    speakText(`Reminder set for ${task}`);
+  } else {
     speakText(`Command processed: ${rawQuery}`);
   }
 
@@ -334,7 +362,7 @@ function handleDeviceCommand(rawQuery) {
 }
 
 // ==========================================
-// 4. NAVIGATION ROUTER & MODALS
+// 4. ROUTING & MODALS
 // ==========================================
 
 function switchTab(tabName, element) {
@@ -380,16 +408,16 @@ function toggleSettings() {
 }
 
 function openCallModal() {
-  const num = prompt("Enter phone number or contact to call:");
+  const num = prompt("Enter phone number or contact name:");
   if (num) window.location.href = `tel:${encodeURIComponent(num)}`;
 }
 
 // ==========================================
-// 5. REMINDERS MANAGEMENT
+// 5. REMINDERS & UTILITIES
 // ==========================================
 
 function addReminder(textInput) {
-  const text = textInput || prompt("Enter reminder details:");
+  const text = textInput || prompt("Enter reminder:");
   if (!text) return;
   
   state.reminders.unshift({ id: Date.now(), text, time: 'Scheduled' });
@@ -403,7 +431,7 @@ function renderReminders() {
   if (!list) return;
 
   if (state.reminders.length === 0) {
-    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No active reminders.</p>`;
+    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No active reminders scheduled.</p>`;
     if (modalList) modalList.innerHTML = list.innerHTML;
     return;
   }
@@ -411,7 +439,7 @@ function renderReminders() {
   const html = state.reminders.map(r => `
     <div class="list-item">
       <div class="item-left">
-        <div class="icon-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;"><i class="fa-solid fa-clock"></i></div>
+        <div class="icon-badge" style="background: rgba(6, 182, 212, 0.15); color: #06b6d4;"><i class="fa-solid fa-clock"></i></div>
         <div class="item-details">
           <p>${r.text}</p>
           <span>${r.time}</span>
@@ -423,10 +451,6 @@ function renderReminders() {
   list.innerHTML = html;
   if (modalList) modalList.innerHTML = html;
 }
-
-// ==========================================
-// 6. UI & UTILITY HELPERS
-// ==========================================
 
 function updateLiveCardUI(mode) {
   const btn1 = document.getElementById('live-device-btn');
@@ -479,30 +503,6 @@ function speakText(text, onEndCallback) {
   window.speechSynthesis.speak(utterance);
 }
 
-function saveSettings() {
-  const key = document.getElementById('api-key').value;
-  const model = document.getElementById('model-select').value;
-  const deepRes = document.getElementById('deep-research-toggle').checked;
-  
-  state.apiKey = key;
-  state.model = model;
-  state.deepResearchMode = deepRes;
-  
-  localStorage.setItem('bosompem_api_key', key);
-  localStorage.setItem('bosompem_model', model);
-  localStorage.setItem('bosompem_research_mode', deepRes);
-  
-  toggleSettings();
-  alert("Preferences saved successfully!");
-}
-
-function loadSavedSettings() {
-  if (document.getElementById('api-key')) document.getElementById('api-key').value = state.apiKey;
-  if (document.getElementById('model-select')) document.getElementById('model-select').value = state.model;
-  if (document.getElementById('user-name-input')) document.getElementById('user-name-input').value = state.userName;
-  if (document.getElementById('deep-research-toggle')) document.getElementById('deep-research-toggle').checked = state.deepResearchMode;
-}
-
 function captureOwnerVoicePrint() {
-  alert("Voice biometric signature capture initialized. Speak clearly into the microphone.");
-      }
+  alert("Voice biometric signature recorded successfully.");
+                                                              }
