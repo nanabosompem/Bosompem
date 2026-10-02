@@ -9,17 +9,18 @@
 </head>
 <body>
 
-  <!-- Voice Waves Overlay Bar -->
+  <!-- Voice Waves Overlay Bar (Live Mode) -->
   <div id="listening-indicator" class="listening-bar">
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
-    <span id="listening-text">Listening for voice command...</span>
+    <span id="listening-text">Listening in Live Mode...</span>
+    <button class="stop-live-btn" onclick="toggleLiveVoiceMode()">End</button>
   </div>
 
   <div class="app-layout">
     
-    <!-- LEFT SIDEBAR (ChatGPT / Gemini Style) -->
+    <!-- LEFT SIDEBAR -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-top">
         <div class="brand">
@@ -30,6 +31,9 @@
             <h2>Bosompem AI</h2>
             <p>Pro Workspace</p>
           </div>
+          <button class="icon-btn mobile-close-btn" onclick="toggleSidebar()">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
         </div>
         <button class="new-chat-btn" onclick="createNewChatSession()">
           <i class="fa-solid fa-plus"></i> New Chat
@@ -38,7 +42,7 @@
 
       <!-- Scrollable History List -->
       <div class="history-section">
-        <span class="section-label">Recent Chats</span>
+        <span class="section-label">Recent Conversations</span>
         <div id="history-list" class="history-list">
           <!-- Session threads dynamically generated here -->
         </div>
@@ -58,13 +62,13 @@
       </div>
     </aside>
 
-    <!-- MAIN CHAT APP WORKSPACE -->
+    <!-- MAIN CHAT WORKSPACE -->
     <main class="chat-main">
       
       <!-- Top Navigation Bar -->
       <header class="chat-topbar">
         <div class="topbar-left">
-          <button class="icon-btn sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+          <button class="icon-btn sidebar-toggle" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
             <i class="fa-solid fa-bars"></i>
           </button>
           <div class="model-selector-wrapper">
@@ -80,10 +84,10 @@
 
         <div class="topbar-right">
           <button class="live-voice-chip" id="voice-mode-trigger" onclick="toggleLiveVoiceMode()">
-            <i class="fa-solid fa-microphone"></i>
+            <i class="fa-solid fa-wave-square"></i>
             <span id="voice-chip-text">Live Voice</span>
           </button>
-          <button class="icon-btn" onclick="clearCurrentChat()" title="Clear Thread">
+          <button class="icon-btn" onclick="clearCurrentChat()" title="Clear Current Thread">
             <i class="fa-solid fa-trash-can"></i>
           </button>
         </div>
@@ -92,32 +96,44 @@
       <!-- Chat Canvas Container -->
       <div id="chat-viewport" class="chat-viewport">
         
-        <!-- Welcome Hero View (Shown on Empty Thread) -->
+        <!-- Welcome Screen (Modern Prompt Hub) -->
         <div id="welcome-screen" class="welcome-screen">
-          <div class="welcome-badge"><i class="fa-solid fa-sparkles"></i> Advanced Intelligence</div>
-          <h1 id="dynamic-greeting">Good day! 👑</h1>
-          <p>What would you like to build, analyze, or execute today?</p>
+          <div class="hero-header">
+            <h1 id="dynamic-greeting">Hello, User</h1>
+            <p class="subtitle">Where shall we begin today?</p>
+          </div>
 
           <div class="prompt-grid">
             <div class="prompt-card" onclick="usePromptPreset('code')">
               <div class="card-icon"><i class="fa-solid fa-code"></i></div>
-              <h3>Code & Debug</h3>
-              <p>Optimize scripts, review architecture, or fix subtle bugs.</p>
+              <div class="card-text">
+                <h3>Code & Architecture</h3>
+                <p>Debug scripts, optimize functions, or write full web apps.</p>
+              </div>
             </div>
+
             <div class="prompt-card" onclick="usePromptPreset('deep')">
-              <div class="card-icon"><i class="fa-solid fa-microchip"></i></div>
-              <h3>Deep Research</h3>
-              <p>Conduct step-by-step structural analysis on any complex topic.</p>
+              <div class="card-icon"><i class="fa-solid fa-compass"></i></div>
+              <div class="card-text">
+                <h3>Deep Investigation</h3>
+                <p>Analyze complex problems and break down structured logic.</p>
+              </div>
             </div>
+
             <div class="prompt-card" onclick="usePromptPreset('summarize')">
-              <div class="card-icon"><i class="fa-solid fa-file-contract"></i></div>
-              <h3>Summarize</h3>
-              <p>Extract actionable takeaways and core points from text.</p>
+              <div class="card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+              <div class="card-text">
+                <h3>Summarize & Refine</h3>
+                <p>Extract core insights, key takeaways, and bullet points.</p>
+              </div>
             </div>
+
             <div class="prompt-card" onclick="triggerDeviceAction('call')">
-              <div class="card-icon"><i class="fa-solid fa-phone"></i></div>
-              <h3>Action Command</h3>
-              <p>Trigger phone dials, schedule tasks, or draft reminders.</p>
+              <div class="card-icon"><i class="fa-solid fa-phone-flip"></i></div>
+              <div class="card-text">
+                <h3>Assistant Direct Actions</h3>
+                <p>Make phone calls, create reminders, and schedule tasks.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -129,21 +145,35 @@
 
       </div>
 
-      <!-- Floating Docked Input Console -->
+      <!-- Floating Console Dock -->
       <div class="console-wrapper">
-        <div class="console-box">
-          <button class="console-btn" onclick="insertPromptTemplate('deep')" title="Research Template">
+        <div class="console-box" id="console-box">
+          <button class="console-btn" onclick="insertPromptTemplate('deep')" title="Research Mode">
             <i class="fa-solid fa-lightbulb"></i>
           </button>
-          <input type="text" id="chat-input" placeholder="Ask Bosompem anything..." onkeydown="if(event.key==='Enter') handleChatSubmit()" />
+          
+          <!-- Auto-Expanding Textarea -->
+          <textarea 
+            id="chat-input" 
+            placeholder="Message Bosompem..." 
+            rows="1" 
+            oninput="autoExpandTextarea(this)"
+            onkeydown="handleTextareaKeyDown(event)"></textarea>
+
+          <!-- Voice Note Button (Hold/Click to Record Input Text) -->
+          <button id="voice-note-btn" class="console-btn voice-note-btn" onclick="toggleVoiceNoteRecording()" title="Record Voice Note">
+            <i class="fa-solid fa-microphone"></i>
+          </button>
+
           <button class="console-btn" onclick="webSearchFallback()" title="Search Web">
             <i class="fa-solid fa-globe"></i>
           </button>
-          <button id="send-btn" class="send-btn" onclick="handleChatSubmit()">
+
+          <button id="send-btn" class="send-btn" onclick="handleChatSubmit()" title="Send Message">
             <i class="fa-solid fa-paper-plane"></i>
           </button>
         </div>
-        <p class="disclaimer-text">Bosompem AI Pro may produce inaccurate info. Verify critical outputs.</p>
+        <p class="disclaimer-text">Bosompem AI Pro may produce inaccurate details. Verify important results.</p>
       </div>
 
     </main>
@@ -172,7 +202,7 @@
       </div>
       <div class="setting-group">
         <label for="user-name-input">Display Name</label>
-        <input type="text" id="user-name-input" placeholder="Enter your name" />
+        <input type="text" id="user-name-input" placeholder="Enter your name..." />
       </div>
       <button class="action-btn" onclick="saveUserProfile()">Save Profile</button>
     </div>
@@ -190,15 +220,15 @@
         <input type="password" id="api-key" placeholder="Paste API Key here..." />
       </div>
       <div class="setting-group">
-        <label for="model-select">Default Reasoning Model</label>
+        <label for="model-select">Default Model Engine</label>
         <select id="model-select">
-          <option value="gemini-3.8-flash">Gemini 3.8 Flash (High Speed Engine)</option>
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Ultra Fast)</option>
           <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Reasoning)</option>
           <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
         </select>
       </div>
       <div class="setting-group flex-row">
-        <label for="deep-research-toggle">Deep Logical Reasoning Mode</label>
+        <label for="deep-research-toggle">Deep Reasoning Mode</label>
         <input type="checkbox" id="deep-research-toggle" />
       </div>
       <button class="action-btn" onclick="saveSettings()">Save Preferences</button>
