@@ -8,7 +8,7 @@ Answer thoroughly, accurately, and directly using clean Markdown formatting.`;
 const state = {
   userName: localStorage.getItem('bosompem_user_name') || '',
   apiKey: localStorage.getItem('bosompem_api_key') || '',
-  model: localStorage.getItem('bosompem_model') || 'gemini-3.8-flash',
+  model: localStorage.getItem('bosompem_model') || 'gemini-1.5-flash',
   deepResearchMode: localStorage.getItem('bosompem_research_mode') === 'true',
   
   sessions: JSON.parse(localStorage.getItem('bosompem_sessions') || '[]'),
@@ -38,7 +38,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// --- SIDEBAR TOGGLE & NAVIGATION ---
+// --- SIDEBAR TOGGLE ---
 
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
@@ -49,7 +49,13 @@ function toggleSidebar() {
 
 function autoExpandTextarea(el) {
   el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+  const newHeight = Math.min(el.scrollHeight, 160);
+  el.style.height = newHeight + 'px';
+  
+  const consoleBox = document.getElementById('console-box');
+  if (consoleBox) {
+    consoleBox.style.alignItems = newHeight > 32 ? 'flex-end' : 'center';
+  }
 }
 
 function handleTextareaKeyDown(e) {
@@ -72,7 +78,6 @@ function createNewChatSession() {
   saveSessionsToStorage();
   loadSession(newSession.id);
   
-  // Close mobile sidebar if open
   document.getElementById('sidebar').classList.remove('open');
 }
 
@@ -139,63 +144,75 @@ async function sendChatMessage(text) {
   const session = getActiveSession();
   if (!session) return;
 
-  // Set session title from first prompt
   if (session.messages.length === 0) {
     session.title = text.length > 28 ? text.substring(0, 28) + '...' : text;
   }
 
-  // Hide welcome view
   document.getElementById('welcome-screen').style.display = 'none';
   const messagesBox = document.getElementById('chat-messages-container');
   messagesBox.style.display = 'flex';
 
-  // Push user message
   session.messages.push({ role: 'user', text });
   renderMessages();
   saveSessionsToStorage();
 
   const thinkingId = appendThinkingIndicator();
 
-  // Reset textarea height
+  // Reset textarea
   const textarea = document.getElementById('chat-input');
   textarea.value = '';
-  textarea.style.height = 'auto';
+  autoExpandTextarea(textarea);
 
-  // Build payload
   const contentsPayload = session.messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.text }]
   }));
 
   try {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.model}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    // Map UI selection to valid API endpoint models
+    let apiModel = 'gemini-1.5-flash';
+    if (state.model.includes('pro')) {
+      apiModel = 'gemini-1.5-pro';
+    }
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
     
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: contentsPayload,
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        generationConfig: { temperature: state.deepResearchMode ? 0.2 : 0.7 }
+        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] }
       })
     });
 
     const data = await response.json();
     removeThinkingIndicator(thinkingId);
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to retrieve response from Gemini API.";
+    if (data.error) {
+      session.messages.push({ 
+        role: 'assistant', 
+        text: `API Error (${data.error.code || 'Unknown'}): ${data.error.message || 'Please check your API key and permissions.'}` 
+      });
+    } else {
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content received.";
+      session.messages.push({ role: 'assistant', text: reply });
+      
+      if (state.isLiveVoiceActive) {
+        speakText(reply.length > 250 ? reply.substring(0, 250) + "..." : reply);
+      }
+    }
 
-    session.messages.push({ role: 'assistant', text: reply });
     saveSessionsToStorage();
     renderMessages();
 
-    if (state.isLiveVoiceActive) {
-      speakText(reply.length > 250 ? reply.substring(0, 250) + "..." : reply);
-    }
-
   } catch (err) {
     removeThinkingIndicator(thinkingId);
-    session.messages.push({ role: 'assistant', text: "Error communicating with Gemini API. Check network and API Key." });
+    session.messages.push({ 
+      role: 'assistant', 
+      text: "Network error calling Gemini API. Please check internet connection." 
+    });
+    saveSessionsToStorage();
     renderMessages();
   }
 }
@@ -236,12 +253,11 @@ function insertPromptTemplate(type) {
   autoExpandTextarea(input);
 }
 
-// --- VOICE RECOGNITION (LIVE & VOICE NOTES) ---
+// --- VOICE RECOGNITION ---
 
 function initVoiceEngines() {
   if (!SpeechRecognition) return;
 
-  // Live Mode Recognition
   liveRecognition = new SpeechRecognition();
   liveRecognition.continuous = false;
   liveRecognition.onresult = (e) => {
@@ -249,10 +265,9 @@ function initVoiceEngines() {
     if (transcript) sendChatMessage(transcript);
   };
   liveRecognition.onend = () => {
-    if (state.isLiveVoiceActive) liveRecognition.start(); // Keep listening in live mode
+    if (state.isLiveVoiceActive) liveRecognition.start();
   };
 
-  // Voice Note Dictation
   voiceNoteRecognition = new SpeechRecognition();
   voiceNoteRecognition.continuous = false;
   voiceNoteRecognition.onresult = (e) => {
@@ -325,10 +340,10 @@ function saveSettings() {
 }
 
 function loadSavedSettings() {
-  document.getElementById('api-key').value = state.apiKey;
-  document.getElementById('model-select').value = state.model;
-  document.getElementById('deep-research-toggle').checked = state.deepResearchMode;
-  document.getElementById('user-name-input').value = state.userName;
+  if (document.getElementById('api-key')) document.getElementById('api-key').value = state.apiKey;
+  if (document.getElementById('model-select')) document.getElementById('model-select').value = state.model;
+  if (document.getElementById('deep-research-toggle')) document.getElementById('deep-research-toggle').checked = state.deepResearchMode;
+  if (document.getElementById('user-name-input')) document.getElementById('user-name-input').value = state.userName;
 }
 
 function switchModel(val) {
@@ -442,5 +457,4 @@ function speakText(text) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   window.speechSynthesis.speak(u);
-}
-  
+        }
