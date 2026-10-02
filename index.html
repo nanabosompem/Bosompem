@@ -14,21 +14,23 @@
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
     <div class="wave-bar"></div>
-    <span style="margin-left: 8px;">Bosompem is listening...</span>
+    <span style="margin-left: 8px;">Listening for voice command...</span>
   </div>
 
   <!-- Header -->
   <header>
     <div class="header-left">
       <div class="brand-avatar">
-        <i class="fa-solid fa-brain"></i>
+        <i class="fa-solid fa-brain" style="color: #fff; font-size: 1.2rem;"></i>
       </div>
       <div class="brand-info">
         <h1>Bosompem Pro</h1>
-        <p>Research & Device Assistant</p>
+        <p>Intelligence Engine</p>
       </div>
     </div>
-    <button class="liquid-glass-btn" onclick="toggleSettings()" title="Settings"><i class="fa-solid fa-gear"></i></button>
+    <button class="liquid-glass-btn" onclick="toggleSettings()" title="Settings">
+      <i class="fa-solid fa-sliders"></i>
+    </button>
   </header>
 
   <main class="dashboard-container">
@@ -37,62 +39,62 @@
     <section class="welcome-card">
       <div class="welcome-text">
         <h2 id="dynamic-greeting">Good day! 👑</h2>
-        <p>Bosompem Pro is configured for deep analytical research, complex Q&A, and quick device control.</p>
+        <p>Your high-reasoning assistant is online. Execute queries, generate technical analysis, or handle device workflows.</p>
       </div>
     </section>
 
-    <!-- DUAL LIVE VOICE CONTROLS -->
+    <!-- ULTRA VOICE DASHBOARD -->
     <section class="dual-live-card">
-      <div class="live-card-title"><i class="fa-solid fa-bolt" style="color: #06b6d4;"></i> Ultra-Fast Voice Controls</div>
+      <div class="live-card-title"><i class="fa-solid fa-bolt" style="color: var(--accent-cyan);"></i> Voice Control Center</div>
       
       <div class="live-buttons-row">
-        <!-- Live Mode 1: Multi-Task Device Controller -->
+        <!-- Live Mode 1: Device Assistant -->
         <div id="live-device-btn" class="live-mode-box" onclick="startLiveMode('device')">
-          <div class="mic-btn-small" style="background: linear-gradient(135deg, #22c55e, #06b6d4);">
+          <div class="mic-btn-small" style="background: linear-gradient(135deg, #10b981, #06b6d4);">
             <i class="fa-solid fa-mobile-screen-button"></i>
           </div>
-          <span class="mode-title">Device Tasks</span>
-          <span class="mode-desc">Calls, SMS, Search</span>
+          <span class="mode-title">Device Action</span>
+          <span class="mode-desc">Calls & Tasks</span>
         </div>
 
-        <!-- Live Mode 2: Direct AI Chat Instant Voice -->
+        <!-- Live Mode 2: AI Live Chat -->
         <div id="live-chat-btn" class="live-mode-box" onclick="startLiveMode('chat')">
-          <div class="mic-btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7);">
+          <div class="mic-btn-small" style="background: linear-gradient(135deg, #8b5cf6, #3b82f6);">
             <i class="fa-solid fa-comment-dots"></i>
           </div>
-          <span class="mode-title">AI Live Chat</span>
-          <span class="mode-desc">Instant Q&A Answers</span>
+          <span class="mode-title">Live Q&A</span>
+          <span class="mode-desc">Voice Research</span>
         </div>
       </div>
 
       <p id="voice-status-text" class="live-status-label">Select a Live mode above to speak</p>
-      <button class="liquid-glass-btn" style="margin: 10px auto 0 auto; width: 36px; height: 36px;" onclick="stopLiveMode()" title="Stop Voice"><i class="fa-solid fa-stop"></i></button>
+      <button class="liquid-glass-btn" style="margin: 10px auto 0 auto; width: 38px; height: 38px;" onclick="stopLiveMode()" title="Stop Voice"><i class="fa-solid fa-stop"></i></button>
     </section>
 
     <!-- Feature Grid -->
     <section class="feature-grid">
       <div class="feature-item" onclick="openChatModal()">
-        <div class="feature-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i class="fa-solid fa-brain"></i></div>
+        <div class="feature-icon" style="background: rgba(139, 92, 246, 0.15); color: var(--primary);"><i class="fa-solid fa-robot"></i></div>
         <span class="title">Research Chat</span>
         <span class="sub">Deep Q&A</span>
       </div>
       <div class="feature-item" onclick="triggerQuickAction('call')">
-        <div class="feature-icon" style="background: rgba(34, 197, 94, 0.15); color: #4ade80;"><i class="fa-solid fa-phone"></i></div>
+        <div class="feature-icon" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);"><i class="fa-solid fa-phone"></i></div>
         <span class="title">Calls</span>
-        <span class="sub">Dial Contact</span>
+        <span class="sub">Quick Dial</span>
       </div>
       <div class="feature-item" onclick="triggerQuickAction('reminder')">
-        <div class="feature-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;"><i class="fa-solid fa-calendar-days"></i></div>
+        <div class="feature-icon" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan);"><i class="fa-solid fa-calendar-check"></i></div>
         <span class="title">Reminders</span>
         <span class="sub">Schedule</span>
       </div>
     </section>
 
-    <!-- Today's Overview Panel -->
+    <!-- Schedule Panel -->
     <div class="dashboard-split">
       <div class="panel-card">
         <div class="panel-header">
-          <h4><i class="fa-regular fa-calendar" style="color: #c084fc;"></i> Active Tasks & Schedule</h4>
+          <h4><i class="fa-regular fa-clock" style="color: var(--primary);"></i> Active Tasks & Agenda</h4>
           <a href="#" onclick="triggerQuickAction('reminder'); return false;">Manage &rarr;</a>
         </div>
         <div id="overview-reminders-list" class="list-group">
@@ -110,11 +112,11 @@
       <span>Home</span>
     </div>
     <div class="nav-tab" onclick="switchTab('chat', this)">
-      <i class="fa-solid fa-comment-dots"></i>
+      <i class="fa-solid fa-message"></i>
       <span>Research</span>
     </div>
     <div class="nav-tab" onclick="switchTab('memory', this)">
-      <i class="fa-solid fa-memory"></i>
+      <i class="fa-solid fa-brain"></i>
       <span>Memory</span>
     </div>
     <div class="nav-tab" onclick="switchTab('profile', this)">
@@ -123,48 +125,56 @@
     </div>
   </nav>
 
-  <!-- Fixed Mobile Chat Overlay Modal -->
+  <!-- MODERN CHAT OVERLAY MODAL -->
   <div id="chat-modal" class="modal-overlay">
     <div class="modal-header">
       <div class="chat-header-info">
-        <h2>Bosompem Pro Research</h2>
-        <span class="online-indicator"><i class="fa-solid fa-microchip"></i> High-Reasoning Engine</span>
+        <h2>Bosompem Pro Engine</h2>
+        <span class="online-indicator"><i class="fa-solid fa-circle"></i> Gemini High-Reasoning Active</span>
       </div>
       <div style="display: flex; gap: 8px;">
         <button class="liquid-glass-btn" onclick="clearChatHistory()" title="Clear History"><i class="fa-solid fa-trash-can"></i></button>
         <button class="liquid-glass-btn" onclick="closeChatModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
     </div>
+
+    <!-- Quick Tool/Action Bar inside Chat -->
+    <div class="chat-action-bar">
+      <button class="chip-btn" onclick="insertPromptTemplate('code')"><i class="fa-solid fa-code"></i> Code Analysis</button>
+      <button class="chip-btn" onclick="insertPromptTemplate('summarize')"><i class="fa-solid fa-file-contract"></i> Summarize</button>
+      <button class="chip-btn" onclick="insertPromptTemplate('deep')"><i class="fa-solid fa-microchip"></i> Deep Research</button>
+      <button class="chip-btn" onclick="startLiveMode('chat')"><i class="fa-solid fa-microphone"></i> Voice Chat</button>
+    </div>
     
     <div id="chat-modal-messages" class="chat-messages-box">
       <!-- Chat Rendered Dynamically -->
     </div>
     
-    <div class="chat-input-row">
-      <input type="text" id="chat-modal-input" placeholder="Ask a research topic, calculation, or analysis..." onkeydown="if(event.key==='Enter') handleChatSubmit()" />
-      <button class="liquid-glass-btn" onclick="webSearchFallback()" title="Search Web"><i class="fa-solid fa-globe"></i></button>
-      <button class="liquid-glass-btn" onclick="handleChatSubmit()" title="Send"><i class="fa-solid fa-paper-plane"></i></button>
+    <div class="chat-input-wrapper">
+      <input type="text" id="chat-modal-input" placeholder="Type a message or prompt template..." onkeydown="if(event.key==='Enter') handleChatSubmit()" />
+      <button class="liquid-glass-btn" style="width: 36px; height: 36px;" onclick="webSearchFallback()" title="Search Web"><i class="fa-solid fa-globe"></i></button>
+      <button class="chat-send-btn" onclick="handleChatSubmit()" title="Send"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
   </div>
 
-  <!-- Reminders View Modal -->
+  <!-- Reminders Modal -->
   <div id="reminders-modal" class="modal-overlay">
     <div class="modal-header">
       <h2>Reminders</h2>
       <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div id="full-reminders-list" class="list-group" style="flex:1;"></div>
-    <button class="liquid-glass-btn save-config-btn" onclick="addReminder()">+ Add New Reminder</button>
+    <button class="save-config-btn" onclick="addReminder()">+ Add New Reminder</button>
   </div>
 
   <!-- Memory Modal -->
   <div id="memory-modal" class="modal-overlay">
     <div class="modal-header">
-      <h2>Memory & Context</h2>
+      <h2>Context Memory</h2>
       <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="profile-card">
-      <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">Bosompem remembers conversation context across sessions to provide continuous reasoning and structured insights.</p>
+    <div class="panel-card" style="margin-top: 10px;">
+      <p style="font-size: 0.88rem; color: var(--text-sub); line-height: 1.6;">Bosompem remembers conversation context and preferences locally to deliver continuous logical continuity across sessions.</p>
     </div>
   </div>
 
@@ -174,13 +184,12 @@
       <h2>User Profile</h2>
       <button class="liquid-glass-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="profile-card">
-      <div class="profile-avatar"><i class="fa-solid fa-user-gear"></i></div>
-      <div class="setting-group" style="width: 100%; margin-top: 15px;">
-        <label for="user-name-input">Your Display Name</label>
+    <div class="panel-card" style="margin-top: 10px;">
+      <div class="setting-group">
+        <label for="user-name-input">Display Name</label>
         <input type="text" id="user-name-input" placeholder="Enter your name" />
       </div>
-      <button class="liquid-glass-btn save-config-btn" onclick="saveUserProfile()">Update Name & Profile</button>
+      <button class="save-config-btn" onclick="saveUserProfile()">Save Profile</button>
     </div>
   </div>
 
@@ -190,29 +199,31 @@
       <h2>Preferences</h2>
       <button class="liquid-glass-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <div class="setting-group">
-      <label for="api-key">Gemini API Key</label>
-      <input type="password" id="api-key" placeholder="Paste Gemini API Key here" />
+    <div style="flex: 1; overflow-y: auto; padding-top: 10px;">
+      <div class="setting-group">
+        <label for="api-key">Gemini API Key</label>
+        <input type="password" id="api-key" placeholder="Paste your Gemini API Key here" />
+      </div>
+      <div class="setting-group">
+        <label for="model-select">Reasoning Model</label>
+        <select id="model-select">
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (High Speed Engine)</option>
+          <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Logical Reasoning)</option>
+          <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+        </select>
+      </div>
+      <div class="setting-group" style="flex-direction: row; justify-content: space-between; align-items: center;">
+        <label for="deep-research-toggle" style="margin: 0;">Enable Deep Research Mode</label>
+        <input type="checkbox" id="deep-research-toggle" style="width: 20px; height: 20px;" />
+      </div>
+      <div class="setting-group">
+        <label>Biometric Security</label>
+        <button class="save-config-btn" style="background: rgba(6, 182, 212, 0.2); border: 1px solid var(--accent-cyan);" onclick="captureOwnerVoicePrint()">
+          <i class="fa-solid fa-fingerprint"></i> Train Voice Signature
+        </button>
+      </div>
+      <button class="save-config-btn" onclick="saveSettings()">Save Preferences</button>
     </div>
-    <div class="setting-group">
-      <label for="model-select">Primary Reasoning Model</label>
-      <select id="model-select">
-        <option value="gemini-3.8-flash">Gemini 3.8 Flash (High Speed Research)</option>
-        <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Logical Research)</option>
-        <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
-      </select>
-    </div>
-    <div class="setting-group" style="flex-direction: row; justify-content: space-between; align-items: center;">
-      <label for="deep-research-toggle" style="margin: 0;">Enable Deep Research Mode</label>
-      <input type="checkbox" id="deep-research-toggle" style="width: auto; height: 18px;" />
-    </div>
-    <div class="setting-group">
-      <label>Voice Security (Owner Verification)</label>
-      <button class="liquid-glass-btn save-config-btn" style="background: #06b6d4;" onclick="captureOwnerVoicePrint()">
-        <i class="fa-solid fa-fingerprint" style="margin-right: 8px;"></i> Train / Register Voice
-      </button>
-    </div>
-    <button class="liquid-glass-btn save-config-btn" onclick="saveSettings()">Save Preferences</button>
   </div>
 
   <script src="app.js"></script>
