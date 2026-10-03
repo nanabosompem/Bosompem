@@ -275,6 +275,7 @@ html, body {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+  width: 100%;
 }
 
 .live-voice-chip {
@@ -389,7 +390,7 @@ html, body {
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px 20px 140px 20px;
+  padding: 24px 20px 160px 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -410,6 +411,7 @@ html, body {
   max-width: 85%;
   padding: 14px 18px;
   border-radius: var(--radius-lg);
+  word-break: break-word;
 }
 
 .chat-bubble.user .bubble-content {
@@ -441,17 +443,18 @@ html, body {
   font-size: 0.85rem;
 }
 
-/* Console Dock */
+/* Dynamic Expanding Console Dock */
 .console-wrapper {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
   padding: 16px 20px 20px 20px;
-  background: linear-gradient(0deg, var(--bg-deep) 70%, transparent 100%);
+  background: linear-gradient(0deg, var(--bg-deep) 75%, transparent 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
+  z-index: 50;
 }
 
 .console-box {
@@ -463,12 +466,11 @@ html, body {
   border-radius: 24px;
   padding: 10px 14px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, height 0.1s ease;
   min-height: 56px;
-  height: auto;
 }
 
 .console-box:focus-within {
@@ -484,9 +486,9 @@ html, body {
   font-size: 0.95rem;
   outline: none;
   resize: none;
-  max-height: 160px;
-  min-height: 24px;
-  height: 24px;
+  max-height: 180px;
+  min-height: 28px;
+  height: 28px;
   line-height: 1.4;
   padding: 4px 0;
   box-sizing: border-box;
@@ -506,6 +508,8 @@ html, body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  height: 38px;
+  width: 38px;
 }
 
 .console-btn:hover {
@@ -688,4 +692,4 @@ html, body {
   .prompt-grid {
     grid-template-columns: 1fr;
   }
-}
+  }
