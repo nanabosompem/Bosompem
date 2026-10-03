@@ -1,11 +1,12 @@
 // ==========================================
-// BOSOMPEM AI PRO - ENGINE & CONTROLLERS
+// BOSOMPEM AI PRO - ARCHITECTURE ENGINE
 // ==========================================
 
-const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an advanced AI assistant.
+const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an advanced AI personal assistant.
 Answer thoroughly, accurately, and directly using clean Markdown formatting.`;
 
 const state = {
+  activeScreen: 'chat',
   userName: localStorage.getItem('bosompem_user_name') || '',
   apiKey: localStorage.getItem('bosompem_api_key') || '',
   model: localStorage.getItem('bosompem_model') || 'gemini-2.5-flash',
@@ -16,7 +17,8 @@ const state = {
   
   isLiveVoiceActive: false,
   isVoiceNoteRecording: false,
-  reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]')
+  reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]'),
+  selectedImageData: null
 };
 
 // Web Speech API
@@ -30,6 +32,8 @@ window.addEventListener('DOMContentLoaded', () => {
   loadSavedSettings();
   updateGreeting();
   renderReminders();
+  updateClock();
+  setInterval(updateClock, 30000);
 
   if (state.sessions.length === 0) {
     createNewChatSession();
@@ -38,23 +42,62 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// --- SIDEBAR TOGGLE ---
-function toggleSidebar() {
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) sidebar.classList.toggle('open');
+// --- STATUS BAR CLOCK ---
+function updateClock() {
+  const timeEl = document.getElementById('status-time');
+  if (!timeEl) return;
+  const now = new Date();
+  timeEl.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// --- DYNAMIC AUTO-EXPANDING INPUT BOX ---
+// --- SCREEN SWITCHER (6 SCREENS) ---
+function openScreen(screenId) {
+  state.activeScreen = screenId;
+
+  // Update screen visibility
+  document.querySelectorAll('.screen-view').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById(`screen-${screenId}`);
+  if (target) target.classList.add('active');
+
+  // Update Bottom Nav icons
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.screen === screenId);
+  });
+
+  // Update Topbar Title
+  const titleMap = {
+    'chat': 'Chat Studio',
+    'live-voice': 'Live Voice Mode',
+    'media-lab': 'Photo & Media Lab',
+    'tasks': 'Tasks & Reminders',
+    'profile': 'User Profile',
+    'settings': 'System Settings'
+  };
+  const titleEl = document.getElementById('active-screen-title');
+  if (titleEl) titleEl.innerText = titleMap[screenId] || 'Bosompem AI';
+}
+
+// --- NAVIGATION DRAWER ---
+function toggleNavDrawer() {
+  const drawer = document.getElementById('nav-drawer');
+  const overlay = document.getElementById('nav-overlay');
+  if (drawer && overlay) {
+    drawer.classList.toggle('open');
+    overlay.classList.toggle('active');
+  }
+}
+
+function switchScreenFromDrawer(screenId) {
+  openScreen(screenId);
+  toggleNavDrawer();
+}
+
+// --- TEXTAREA AUTO EXPAND ---
 function autoExpandTextarea(el) {
   if (!el) return;
-  el.style.height = '28px'; // Reset base height for recalculation
-  const newHeight = Math.min(el.scrollHeight, 180);
+  el.style.height = '24px';
+  const newHeight = Math.min(el.scrollHeight, 120);
   el.style.height = newHeight + 'px';
-  
-  const consoleBox = document.getElementById('console-box');
-  if (consoleBox) {
-    consoleBox.style.alignItems = newHeight > 40 ? 'flex-end' : 'center';
-  }
 }
 
 function handleTextareaKeyDown(e) {
@@ -64,7 +107,7 @@ function handleTextareaKeyDown(e) {
   }
 }
 
-// --- SESSION MANAGEMENT ---
+// --- SESSIONS & CHAT ---
 function createNewChatSession() {
   const newSession = {
     id: 'session-' + Date.now(),
@@ -75,27 +118,22 @@ function createNewChatSession() {
   state.sessions.unshift(newSession);
   saveSessionsToStorage();
   loadSession(newSession.id);
-  
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar) sidebar.classList.remove('open');
 }
 
 function loadSession(sessionId) {
   state.activeSessionId = sessionId;
-  renderHistorySidebar();
-
   const session = getActiveSession();
-  const welcomeScreen = document.getElementById('welcome-screen');
+  const hero = document.getElementById('welcome-hero');
   const messagesBox = document.getElementById('chat-messages-container');
 
   if (!session || session.messages.length === 0) {
-    if (welcomeScreen) welcomeScreen.style.display = 'flex';
+    if (hero) hero.style.display = 'flex';
     if (messagesBox) {
       messagesBox.style.display = 'none';
       messagesBox.innerHTML = '';
     }
   } else {
-    if (welcomeScreen) welcomeScreen.style.display = 'none';
+    if (hero) hero.style.display = 'none';
     if (messagesBox) messagesBox.style.display = 'flex';
     renderMessages();
   }
@@ -109,35 +147,12 @@ function saveSessionsToStorage() {
   localStorage.setItem('bosompem_sessions', JSON.stringify(state.sessions));
 }
 
-function renderHistorySidebar() {
-  const container = document.getElementById('history-list');
-  if (!container) return;
-
-  container.innerHTML = state.sessions.map(s => `
-    <div class="history-item ${s.id === state.activeSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')">
-      <i class="fa-regular fa-message"></i>
-      <span>${escapeHtml(s.title)}</span>
-    </div>
-  `).join('');
-}
-
-function clearCurrentChat() {
-  const session = getActiveSession();
-  if (session && confirm("Clear current thread messages?")) {
-    session.messages = [];
-    session.title = "New Conversation";
-    saveSessionsToStorage();
-    loadSession(session.id);
-  }
-}
-
-// --- CHAT API & MESSAGING ---
 async function sendChatMessage(text) {
   if (!text || !text.trim()) return;
 
   if (!state.apiKey) {
-    alert("Please enter your Gemini API Key in System Preferences first.");
-    toggleSettings();
+    alert("Please set your Gemini API Key in System Settings first.");
+    openScreen('settings');
     return;
   }
 
@@ -145,11 +160,11 @@ async function sendChatMessage(text) {
   if (!session) return;
 
   if (session.messages.length === 0) {
-    session.title = text.length > 28 ? text.substring(0, 28) + '...' : text;
+    session.title = text.length > 25 ? text.substring(0, 25) + '...' : text;
   }
 
-  const welcomeScreen = document.getElementById('welcome-screen');
-  if (welcomeScreen) welcomeScreen.style.display = 'none';
+  const hero = document.getElementById('welcome-hero');
+  if (hero) hero.style.display = 'none';
 
   const messagesBox = document.getElementById('chat-messages-container');
   if (messagesBox) messagesBox.style.display = 'flex';
@@ -160,7 +175,6 @@ async function sendChatMessage(text) {
 
   const thinkingId = appendThinkingIndicator();
 
-  // Reset textarea dynamically
   const textarea = document.getElementById('chat-input');
   if (textarea) {
     textarea.value = '';
@@ -191,14 +205,14 @@ async function sendChatMessage(text) {
     if (data.error) {
       session.messages.push({ 
         role: 'assistant', 
-        text: `API Error (${data.error.code || '404'}): ${data.error.message || 'Selected model not found or invalid API key.'}` 
+        text: `API Error: ${data.error.message || 'Check API key or selection.'}` 
       });
     } else {
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response content received.";
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
       session.messages.push({ role: 'assistant', text: reply });
       
       if (state.isLiveVoiceActive) {
-        speakText(reply.length > 300 ? reply.substring(0, 300) + "..." : reply);
+        speakText(reply.length > 250 ? reply.substring(0, 250) + "..." : reply);
       }
     }
 
@@ -209,7 +223,7 @@ async function sendChatMessage(text) {
     removeThinkingIndicator(thinkingId);
     session.messages.push({ 
       role: 'assistant', 
-      text: "Network connection error calling Gemini API." 
+      text: "Connection error reaching Gemini API." 
     });
     saveSessionsToStorage();
     renderMessages();
@@ -235,140 +249,121 @@ function renderMessages() {
 function handleChatSubmit() {
   const textarea = document.getElementById('chat-input');
   if (!textarea) return;
-  const text = textarea.value;
-  if (!text.trim()) return;
-  sendChatMessage(text);
+  sendChatMessage(textarea.value);
 }
 
 function usePromptPreset(type) {
-  if (type === 'code') sendChatMessage("Write a clean, optimized code module and explain its implementation:");
-  else if (type === 'deep') sendChatMessage("Provide a deep technical and architectural research breakdown on:");
-  else if (type === 'summarize') sendChatMessage("Extract actionable summary points and key takeaways for:");
+  if (type === 'code') sendChatMessage("Write a clean, modular Javascript function for:");
+  else if (type === 'deep') sendChatMessage("Provide an architectural and technical deep dive for:");
 }
 
-function insertPromptTemplate(type) {
-  const input = document.getElementById('chat-input');
-  if (!input) return;
-  if (type === 'deep') input.value = "Conduct deep technical research on: ";
-  input.focus();
-  autoExpandTextarea(input);
-}
-
-// --- IMPROVED LIVE & RECORD VOICE ENGINES ---
+// --- LIVE VOICE MODE ---
 function initVoiceEngines() {
   if (!SpeechRecognition) return;
 
-  // 1. Live Interactive Voice Mode
   liveRecognition = new SpeechRecognition();
   liveRecognition.continuous = false;
-  liveRecognition.interimResults = false;
+  liveRecognition.interimResults = true;
   liveRecognition.lang = 'en-US';
 
   liveRecognition.onresult = (e) => {
     const transcript = e.results[0][0].transcript;
-    if (transcript && transcript.trim()) {
+    const card = document.getElementById('voice-live-transcript');
+    if (card) card.innerText = transcript;
+
+    if (e.results[0].isFinal && transcript.trim()) {
       sendChatMessage(transcript);
     }
   };
 
   liveRecognition.onend = () => {
     if (state.isLiveVoiceActive) {
-      setTimeout(() => {
-        try { liveRecognition.start(); } catch(err){}
-      }, 300);
+      setTimeout(() => { try { liveRecognition.start(); } catch(e){} }, 300);
     }
   };
 
-  // 2. Voice Dictation Engine
   voiceNoteRecognition = new SpeechRecognition();
   voiceNoteRecognition.continuous = true;
   voiceNoteRecognition.interimResults = true;
-  voiceNoteRecognition.lang = 'en-US';
-
-  let baseText = '';
-
-  voiceNoteRecognition.onstart = () => {
-    const input = document.getElementById('chat-input');
-    baseText = input ? input.value : '';
-  };
 
   voiceNoteRecognition.onresult = (e) => {
-    let interimTranscript = '';
-    let finalTranscript = '';
-
+    let transcript = '';
     for (let i = e.resultIndex; i < e.results.length; ++i) {
-      if (e.results[i].isFinal) {
-        finalTranscript += e.results[i][0].transcript;
-      } else {
-        interimTranscript += e.results[i][0].transcript;
-      }
+      transcript += e.results[i][0].transcript;
     }
-
     const input = document.getElementById('chat-input');
     if (input) {
-      input.value = (baseText + ' ' + finalTranscript + ' ' + interimTranscript).trim();
+      input.value = transcript;
       autoExpandTextarea(input);
     }
-  };
-
-  voiceNoteRecognition.onerror = () => {
-    stopVoiceNoteRecording();
-  };
-
-  voiceNoteRecognition.onend = () => {
-    stopVoiceNoteRecording();
   };
 }
 
 function toggleLiveVoiceMode() {
   if (!SpeechRecognition) {
-    alert("Voice recognition is not supported on this device/browser.");
+    alert("Voice recognition not supported on this device.");
     return;
   }
 
   state.isLiveVoiceActive = !state.isLiveVoiceActive;
-  const chip = document.getElementById('voice-mode-trigger');
-  const bar = document.getElementById('listening-indicator');
+  const btn = document.getElementById('live-voice-toggle-btn');
+  const title = document.getElementById('voice-status-title');
 
   if (state.isLiveVoiceActive) {
-    if (chip) chip.classList.add('active');
-    if (bar) bar.classList.add('active');
+    if (btn) btn.innerHTML = `<i class="fa-solid fa-stop"></i> Stop Live Mode`;
+    if (title) title.innerText = "Listening...";
     try { liveRecognition.start(); } catch(e){}
   } else {
-    if (chip) chip.classList.remove('active');
-    if (bar) bar.classList.remove('active');
+    if (btn) btn.innerHTML = `<i class="fa-solid fa-microphone"></i> Start Live Mode`;
+    if (title) title.innerText = "Live Voice Paused";
     try { liveRecognition.stop(); } catch(e){}
   }
 }
 
 function toggleVoiceNoteRecording() {
-  if (!SpeechRecognition) {
-    alert("Voice dictation is not supported on this browser.");
+  if (!SpeechRecognition) return;
+  state.isVoiceNoteRecording = !state.isVoiceNoteRecording;
+  const btn = document.getElementById('voice-note-btn');
+
+  if (state.isVoiceNoteRecording) {
+    if (btn) btn.style.color = 'var(--accent-rose)';
+    try { voiceNoteRecognition.start(); } catch(e){}
+  } else {
+    if (btn) btn.style.color = 'var(--text-sub)';
+    try { voiceNoteRecognition.stop(); } catch(e){}
+  }
+}
+
+// --- PHOTO & MEDIA LAB ---
+function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    state.selectedImageData = event.target.result;
+    const preview = document.getElementById('lab-image-preview');
+    const box = document.getElementById('image-preview-box');
+    if (preview && box) {
+      preview.src = state.selectedImageData;
+      box.style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function processMediaLabTask() {
+  const promptText = document.getElementById('media-prompt-input')?.value;
+  if (!promptText && !state.selectedImageData) {
+    alert("Please select an image or enter design instructions.");
     return;
   }
 
-  if (state.isVoiceNoteRecording) {
-    stopVoiceNoteRecording();
-  } else {
-    startVoiceNoteRecording();
-  }
+  openScreen('chat');
+  sendChatMessage(`[Media Lab Processing Request]: ${promptText || "Enhance & sharpen focus on uploaded media."}`);
 }
 
-function startVoiceNoteRecording() {
-  state.isVoiceNoteRecording = true;
-  const btn = document.getElementById('voice-note-btn');
-  if (btn) btn.classList.add('recording');
-  try { voiceNoteRecognition.start(); } catch(e){}
-}
-
-function stopVoiceNoteRecording() {
-  state.isVoiceNoteRecording = false;
-  const btn = document.getElementById('voice-note-btn');
-  if (btn) btn.classList.remove('recording');
-  try { voiceNoteRecognition.stop(); } catch(e){}
-}
-
-// --- MODALS & SETTINGS ---
+// --- SETTINGS & PROFILE ---
 function saveSettings() {
   const keyInput = document.getElementById('api-key');
   const modelSelect = document.getElementById('model-select');
@@ -382,47 +377,24 @@ function saveSettings() {
   localStorage.setItem('bosompem_model', state.model);
   localStorage.setItem('bosompem_research_mode', state.deepResearchMode);
 
-  syncModelSelectDropdowns(state.model);
-  toggleSettings();
-  alert("Preferences saved successfully!");
+  alert("Settings updated!");
 }
 
 function loadSavedSettings() {
   const keyInput = document.getElementById('api-key');
+  const modelSelect = document.getElementById('model-select');
   const deepToggle = document.getElementById('deep-research-toggle');
   const nameInput = document.getElementById('user-name-input');
 
   if (keyInput) keyInput.value = state.apiKey;
+  if (modelSelect) modelSelect.value = state.model;
   if (deepToggle) deepToggle.checked = state.deepResearchMode;
   if (nameInput) nameInput.value = state.userName;
-
-  syncModelSelectDropdowns(state.model);
 }
 
 function switchModel(val) {
   state.model = val;
   localStorage.setItem('bosompem_model', val);
-  syncModelSelectDropdowns(val);
-}
-
-function syncModelSelectDropdowns(val) {
-  const topbarSelect = document.getElementById('topbar-model-select');
-  const modalSelect = document.getElementById('model-select');
-  const label = document.getElementById('active-model-label');
-
-  if (topbarSelect) topbarSelect.value = val;
-  if (modalSelect) modalSelect.value = val;
-  
-  if (label && topbarSelect && topbarSelect.selectedIndex >= 0) {
-    label.innerText = topbarSelect.options[topbarSelect.selectedIndex].text;
-  }
-}
-
-function updateGreeting() {
-  const greetingEl = document.getElementById('dynamic-greeting');
-  if (greetingEl) {
-    greetingEl.innerText = `Hello${state.userName ? ', ' + state.userName : ''}`;
-  }
 }
 
 function saveUserProfile() {
@@ -432,26 +404,43 @@ function saveUserProfile() {
     localStorage.setItem('bosompem_user_name', state.userName);
     updateGreeting();
   }
-  closeAllModals();
+  alert("Profile saved!");
 }
 
-function openModal(id) {
-  closeAllModals();
-  const target = document.getElementById(id);
-  if (target) target.classList.add('active');
+function updateGreeting() {
+  const greetingEl = document.getElementById('dynamic-greeting');
+  if (greetingEl) {
+    greetingEl.innerText = `Hello${state.userName ? ', ' + state.userName : ''}`;
+  }
 }
 
-function closeAllModals() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+// --- REMINDERS & UTILITIES ---
+function addReminder() {
+  const text = prompt("Enter task or reminder:");
+  if (text) {
+    state.reminders.unshift({ id: Date.now(), text });
+    localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
+    renderReminders();
+  }
 }
 
-function toggleSettings() {
-  const panel = document.getElementById('settings-panel');
-  if (panel) panel.classList.toggle('active');
+function renderReminders() {
+  const list = document.getElementById('full-reminders-list');
+  if (!list) return;
+  if (state.reminders.length === 0) {
+    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No scheduled tasks.</p>`;
+    return;
+  }
+  list.innerHTML = state.reminders.map(r => `
+    <div class="task-item">
+      <span>${escapeHtml(r.text)}</span>
+      <i class="fa-solid fa-check" style="color:var(--accent-cyan)"></i>
+    </div>
+  `).join('');
 }
 
 function scrollToBottom() {
-  const box = document.getElementById('chat-viewport');
+  const box = document.getElementById('chat-messages-container');
   if (box) box.scrollTop = box.scrollHeight;
 }
 
@@ -462,7 +451,7 @@ function appendThinkingIndicator() {
   const el = document.createElement('div');
   el.className = 'chat-bubble assistant';
   el.id = id;
-  el.innerHTML = `<div class="bubble-content" style="color: var(--accent-cyan);"><i class="fa-solid fa-brain fa-spin"></i> Thinking...</div>`;
+  el.innerHTML = `<div class="bubble-content" style="color: var(--accent-cyan);"><i class="fa-solid fa-brain fa-spin"></i> Processing...</div>`;
   box.appendChild(el);
   scrollToBottom();
   return id;
@@ -495,32 +484,10 @@ function webSearchFallback() {
   }
 }
 
-function addReminder() {
-  const text = prompt("Enter new task:");
-  if (text) {
-    state.reminders.unshift({ id: Date.now(), text });
-    localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
-    renderReminders();
-  }
-}
-
-function renderReminders() {
-  const list = document.getElementById('full-reminders-list');
-  if (!list) return;
-  if (state.reminders.length === 0) {
-    list.innerHTML = `<p style="font-size: 0.85rem; color: var(--text-muted);">No scheduled tasks.</p>`;
-    return;
-  }
-  list.innerHTML = state.reminders.map(r => `
-    <div style="padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size:0.85rem; margin-bottom: 6px;">
-      <strong>${escapeHtml(r.text)}</strong>
-    </div>
-  `).join('');
-}
-
 function speakText(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   window.speechSynthesis.speak(u);
-                           }
+      }
+         
