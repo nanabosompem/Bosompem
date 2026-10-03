@@ -1,6 +1,6 @@
 /**
- * BOSOMPEM PRO ARCHITECTURE ENGINE
- * Edge-Cloud Hybrid Multimodal Assistant Layer
+ * BOSOMPEM PRO CORE ENGINE
+ * Safe Initialization & Multimodal Engine Layer
  */
 
 class SecureMemoryStore {
@@ -11,8 +11,19 @@ class SecureMemoryStore {
     }
 
     async init() {
-        this.key = await this.getOrCreateKey();
-        return new Promise((resolve, reject) => {
+        try {
+            if (window.crypto && window.crypto.subtle) {
+                this.key = await this.getOrCreateKey();
+            }
+        } catch (e) {
+            console.warn("WebCrypto restricted, running non-encrypted memory mode:", e);
+        }
+
+        return new Promise((resolve) => {
+            if (!window.indexedDB) {
+                console.warn("IndexedDB not available.");
+                return resolve();
+            }
             const request = indexedDB.open(this.dbName, 1);
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
@@ -24,12 +35,14 @@ class SecureMemoryStore {
                 this.db = e.target.result;
                 resolve();
             };
-            request.onerror = reject;
+            request.onerror = () => {
+                console.warn("IndexedDB init failed.");
+                resolve();
+            };
         });
     }
 
     async getOrCreateKey() {
-        // Secure key storage initialization using WebCrypto
         return await window.crypto.subtle.generateKey(
             { name: "AES-GCM", length: 256 },
             true,
@@ -38,49 +51,43 @@ class SecureMemoryStore {
     }
 
     async saveMemory(id, data) {
-        const enc = new TextEncoder();
-        const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const encrypted = await window.crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv },
-            this.key,
-            enc.encode(JSON.stringify(data))
-        );
-
-        return new Promise((resolve) => {
+        if (!this.db) return;
+        try {
             const tx = this.db.transaction('memories', 'readwrite');
             const store = tx.objectStore('memories');
-            store.put({ id, data: encrypted, iv });
-            tx.oncomplete = resolve;
-        });
+            if (this.key) {
+                const enc = new TextEncoder();
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                const encrypted = await window.crypto.subtle.encrypt(
+                    { name: "AES-GCM", iv: iv },
+                    this.key,
+                    enc.encode(JSON.stringify(data))
+                );
+                store.put({ id, data: encrypted, iv });
+            } else {
+                store.put({ id, data: JSON.stringify(data) });
+            }
+        } catch (e) {
+            console.error("Memory write error:", e);
+        }
     }
 }
 
 class OrchestrationPlanner {
     constructor() {
-        this.sensitiveActions = ['payment', 'delete_file', 'send_external_msg', 'modify_system'];
+        this.sensitiveActions = ['payment', 'delete', 'send_msg', 'system_setting', 'clear'];
     }
 
     parseIntent(input) {
-        // Deconstruct query into action pipeline steps
         const steps = [];
-        const isMultiStep = input.includes('and') || input.includes('then');
-        
-        if (isMultiStep) {
-            const parts = input.split(/and|then/g);
-            parts.forEach((part, index) => {
-                steps.push({
-                    step: index + 1,
-                    action: part.trim(),
-                    isSensitive: this.checkSensitivity(part)
-                });
-            });
-        } else {
+        const parts = input.split(/and|then/g);
+        parts.forEach((part, index) => {
             steps.push({
-                step: 1,
-                action: input.trim(),
-                isSensitive: this.checkSensitivity(input)
+                step: index + 1,
+                action: part.trim(),
+                isSensitive: this.checkSensitivity(part)
             });
-        }
+        });
         return steps;
     }
 
@@ -101,8 +108,12 @@ class BosompemProCore {
     }
 
     async init() {
-        await this.memory.init();
-        console.log("Bosompem Core: Secure Local Vault & Engine Initialized.");
+        try {
+            await this.memory.init();
+            console.log("Bosompem Engine operational.");
+        } catch (e) {
+            console.error("Initialization warning:", e);
+        }
     }
 
     initUI() {
@@ -121,8 +132,20 @@ class BosompemProCore {
             cancelBtn: document.getElementById('btn-cancel-action')
         };
 
-        this.ui.sendBtn.addEventListener('click', () => this.handleUserSubmit());
-        this.ui.cameraBtn.addEventListener('click', () => this.toggleCameraStream());
+        if (this.ui.sendBtn) {
+            this.ui.sendBtn.addEventListener('click', () => this.handleUserSubmit());
+        }
+        if (this.ui.userInput) {
+            this.ui.userInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.handleUserSubmit();
+                }
+            });
+        }
+        if (this.ui.cameraBtn) {
+            this.ui.cameraBtn.addEventListener('click', () => this.toggleCameraStream());
+        }
     }
 
     initNetworkMonitoring() {
@@ -132,12 +155,13 @@ class BosompemProCore {
 
     updateNodeState(online) {
         this.isOnline = online;
+        if (!this.ui.nodeIndicator) return;
         if (online) {
             this.ui.nodeIndicator.className = "telemetry-badge cloud";
-            this.ui.nodeIndicator.innerHTML = `<i class="fa-solid fa-cloud"></i> HYBRID CLOUD`;
+            this.ui.nodeIndicator.innerHTML = `☁️ HYBRID CLOUD`;
         } else {
             this.ui.nodeIndicator.className = "telemetry-badge edge";
-            this.ui.nodeIndicator.innerHTML = `<i class="fa-solid fa-microchip"></i> EDGE LOCAL`;
+            this.ui.nodeIndicator.innerHTML = `⚡ EDGE LOCAL`;
         }
     }
 
@@ -157,34 +181,25 @@ class BosompemProCore {
             if (task.isSensitive) {
                 const confirmed = await this.requestUserConfirmation(task.action);
                 if (!confirmed) {
-                    this.appendChatBubble('assistant', `Execution aborted for step ${task.step}: ${task.action}`);
+                    this.appendChatBubble('assistant', `Step ${task.step} cancelled.`);
                     return;
                 }
             }
 
-            // Route execution between local edge vs cloud processing engine
-            const executionNode = this.isOnline ? "CLOUD ENGINE" : "EDGE ON-DEVICE";
-            this.appendChatBubble('assistant', `[${executionNode}] Executing Step ${task.step}: "${task.action}"`);
-            
-            // Persist encrypted action history
+            const executionNode = this.isOnline ? "CLOUD" : "EDGE LOCAL";
+            this.appendChatBubble('assistant', `[${executionNode}] Processing: "${task.action}"`);
             await this.memory.saveMemory(Date.now().toString(), { task: task.action, timestamp: Date.now() });
         }
     }
 
     requestUserConfirmation(actionDescription) {
         return new Promise((resolve) => {
-            this.ui.dialogMsg.innerText = `Bosompem requires confirmation to execute sensitive intent: "${actionDescription}"`;
+            if (!this.ui.dialog) return resolve(true);
+            this.ui.dialogMsg.innerText = `Confirm execution: "${actionDescription}"`;
             this.ui.dialog.classList.remove('hidden');
 
-            const onConfirm = () => {
-                cleanup();
-                resolve(true);
-            };
-
-            const onCancel = () => {
-                cleanup();
-                resolve(false);
-            };
+            const onConfirm = () => { cleanup(); resolve(true); };
+            const onCancel = () => { cleanup(); resolve(false); };
 
             const cleanup = () => {
                 this.ui.confirmBtn.removeEventListener('click', onConfirm);
@@ -208,12 +223,13 @@ class BosompemProCore {
                 this.ui.cameraStream.srcObject = this.mediaStream;
                 this.ui.viewport.classList.remove('hidden');
             } catch (err) {
-                alert("Camera Multimodal Stream inaccessible: " + err.message);
+                alert("Camera access unavailable: " + err.message);
             }
         }
     }
 
     appendChatBubble(sender, text) {
+        if (!this.ui.chatThread) return;
         const bubble = document.createElement('div');
         bubble.className = `chat-bubble ${sender}`;
         bubble.innerText = text;
@@ -222,9 +238,8 @@ class BosompemProCore {
     }
 }
 
-// Register Service Worker and Boot System Core
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.error("SW Registration failed", err));
+    navigator.serviceWorker.register('./sw.js').catch(err => console.error("SW issue:", err));
 }
 
 window.addEventListener('DOMContentLoaded', () => {
