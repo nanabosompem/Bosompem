@@ -50,21 +50,18 @@ function updateClock() {
   timeEl.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// --- SCREEN SWITCHER (6 SCREENS) ---
+// --- SCREEN SWITCHER ---
 function openScreen(screenId) {
   state.activeScreen = screenId;
 
-  // Update screen visibility
   document.querySelectorAll('.screen-view').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(`screen-${screenId}`);
   if (target) target.classList.add('active');
 
-  // Update Bottom Nav icons
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.screen === screenId);
   });
 
-  // Update Topbar Title
   const titleMap = {
     'chat': 'Chat Studio',
     'live-voice': 'Live Voice Mode',
@@ -147,7 +144,7 @@ function saveSessionsToStorage() {
   localStorage.setItem('bosompem_sessions', JSON.stringify(state.sessions));
 }
 
-async function sendChatMessage(text) {
+async function sendChatMessage(text, imageData = null) {
   if (!text || !text.trim()) return;
 
   if (!state.apiKey) {
@@ -181,10 +178,27 @@ async function sendChatMessage(text) {
     autoExpandTextarea(textarea);
   }
 
-  const contentsPayload = session.messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.text }]
-  }));
+  // Build Payload including Multimodal Base64 Image handling
+  const contentsPayload = session.messages.map((m, idx) => {
+    const parts = [{ text: m.text }];
+    
+    // Attach selected image payload to the latest user prompt if present
+    if (idx === session.messages.length - 1 && imageData) {
+      const base64Data = imageData.split(',')[1];
+      const mimeType = imageData.substring(imageData.indexOf(':') + 1, imageData.indexOf(';'));
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      });
+    }
+
+    return {
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts
+    };
+  });
 
   try {
     const selectedModel = state.model || 'gemini-2.5-flash';
@@ -215,6 +229,9 @@ async function sendChatMessage(text) {
         speakText(reply.length > 250 ? reply.substring(0, 250) + "..." : reply);
       }
     }
+
+    // Reset attached image data post request
+    state.selectedImageData = null;
 
     saveSessionsToStorage();
     renderMessages();
@@ -249,7 +266,7 @@ function renderMessages() {
 function handleChatSubmit() {
   const textarea = document.getElementById('chat-input');
   if (!textarea) return;
-  sendChatMessage(textarea.value);
+  sendChatMessage(textarea.value, state.selectedImageData);
 }
 
 function usePromptPreset(type) {
@@ -359,8 +376,9 @@ function processMediaLabTask() {
     return;
   }
 
+  const query = promptText || "Analyze this image and enhance subject sharpness and focus.";
   openScreen('chat');
-  sendChatMessage(`[Media Lab Processing Request]: ${promptText || "Enhance & sharpen focus on uploaded media."}`);
+  sendChatMessage(`[Media Lab Request]: ${query}`, state.selectedImageData);
 }
 
 // --- SETTINGS & PROFILE ---
@@ -409,8 +427,13 @@ function saveUserProfile() {
 
 function updateGreeting() {
   const greetingEl = document.getElementById('dynamic-greeting');
+  const drawerUserEl = document.getElementById('drawer-user-name');
+  
   if (greetingEl) {
     greetingEl.innerText = `Hello${state.userName ? ', ' + state.userName : ''}`;
+  }
+  if (drawerUserEl && state.userName) {
+    drawerUserEl.innerText = state.userName;
   }
 }
 
@@ -489,5 +512,5 @@ function speakText(text) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   window.speechSynthesis.speak(u);
-      }
-         
+}
+  
