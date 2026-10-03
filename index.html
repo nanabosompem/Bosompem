@@ -1,195 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bosompem AI Pro</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-  <!-- Voice Waves Overlay Bar (Live Mode) -->
-  <div id="listening-indicator" class="listening-bar">
-    <div class="wave-bar"></div>
-    <div class="wave-bar"></div>
-    <div class="wave-bar"></div>
-    <span id="listening-text">Listening in Live Mode...</span>
-    <button class="stop-live-btn" onclick="toggleLiveVoiceMode()">End</button>
-  </div>
-
   <div class="app-layout">
-    
-    <!-- LEFT SIDEBAR -->
+    <!-- Live Voice Header Bar -->
+    <div id="listening-indicator" class="listening-bar">
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <span>Listening for Live Voice...</span>
+      <button class="stop-live-btn" onclick="toggleLiveVoiceMode()">Stop</button>
+    </div>
+
+    <!-- SIDEBAR -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-top">
         <div class="brand">
-          <div class="brand-avatar">
-            <i class="fa-solid fa-brain"></i>
+          <div style="display: flex; align-items: center;">
+            <div class="brand-avatar"><i class="fa-solid fa-brain"></i></div>
+            <div class="brand-info">
+              <h2>Bosompem</h2>
+              <p>AI Pro Engine</p>
+            </div>
           </div>
-          <div class="brand-info">
-            <h2>Bosompem AI</h2>
-            <p>Pro Workspace</p>
-          </div>
-          <button class="icon-btn mobile-close-btn" onclick="toggleSidebar()">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
+          <button class="icon-btn mobile-close-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
         </div>
+
         <button class="new-chat-btn" onclick="createNewChatSession()">
-          <i class="fa-solid fa-plus"></i> New Chat
+          <i class="fa-solid fa-plus"></i> New Conversation
         </button>
-      </div>
 
-      <!-- Scrollable History List -->
-      <div class="history-section">
-        <span class="section-label">Recent Conversations</span>
-        <div id="history-list" class="history-list">
-          <!-- Session threads dynamically generated here -->
+        <div class="history-section">
+          <div class="section-label">Recent Threads</div>
+          <div id="history-list" class="history-list"></div>
         </div>
       </div>
 
-      <!-- Sidebar Footer Tools -->
       <div class="sidebar-bottom">
-        <div class="tool-menu-item" onclick="openModal('reminders-modal')">
-          <i class="fa-solid fa-clock"></i> Tasks & Reminders
-        </div>
         <div class="tool-menu-item" onclick="openModal('profile-modal')">
-          <i class="fa-solid fa-user-gear"></i> User Profile
+          <i class="fa-regular fa-user"></i> Profile Settings
         </div>
         <div class="tool-menu-item" onclick="toggleSettings()">
           <i class="fa-solid fa-sliders"></i> System Preferences
         </div>
+        <div class="tool-menu-item" onclick="openModal('reminders-modal')">
+          <i class="fa-regular fa-clock"></i> Scheduled Tasks
+        </div>
+        <div class="tool-menu-item" onclick="clearCurrentChat()">
+          <i class="fa-regular fa-trash-can"></i> Clear Current Thread
+        </div>
       </div>
     </aside>
 
-    <!-- MAIN CHAT WORKSPACE -->
+    <!-- MAIN CHAT AREA -->
     <main class="chat-main">
-      
-      <!-- Top Navigation Bar -->
       <header class="chat-topbar">
         <div class="topbar-left">
-          <button class="icon-btn sidebar-toggle" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
-            <i class="fa-solid fa-bars"></i>
-          </button>
+          <button class="icon-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
           <div class="model-selector-wrapper">
-            <span class="active-model-title" id="active-model-label">Gemini 3.8 Flash</span>
+            <span id="active-model-label" class="active-model-title">Gemini 2.5 Flash</span>
             <i class="fa-solid fa-chevron-down dropdown-icon"></i>
-            <select id="top-model-select" onchange="switchModel(this.value)">
-              <option value="gemini-3.8-flash">Gemini 3.8 Flash (Ultra Fast)</option>
-              <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Reasoning)</option>
-              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
+            <select id="topbar-model-select" onchange="switchModel(this.value)">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
             </select>
           </div>
         </div>
 
         <div class="topbar-right">
-          <button class="live-voice-chip" id="voice-mode-trigger" onclick="toggleLiveVoiceMode()">
-            <i class="fa-solid fa-wave-square"></i>
-            <span id="voice-chip-text">Live Voice</span>
+          <button id="voice-mode-trigger" class="live-voice-chip" onclick="toggleLiveVoiceMode()">
+            <i class="fa-solid fa-waveform"></i>
+            <span>Live Voice</span>
           </button>
-          <button class="icon-btn" onclick="clearCurrentChat()" title="Clear Current Thread">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
+          <button class="icon-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
         </div>
       </header>
 
-      <!-- Chat Canvas Container -->
       <div id="chat-viewport" class="chat-viewport">
-        
-        <!-- Welcome Screen (Modern Prompt Hub) -->
+        <!-- WELCOME SCREEN -->
         <div id="welcome-screen" class="welcome-screen">
           <div class="hero-header">
-            <h1 id="dynamic-greeting">Hello, User</h1>
-            <p class="subtitle">Where shall we begin today?</p>
+            <h1 id="dynamic-greeting">Hello</h1>
+            <p class="subtitle">What would you like to build or explore today?</p>
           </div>
 
           <div class="prompt-grid">
             <div class="prompt-card" onclick="usePromptPreset('code')">
               <div class="card-icon"><i class="fa-solid fa-code"></i></div>
               <div class="card-text">
-                <h3>Code & Architecture</h3>
-                <p>Debug scripts, optimize functions, or write full web apps.</p>
+                <h3>Code & Engineering</h3>
+                <p>Generate clean, optimized code modules and algorithms.</p>
               </div>
             </div>
-
             <div class="prompt-card" onclick="usePromptPreset('deep')">
-              <div class="card-icon"><i class="fa-solid fa-compass"></i></div>
+              <div class="card-icon"><i class="fa-solid fa-microscope"></i></div>
               <div class="card-text">
-                <h3>Deep Investigation</h3>
-                <p>Analyze complex problems and break down structured logic.</p>
+                <h3>Technical Research</h3>
+                <p>Conduct detailed analytical breakdowns and technical summaries.</p>
               </div>
             </div>
-
             <div class="prompt-card" onclick="usePromptPreset('summarize')">
-              <div class="card-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+              <div class="card-icon"><i class="fa-solid fa-bolt"></i></div>
               <div class="card-text">
-                <h3>Summarize & Refine</h3>
-                <p>Extract core insights, key takeaways, and bullet points.</p>
+                <h3>Quick Insights</h3>
+                <p>Summarize complex documentation into key bullet points.</p>
               </div>
             </div>
-
-            <div class="prompt-card" onclick="triggerDeviceAction('call')">
-              <div class="card-icon"><i class="fa-solid fa-phone-flip"></i></div>
+            <div class="prompt-card" onclick="insertPromptTemplate('deep')">
+              <div class="card-icon"><i class="fa-solid fa-feather"></i></div>
               <div class="card-text">
-                <h3>Assistant Direct Actions</h3>
-                <p>Make phone calls, create reminders, and schedule tasks.</p>
+                <h3>Custom Prompt Draft</h3>
+                <p>Insert pre-configured structural prompt templates into the editor.</p>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Dynamic Message Stream -->
-        <div id="chat-messages-container" class="messages-container" style="display: none;">
-          <!-- Chat bubbles render here -->
-        </div>
-
+        <!-- MESSAGES CONTAINER -->
+        <div id="chat-messages-container" class="messages-container" style="display: none;"></div>
       </div>
 
-      <!-- Floating Console Dock -->
+      <!-- BOTTOM CONSOLE DOCK -->
       <div class="console-wrapper">
-        <div class="console-box" id="console-box">
-          <button class="console-btn" onclick="insertPromptTemplate('deep')" title="Research Mode">
-            <i class="fa-solid fa-lightbulb"></i>
-          </button>
-          
-          <!-- Auto-Expanding Textarea -->
-          <textarea 
-            id="chat-input" 
-            placeholder="Message Bosompem..." 
-            rows="1" 
-            oninput="autoExpandTextarea(this)"
-            onkeydown="handleTextareaKeyDown(event)"></textarea>
-
-          <!-- Voice Note Button (Hold/Click to Record Input Text) -->
-          <button id="voice-note-btn" class="console-btn voice-note-btn" onclick="toggleVoiceNoteRecording()" title="Record Voice Note">
-            <i class="fa-solid fa-microphone"></i>
-          </button>
-
-          <button class="console-btn" onclick="webSearchFallback()" title="Search Web">
-            <i class="fa-solid fa-globe"></i>
-          </button>
-
-          <button id="send-btn" class="send-btn" onclick="handleChatSubmit()" title="Send Message">
-            <i class="fa-solid fa-paper-plane"></i>
-          </button>
+        <div id="console-box" class="console-box">
+          <button class="console-btn" onclick="webSearchFallback()" title="Search Web"><i class="fa-solid fa-globe"></i></button>
+          <textarea id="chat-input" placeholder="Message Bosompem..." rows="1" oninput="autoExpandTextarea(this)" onkeydown="handleTextareaKeyDown(event)"></textarea>
+          <button id="voice-note-btn" class="console-btn" onclick="toggleVoiceNoteRecording()" title="Voice Dictation"><i class="fa-solid fa-microphone"></i></button>
+          <button class="send-btn" onclick="handleChatSubmit()" title="Send Message"><i class="fa-solid fa-arrow-up"></i></button>
         </div>
         <p class="disclaimer-text">Bosompem AI Pro may produce inaccurate details. Verify important results.</p>
       </div>
-
     </main>
   </div>
 
   <!-- MODALS -->
-
-  <!-- Reminders Modal -->
-  <div id="reminders-modal" class="modal-overlay">
+  <!-- Settings Modal -->
+  <div id="settings-panel" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Tasks & Reminders</h3>
-        <button class="icon-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
+        <h3>System Preferences</h3>
+        <button class="icon-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div id="full-reminders-list" class="list-group"></div>
-      <button class="action-btn" onclick="addReminder()">+ Add New Task</button>
+      <div class="setting-group">
+        <label for="api-key">Gemini API Key</label>
+        <input type="password" id="api-key" placeholder="AIzaSy...">
+      </div>
+      <div class="setting-group">
+        <label for="model-select">Primary Engine Model</label>
+        <select id="model-select">
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced Reasoner)</option>
+        </select>
+      </div>
+      <div class="setting-group flex-row">
+        <label for="deep-research-toggle">Enable Enhanced Context Processing</label>
+        <input type="checkbox" id="deep-research-toggle">
+      </div>
+      <button class="action-btn" onclick="saveSettings()">Save Preferences</button>
     </div>
   </div>
 
@@ -202,36 +176,21 @@
       </div>
       <div class="setting-group">
         <label for="user-name-input">Display Name</label>
-        <input type="text" id="user-name-input" placeholder="Enter your name..." />
+        <input type="text" id="user-name-input" placeholder="Enter your name">
       </div>
       <button class="action-btn" onclick="saveUserProfile()">Save Profile</button>
     </div>
   </div>
 
-  <!-- Preferences Modal -->
-  <div id="settings-panel" class="modal-overlay">
+  <!-- Reminders Modal -->
+  <div id="reminders-modal" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Preferences & System API</h3>
-        <button class="icon-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
+        <h3>Scheduled Tasks</h3>
+        <button class="icon-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="setting-group">
-        <label for="api-key">Gemini API Key</label>
-        <input type="password" id="api-key" placeholder="Paste API Key here..." />
-      </div>
-      <div class="setting-group">
-        <label for="model-select">Default Model Engine</label>
-        <select id="model-select">
-          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Ultra Fast)</option>
-          <option value="gemini-3.1-pro">Gemini 3.1 Pro (Deep Reasoning)</option>
-          <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite</option>
-        </select>
-      </div>
-      <div class="setting-group flex-row">
-        <label for="deep-research-toggle">Deep Reasoning Mode</label>
-        <input type="checkbox" id="deep-research-toggle" />
-      </div>
-      <button class="action-btn" onclick="saveSettings()">Save Preferences</button>
+      <div id="full-reminders-list" style="max-height: 200px; overflow-y: auto;"></div>
+      <button class="action-btn" onclick="addReminder()"><i class="fa-solid fa-plus"></i> Add New Task</button>
     </div>
   </div>
 
