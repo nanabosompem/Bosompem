@@ -2,196 +2,254 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bosompem AI Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Bosompem AI - Personal Assistant</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-  <div class="app-layout">
-    <!-- Live Voice Header Bar -->
-    <div id="listening-indicator" class="listening-bar">
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-      <span>Listening for Live Voice...</span>
-      <button class="stop-live-btn" onclick="toggleLiveVoiceMode()">Stop</button>
+  <!-- Android Phone Viewport Wrapper -->
+  <div class="phone-container">
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="status-time">09:41</span>
+      <div class="status-icons">
+        <i class="fa-solid fa-signal"></i>
+        <i class="fa-solid fa-wifi"></i>
+        <i class="fa-solid fa-battery-full"></i>
+      </div>
     </div>
 
-    <!-- SIDEBAR -->
-    <aside id="sidebar" class="sidebar">
-      <div class="sidebar-top">
-        <div class="brand">
-          <div style="display: flex; align-items: center;">
-            <div class="brand-avatar"><i class="fa-solid fa-brain"></i></div>
-            <div class="brand-info">
-              <h2>Bosompem</h2>
-              <p>AI Pro Engine</p>
-            </div>
-          </div>
-          <button class="icon-btn mobile-close-btn" onclick="toggleSidebar()"><i class="fa-solid fa-xmark"></i></button>
-        </div>
+    <!-- Main Navigation Bar -->
+    <header class="app-topbar">
+      <button class="topbar-btn" onclick="toggleNavDrawer()" aria-label="Open Navigation">
+        <i class="fa-solid fa-bars-staggered"></i>
+      </button>
 
-        <button class="new-chat-btn" onclick="createNewChatSession()">
-          <i class="fa-solid fa-plus"></i> New Conversation
+      <div class="screen-title" id="active-screen-title">Chat Studio</div>
+
+      <div class="topbar-actions">
+        <button class="topbar-btn live-voice-btn" onclick="openScreen('live-voice')" title="Live Voice">
+          <i class="fa-solid fa-waveform"></i>
         </button>
+        <button class="topbar-btn" onclick="openScreen('settings')" title="Settings">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
 
-        <div class="history-section">
-          <div class="section-label">Recent Threads</div>
-          <div id="history-list" class="history-list"></div>
+    <!-- Side Navigation Drawer -->
+    <div id="nav-overlay" class="nav-overlay" onclick="toggleNavDrawer()"></div>
+    <aside id="nav-drawer" class="nav-drawer">
+      <div class="drawer-header">
+        <div class="drawer-user">
+          <div class="avatar-glow"><i class="fa-solid fa-brain"></i></div>
+          <div class="user-details">
+            <h3 id="drawer-user-name">Bosompem Pro</h3>
+            <p>Android AI Assistant</p>
+          </div>
         </div>
+        <button class="drawer-close-btn" onclick="toggleNavDrawer()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
-      <div class="sidebar-bottom">
-        <div class="tool-menu-item" onclick="openModal('profile-modal')">
-          <i class="fa-regular fa-user"></i> Profile Settings
-        </div>
-        <div class="tool-menu-item" onclick="toggleSettings()">
-          <i class="fa-solid fa-sliders"></i> System Preferences
-        </div>
-        <div class="tool-menu-item" onclick="openModal('reminders-modal')">
-          <i class="fa-regular fa-clock"></i> Scheduled Tasks
-        </div>
-        <div class="tool-menu-item" onclick="clearCurrentChat()">
-          <i class="fa-regular fa-trash-can"></i> Clear Current Thread
-        </div>
+      <nav class="drawer-menu">
+        <button class="menu-item active" onclick="switchScreenFromDrawer('chat')">
+          <i class="fa-solid fa-message"></i> <span>Chat Studio</span>
+        </button>
+        <button class="menu-item" onclick="switchScreenFromDrawer('live-voice')">
+          <i class="fa-solid fa-headset"></i> <span>Live Voice Mode</span>
+        </button>
+        <button class="menu-item" onclick="switchScreenFromDrawer('media-lab')">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Photo & Media Lab</span>
+        </button>
+        <button class="menu-item" onclick="switchScreenFromDrawer('tasks')">
+          <i class="fa-solid fa-calendar-check"></i> <span>Tasks & Reminders</span>
+        </button>
+        <button class="menu-item" onclick="switchScreenFromDrawer('profile')">
+          <i class="fa-regular fa-user"></i> <span>User Profile</span>
+        </button>
+        <button class="menu-item" onclick="switchScreenFromDrawer('settings')">
+          <i class="fa-solid fa-sliders"></i> <span>System Settings</span>
+        </button>
+      </nav>
+
+      <div class="drawer-footer">
+        <button class="new-session-btn" onclick="createNewChatSession(); toggleNavDrawer();">
+          <i class="fa-solid fa-plus"></i> New Conversation
+        </button>
       </div>
     </aside>
 
-    <!-- MAIN CHAT AREA -->
-    <main class="chat-main">
-      <header class="chat-topbar">
-        <div class="topbar-left">
-          <button class="icon-btn" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
-          <div class="model-selector-wrapper">
-            <span id="active-model-label" class="active-model-title">Gemini 2.5 Flash</span>
-            <i class="fa-solid fa-chevron-down dropdown-icon"></i>
-            <select id="topbar-model-select" onchange="switchModel(this.value)">
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-            </select>
+    <!-- App Screen Views (6 Screens Architecture) -->
+    <main class="app-viewport">
+
+      <!-- SCREEN 1: CHAT STUDIO -->
+      <section id="screen-chat" class="screen-view active">
+        <div id="welcome-hero" class="welcome-hero">
+          <div class="hero-badge"><i class="fa-solid fa-sparkles"></i> Bosompem Intelligence</div>
+          <h1 id="dynamic-greeting">Hello</h1>
+          <p>What would you like to build or automate today?</p>
+
+          <div class="quick-cards-grid">
+            <div class="quick-card" onclick="usePromptPreset('code')">
+              <i class="fa-solid fa-code"></i>
+              <div>
+                <h4>Code Generator</h4>
+                <p>Build clean modules & APIs</p>
+              </div>
+            </div>
+            <div class="quick-card" onclick="usePromptPreset('deep')">
+              <i class="fa-solid fa-microscope"></i>
+              <div>
+                <h4>Deep Research</h4>
+                <p>Analytical break-downs</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="topbar-right">
-          <button id="voice-mode-trigger" class="live-voice-chip" onclick="toggleLiveVoiceMode()">
-            <i class="fa-solid fa-waveform"></i>
-            <span>Live Voice</span>
+        <div id="chat-messages-container" class="messages-container" style="display:none;"></div>
+
+        <!-- Chat Bottom Console -->
+        <div class="console-wrapper">
+          <div id="console-box" class="console-box">
+            <button class="console-btn" onclick="webSearchFallback()" title="Web Search"><i class="fa-solid fa-globe"></i></button>
+            <textarea id="chat-input" placeholder="Ask Bosompem..." rows="1" oninput="autoExpandTextarea(this)" onkeydown="handleTextareaKeyDown(event)"></textarea>
+            <button id="voice-note-btn" class="console-btn" onclick="toggleVoiceNoteRecording()" title="Dictate"><i class="fa-solid fa-microphone"></i></button>
+            <button class="send-btn" onclick="handleChatSubmit()"><i class="fa-solid fa-arrow-up"></i></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 2: LIVE VOICE INTERACTION MODE -->
+      <section id="screen-live-voice" class="screen-view">
+        <div class="voice-screen-content">
+          <div class="voice-orb-container">
+            <div id="voice-orb-glow" class="voice-orb-glow"></div>
+            <div id="voice-orb" class="voice-orb">
+              <i class="fa-solid fa-waveform"></i>
+            </div>
+          </div>
+
+          <div class="voice-status-block">
+            <h2 id="voice-status-title">Live Voice Ready</h2>
+            <p id="voice-status-sub">Tap button below to start continuous AI conversation.</p>
+          </div>
+
+          <div id="voice-live-transcript" class="voice-transcript-card">
+            <span class="transcript-placeholder">Transcript will appear here in real-time...</span>
+          </div>
+
+          <button id="live-voice-toggle-btn" class="voice-action-btn" onclick="toggleLiveVoiceMode()">
+            <i class="fa-solid fa-microphone"></i> Start Live Mode
           </button>
-          <button class="icon-btn" onclick="toggleSettings()"><i class="fa-solid fa-gear"></i></button>
         </div>
-      </header>
+      </section>
 
-      <div id="chat-viewport" class="chat-viewport">
-        <!-- WELCOME SCREEN -->
-        <div id="welcome-screen" class="welcome-screen">
-          <div class="hero-header">
-            <h1 id="dynamic-greeting">Hello</h1>
-            <p class="subtitle">What would you like to build or explore today?</p>
+      <!-- SCREEN 3: PHOTO & MEDIA LAB -->
+      <section id="screen-media-lab" class="screen-view">
+        <div class="screen-scroll-container">
+          <div class="lab-card">
+            <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Image Sharpen & Enhancement</h3>
+            <p>Upload a photograph to enhance subject focus and clarity.</p>
+            <div class="drop-zone" onclick="document.getElementById('lab-file-input').click()">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <p>Tap to select photo</p>
+              <input type="file" id="lab-file-input" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+            </div>
+            <div id="image-preview-box" class="image-preview-box" style="display:none;">
+              <img id="lab-image-preview" src="" alt="Preview">
+            </div>
           </div>
 
-          <div class="prompt-grid">
-            <div class="prompt-card" onclick="usePromptPreset('code')">
-              <div class="card-icon"><i class="fa-solid fa-code"></i></div>
-              <div class="card-text">
-                <h3>Code & Engineering</h3>
-                <p>Generate clean, optimized code modules and algorithms.</p>
-              </div>
-            </div>
-            <div class="prompt-card" onclick="usePromptPreset('deep')">
-              <div class="card-icon"><i class="fa-solid fa-microscope"></i></div>
-              <div class="card-text">
-                <h3>Technical Research</h3>
-                <p>Conduct detailed analytical breakdowns and technical summaries.</p>
-              </div>
-            </div>
-            <div class="prompt-card" onclick="usePromptPreset('summarize')">
-              <div class="card-icon"><i class="fa-solid fa-bolt"></i></div>
-              <div class="card-text">
-                <h3>Quick Insights</h3>
-                <p>Summarize complex documentation into key bullet points.</p>
-              </div>
-            </div>
-            <div class="prompt-card" onclick="insertPromptTemplate('deep')">
-              <div class="card-icon"><i class="fa-solid fa-feather"></i></div>
-              <div class="card-text">
-                <h3>Custom Prompt Draft</h3>
-                <p>Insert pre-configured structural prompt templates into the editor.</p>
-              </div>
-            </div>
+          <div class="lab-card">
+            <h3><i class="fa-solid fa-palette"></i> Creative Edits & Prompt Instructions</h3>
+            <textarea id="media-prompt-input" class="glass-textarea" placeholder="Describe edits (e.g., sharpen portrait, change background to futuristic city)..."></textarea>
+            <button class="primary-btn" onclick="processMediaLabTask()"><i class="fa-solid fa-bolt"></i> Process Request</button>
           </div>
         </div>
+      </section>
 
-        <!-- MESSAGES CONTAINER -->
-        <div id="chat-messages-container" class="messages-container" style="display: none;"></div>
-      </div>
+      <!-- SCREEN 4: TASKS & REMINDERS -->
+      <section id="screen-tasks" class="screen-view">
+        <div class="screen-scroll-container">
+          <div class="tasks-header-card">
+            <div>
+              <h3>Scheduled Tasks</h3>
+              <p>Manage AI commitments & alerts</p>
+            </div>
+            <button class="icon-action-btn" onclick="addReminder()"><i class="fa-solid fa-plus"></i></button>
+          </div>
 
-      <!-- BOTTOM CONSOLE DOCK -->
-      <div class="console-wrapper">
-        <div id="console-box" class="console-box">
-          <button class="console-btn" onclick="webSearchFallback()" title="Search Web"><i class="fa-solid fa-globe"></i></button>
-          <textarea id="chat-input" placeholder="Message Bosompem..." rows="1" oninput="autoExpandTextarea(this)" onkeydown="handleTextareaKeyDown(event)"></textarea>
-          <button id="voice-note-btn" class="console-btn" onclick="toggleVoiceNoteRecording()" title="Voice Dictation"><i class="fa-solid fa-microphone"></i></button>
-          <button class="send-btn" onclick="handleChatSubmit()" title="Send Message"><i class="fa-solid fa-arrow-up"></i></button>
+          <div id="full-reminders-list" class="tasks-list"></div>
         </div>
-        <p class="disclaimer-text">Bosompem AI Pro may produce inaccurate details. Verify important results.</p>
-      </div>
+      </section>
+
+      <!-- SCREEN 5: USER PROFILE -->
+      <section id="screen-profile" class="screen-view">
+        <div class="screen-scroll-container">
+          <div class="profile-card">
+            <div class="profile-avatar"><i class="fa-solid fa-user-gear"></i></div>
+            <div class="setting-group">
+              <label for="user-name-input">Display Name</label>
+              <input type="text" id="user-name-input" class="glass-input" placeholder="Enter your name">
+            </div>
+            <button class="primary-btn" onclick="saveUserProfile()"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCREEN 6: SYSTEM SETTINGS -->
+      <section id="screen-settings" class="screen-view">
+        <div class="screen-scroll-container">
+          <div class="settings-card">
+            <div class="setting-group">
+              <label for="api-key">Gemini API Key</label>
+              <input type="password" id="api-key" class="glass-input" placeholder="AIzaSy...">
+            </div>
+
+            <div class="setting-group">
+              <label for="model-select">Primary Engine Model</label>
+              <select id="model-select" class="glass-select" onchange="switchModel(this.value)">
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast & Fluid)</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced Reasoning)</option>
+              </select>
+            </div>
+
+            <div class="setting-group flex-row">
+              <label for="deep-research-toggle">Enhanced Context Mode</label>
+              <input type="checkbox" id="deep-research-toggle">
+            </div>
+
+            <button class="primary-btn" onclick="saveSettings()"><i class="fa-solid fa-check"></i> Save Preferences</button>
+          </div>
+        </div>
+      </section>
+
     </main>
-  </div>
 
-  <!-- MODALS -->
-  <!-- Settings Modal -->
-  <div id="settings-panel" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>System Preferences</h3>
-        <button class="icon-btn" onclick="toggleSettings()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="setting-group">
-        <label for="api-key">Gemini API Key</label>
-        <input type="password" id="api-key" placeholder="AIzaSy...">
-      </div>
-      <div class="setting-group">
-        <label for="model-select">Primary Engine Model</label>
-        <select id="model-select">
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
-          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced Reasoner)</option>
-        </select>
-      </div>
-      <div class="setting-group flex-row">
-        <label for="deep-research-toggle">Enable Enhanced Context Processing</label>
-        <input type="checkbox" id="deep-research-toggle">
-      </div>
-      <button class="action-btn" onclick="saveSettings()">Save Preferences</button>
-    </div>
-  </div>
+    <!-- Android Bottom Navigation Bar -->
+    <nav class="app-bottom-nav">
+      <button class="nav-tab active" onclick="openScreen('chat')" data-screen="chat">
+        <i class="fa-solid fa-message"></i>
+        <span>Chat</span>
+      </button>
+      <button class="nav-tab" onclick="openScreen('live-voice')" data-screen="live-voice">
+        <i class="fa-solid fa-waveform"></i>
+        <span>Voice</span>
+      </button>
+      <button class="nav-tab" onclick="openScreen('media-lab')" data-screen="media-lab">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span>Lab</span>
+      </button>
+      <button class="nav-tab" onclick="openScreen('tasks')" data-screen="tasks">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span>Tasks</span>
+      </button>
+    </nav>
 
-  <!-- Profile Modal -->
-  <div id="profile-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>User Profile</h3>
-        <button class="icon-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="setting-group">
-        <label for="user-name-input">Display Name</label>
-        <input type="text" id="user-name-input" placeholder="Enter your name">
-      </div>
-      <button class="action-btn" onclick="saveUserProfile()">Save Profile</button>
-    </div>
-  </div>
-
-  <!-- Reminders Modal -->
-  <div id="reminders-modal" class="modal-overlay">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Scheduled Tasks</h3>
-        <button class="icon-btn" onclick="closeAllModals()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div id="full-reminders-list" style="max-height: 200px; overflow-y: auto;"></div>
-      <button class="action-btn" onclick="addReminder()"><i class="fa-solid fa-plus"></i> Add New Task</button>
-    </div>
   </div>
 
   <script src="app.js"></script>
