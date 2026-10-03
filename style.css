@@ -1,9 +1,8 @@
 :root {
     --bg-base: #07090e;
-    --glass-bg: rgba(18, 24, 38, 0.75);
+    --glass-bg: rgba(18, 24, 38, 0.88);
     --glass-border: rgba(255, 255, 255, 0.12);
     --accent-blue: #00d2ff;
-    --accent-glow: rgba(0, 210, 255, 0.35);
     --accent-green: #00ffaa;
     --accent-red: #ff3b30;
     --text-main: #f0f4f8;
@@ -19,22 +18,25 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-body {
+html, body {
+    width: 100%;
+    height: 100%;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
     background-color: var(--bg-base);
     color: var(--text-main);
-    height: 100vh;
     overflow: hidden;
 }
 
-/* Glassmorphism Operating Layer HUD */
 .bosompem-hud-layer {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    padding: 1rem;
+    height: -webkit-fill-available;
+    padding: 0.85rem;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    background: radial-gradient(circle at 50% 0%, rgba(15, 23, 42, 0.8), var(--bg-base));
+    background: radial-gradient(circle at 50% 0%, rgba(15, 23, 42, 0.95), var(--bg-base));
 }
 
 .hud-header {
@@ -43,10 +45,25 @@ body {
     align-items: center;
     padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pulse-ring {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-blue);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent-blue);
 }
 
 .glow-text {
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-weight: 800;
     letter-spacing: 1px;
     background: linear-gradient(90deg, #ffffff, var(--accent-blue));
@@ -55,7 +72,7 @@ body {
 }
 
 .badge-pro {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     background: var(--accent-blue);
     color: #000;
     padding: 2px 6px;
@@ -65,7 +82,7 @@ body {
 
 .engine-telemetry {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .telemetry-badge {
@@ -80,7 +97,6 @@ body {
 .telemetry-badge.edge { color: var(--accent-green); border-color: rgba(0, 255, 170, 0.3); }
 .telemetry-badge.cloud { color: var(--accent-blue); border-color: rgba(0, 210, 255, 0.3); }
 
-/* Main Content Stream */
 .hud-body {
     flex: 1;
     overflow-y: auto;
@@ -92,11 +108,12 @@ body {
 
 .viewport-container {
     width: 100%;
-    height: 180px;
+    height: 160px;
     border-radius: 12px;
     overflow: hidden;
     position: relative;
     border: 1px solid var(--glass-border);
+    flex-shrink: 0;
 }
 
 .viewport-container video {
@@ -109,6 +126,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+    flex: 1;
 }
 
 .chat-thread {
@@ -121,8 +139,9 @@ body {
     padding: 0.85rem 1rem;
     border-radius: 14px;
     max-width: 85%;
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     line-height: 1.4;
+    word-break: break-word;
 }
 
 .chat-bubble.user {
@@ -137,21 +156,10 @@ body {
     border: 1px solid var(--glass-border);
 }
 
-.step-card {
-    background: rgba(10, 15, 25, 0.6);
-    border: 1px solid var(--glass-border);
-    border-left: 3px solid var(--accent-blue);
-    padding: 0.6rem 0.8rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    margin-top: 0.4rem;
-}
-
-/* Security Modal */
 .dialog-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.85);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -161,7 +169,7 @@ body {
 .dialog-card {
     background: #121824;
     border: 1px solid var(--accent-red);
-    padding: 1.5rem;
+    padding: 1.25rem;
     border-radius: 16px;
     width: 90%;
     max-width: 400px;
@@ -190,11 +198,12 @@ body {
 .btn-secondary { background: #2a3447; color: #fff; }
 .btn-danger { background: var(--accent-red); color: #fff; }
 
-/* Input Bar */
 .hud-footer {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    flex-shrink: 0;
+    padding-bottom: 0.5rem;
 }
 
 .multimodal-tools {
@@ -205,14 +214,15 @@ body {
 .tool-btn {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    color: var(--text-dim);
-    width: 36px;
-    height: 36px;
+    color: var(--text-main);
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    font-size: 1rem;
 }
 
 .input-bar {
@@ -239,10 +249,12 @@ body {
     background: var(--accent-blue);
     border: none;
     color: #000;
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     cursor: pointer;
+    flex-shrink: 0;
+    font-weight: bold;
 }
 
 .hidden { display: none !important; }
