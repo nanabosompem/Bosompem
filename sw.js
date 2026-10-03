@@ -1,56 +1,60 @@
-const CACHE_NAME = 'bosompem-v2';
-const ASSETS = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+/**
+ * BOSOMPEM PRO SERVICE WORKER
+ * Edge Cache Resilience Layer
+ */
+
+const CACHE_NAME = 'bosompem-pro-v1';
+const ASSETS_TO_CACHE = [
+    './',
+    './index.html',
+    './style.css',
+    './app.js',
+    './manifest.json',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
-// Install Event: Cache Core Assets
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
-  );
-});
-
-// Activate Event: Clean up stale caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('[Bosompem SW] Pre-caching core Edge Assets');
+            return cache.addAll(ASSETS_TO_CACHE);
         })
-      );
-    }).then(() => self.clients.claim())
-  );
+    );
+    self.skipWaiting();
 });
 
-// Fetch Event: Stale-While-Revalidate with API Bypass
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(
+                keys.map((key) => {
+                    if (key !== CACHE_NAME) {
+                        return caches.delete(key);
+                    }
+                })
+            );
+        })
+    );
+    self.clients.claim();
+});
+
 self.addEventListener('fetch', (event) => {
-  // Bypass caching for Gemini API requests
-  if (event.request.url.includes('generativelanguage.googleapis.com')) {
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
-    })
-  );
+    // Strategy: Network-First with Edge Fallback for Offline Autonomous Capability
+    event.respondWith(
+        fetch(event.request)
+            .then((response) => {
+                // Clone and store valid responses into local cache
+                if (response.status === 200) {
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseClone);
+                    });
+                }
+                return response;
+            })
+            .catch(() => {
+                console.log('[Bosompem SW] Network offline. Serving from Edge Cache.');
+                return caches.match(event.request);
+            })
+    );
 });
