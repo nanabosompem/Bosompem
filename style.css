@@ -348,6 +348,39 @@ html, body {
 .quick-card h4 { font-size: 0.88rem; color: var(--text-main); }
 .quick-card p { font-size: 0.75rem; color: var(--text-muted); }
 
+/* Agent Execution Card */
+.agent-planner-card {
+  margin: 10px 16px;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-md);
+}
+
+.planner-header {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--accent-cyan);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-step-item {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .messages-container {
   flex: 1;
   overflow-y: auto;
@@ -387,6 +420,29 @@ html, body {
   color: var(--text-main);
 }
 
+.bubble-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-bubble-action {
+  background: transparent;
+  border: none;
+  color: var(--text-sub);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.btn-bubble-action:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Formatted Code Blocks in Chat */
 .bubble-content pre {
   background: rgba(0, 0, 0, 0.4);
@@ -411,6 +467,51 @@ html, body {
   padding: 12px 16px;
   background: linear-gradient(0deg, var(--bg-deep) 80%, transparent 100%);
   z-index: 20;
+}
+
+/* Speech Overlay Bar */
+.speech-state-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(139, 92, 246, 0.2);
+  border: 1px solid var(--primary);
+  padding: 6px 12px;
+  border-radius: 18px;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  color: var(--text-main);
+}
+
+.speech-wave {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.speech-wave span {
+  width: 3px;
+  height: 12px;
+  background: var(--accent-cyan);
+  animation: wave 1s infinite ease-in-out;
+}
+
+.speech-wave span:nth-child(2) { animation-delay: 0.2s; }
+.speech-wave span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+.stop-speech-btn {
+  background: var(--accent-rose);
+  border: none;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  cursor: pointer;
 }
 
 .console-box {
@@ -494,6 +595,22 @@ html, body {
   color: #fff;
   z-index: 2;
   box-shadow: 0 0 30px var(--primary-glow);
+  transition: all 0.3s ease;
+}
+
+.voice-orb.listening {
+  animation: orb-pulse 1.5s infinite;
+  background: linear-gradient(135deg, var(--accent-cyan), #00ffaa);
+}
+
+.voice-orb.thinking {
+  animation: orb-spin 1s infinite linear;
+  background: linear-gradient(135deg, #ff9500, var(--accent-rose));
+}
+
+.voice-orb.speaking {
+  animation: orb-glow 1s infinite alternate;
+  background: linear-gradient(135deg, var(--primary), var(--accent-cyan));
 }
 
 .voice-orb-glow {
@@ -509,6 +626,16 @@ html, body {
 @keyframes orb-pulse {
   0%, 100% { transform: scale(1); opacity: 0.3; }
   50% { transform: scale(1.2); opacity: 0.6; }
+}
+
+@keyframes orb-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes orb-glow {
+  0% { box-shadow: 0 0 10px var(--primary); }
+  100% { box-shadow: 0 0 35px var(--accent-cyan); }
 }
 
 .voice-status-block { text-align: center; }
@@ -542,7 +669,7 @@ html, body {
   cursor: pointer;
 }
 
-/* SCREEN 3: MEDIA LAB */
+/* SCREEN 3 & MEMORY VAULT CARDS */
 .lab-card, .tasks-header-card, .profile-card, .settings-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-glass);
@@ -551,6 +678,27 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.memory-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.primary-btn-sm {
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btn-icon-danger {
+  background: transparent;
+  border: none;
+  color: var(--accent-rose);
+  cursor: pointer;
 }
 
 .drop-zone {
@@ -604,7 +752,7 @@ html, body {
   gap: 8px;
 }
 
-/* SCREEN 4: TASKS */
+/* SCREEN 5: TASKS */
 .tasks-header-card {
   flex-direction: row;
   justify-content: space-between;
@@ -639,7 +787,7 @@ html, body {
   color: var(--text-main);
 }
 
-/* SCREEN 5: PROFILE */
+/* SCREEN 6: PROFILE */
 .profile-avatar {
   width: 64px;
   height: 64px;
@@ -653,7 +801,7 @@ html, body {
   margin: 0 auto;
 }
 
-/* SCREEN 6: SETTINGS */
+/* SCREEN 7: SETTINGS */
 .setting-group {
   display: flex;
   flex-direction: column;
@@ -699,5 +847,7 @@ html, body {
 
 .nav-tab.active {
   color: var(--accent-cyan);
-    }
-      
+}
+
+.hidden { display: none !important; }
+  
