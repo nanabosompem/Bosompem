@@ -66,6 +66,9 @@
         <button class="menu-item" onclick="switchScreenFromDrawer('media-lab')">
           <i class="fa-solid fa-wand-magic-sparkles"></i> <span>Photo & Media Lab</span>
         </button>
+        <button class="menu-item" onclick="switchScreenFromDrawer('memory-vault')">
+          <i class="fa-solid fa-brain"></i> <span>Memory Vault</span>
+        </button>
         <button class="menu-item" onclick="switchScreenFromDrawer('tasks')">
           <i class="fa-solid fa-calendar-check"></i> <span>Tasks & Reminders</span>
         </button>
@@ -112,10 +115,22 @@
           </div>
         </div>
 
+        <!-- Agent Workflow Execution Card -->
+        <div id="agent-planner-card" class="agent-planner-card hidden">
+          <div class="planner-header"><i class="fa-solid fa-diagram-project"></i> Autonomous Execution Plan</div>
+          <div id="agent-steps-list" class="agent-steps-list"></div>
+        </div>
+
         <div id="chat-messages-container" class="messages-container" style="display:none;"></div>
 
         <!-- Chat Bottom Console -->
         <div class="console-wrapper">
+          <div id="speech-state-bar" class="speech-state-bar hidden">
+            <div class="speech-wave"><span></span><span></span><span></span></div>
+            <span id="speech-state-text">Bosompem Speaking...</span>
+            <button class="stop-speech-btn" onclick="stopSpeechPlayback()"><i class="fa-solid fa-stop"></i> Stop</button>
+          </div>
+          
           <div id="console-box" class="console-box">
             <button class="console-btn" onclick="webSearchFallback()" title="Web Search"><i class="fa-solid fa-globe"></i></button>
             <textarea id="chat-input" placeholder="Ask Bosompem..." rows="1" oninput="autoExpandTextarea(this)" onkeydown="handleTextareaKeyDown(event)"></textarea>
@@ -130,8 +145,8 @@
         <div class="voice-screen-content">
           <div class="voice-orb-container">
             <div id="voice-orb-glow" class="voice-orb-glow"></div>
-            <div id="voice-orb" class="voice-orb">
-              <i class="fa-solid fa-waveform"></i>
+            <div id="voice-orb" class="voice-orb idle">
+              <i id="orb-icon" class="fa-solid fa-microphone"></i>
             </div>
           </div>
 
@@ -155,7 +170,7 @@
         <div class="screen-scroll-container">
           <div class="lab-card">
             <h3><i class="fa-solid fa-wand-magic-sparkles"></i> Image Sharpen & Enhancement</h3>
-            <p>Upload a photograph to enhance subject focus and clarity.</p>
+            <p>Upload a photograph to enhance subject focus, sharpness, and clarity.</p>
             <div class="drop-zone" onclick="document.getElementById('lab-file-input').click()">
               <i class="fa-solid fa-cloud-arrow-up"></i>
               <p>Tap to select photo</p>
@@ -168,13 +183,29 @@
 
           <div class="lab-card">
             <h3><i class="fa-solid fa-palette"></i> Creative Edits & Prompt Instructions</h3>
-            <textarea id="media-prompt-input" class="glass-textarea" placeholder="Describe edits (e.g., sharpen portrait, change background to futuristic city)..."></textarea>
+            <textarea id="media-prompt-input" class="glass-textarea" placeholder="Describe edits (e.g., sharpen subject portrait, adjust background lighting)..."></textarea>
             <button class="primary-btn" onclick="processMediaLabTask()"><i class="fa-solid fa-bolt"></i> Process Request</button>
           </div>
         </div>
       </section>
 
-      <!-- SCREEN 4: TASKS & REMINDERS -->
+      <!-- SCREEN 4: MEMORY VAULT -->
+      <section id="screen-memory-vault" class="screen-view">
+        <div class="screen-scroll-container">
+          <div class="lab-card">
+            <h3><i class="fa-solid fa-brain"></i> Persistent Memory Layer</h3>
+            <p>Store preferences, key instructions, and persistent contextual facts.</p>
+            <div class="memory-input-row">
+              <input type="text" id="memory-add-input" class="glass-input" placeholder="e.g. Always respond in structured concise points">
+              <button class="primary-btn-sm" onclick="addCustomMemory()"><i class="fa-solid fa-plus"></i></button>
+            </div>
+          </div>
+
+          <div id="memory-items-list" class="tasks-list"></div>
+        </div>
+      </section>
+
+      <!-- SCREEN 5: TASKS & REMINDERS -->
       <section id="screen-tasks" class="screen-view">
         <div class="screen-scroll-container">
           <div class="tasks-header-card">
@@ -189,7 +220,7 @@
         </div>
       </section>
 
-      <!-- SCREEN 5: USER PROFILE -->
+      <!-- SCREEN 6: USER PROFILE -->
       <section id="screen-profile" class="screen-view">
         <div class="screen-scroll-container">
           <div class="profile-card">
@@ -203,7 +234,7 @@
         </div>
       </section>
 
-      <!-- SCREEN 6: SYSTEM SETTINGS -->
+      <!-- SCREEN 7: SYSTEM SETTINGS -->
       <section id="screen-settings" class="screen-view">
         <div class="screen-scroll-container">
           <div class="settings-card">
@@ -221,7 +252,7 @@
             </div>
 
             <div class="setting-group flex-row">
-              <label for="deep-research-toggle">Enhanced Context Mode</label>
+              <label for="deep-research-toggle">Enhanced Context & Memory Mode</label>
               <input type="checkbox" id="deep-research-toggle">
             </div>
 
