@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bosompem-v2';
+const CACHE_NAME = 'bosompem-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -7,7 +7,6 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
-// Install Event: Cache Core Assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -16,7 +15,6 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate Event: Clean up stale caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -31,9 +29,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Event: Stale-While-Revalidate with API Bypass
 self.addEventListener('fetch', (event) => {
-  // Bypass caching for Gemini API requests
   if (event.request.url.includes('generativelanguage.googleapis.com')) {
     return;
   }
