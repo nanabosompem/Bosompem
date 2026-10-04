@@ -1,10 +1,123 @@
 // ==========================================
 // BOSOMPEM AI PRO - ARCHITECTURE ENGINE
+// Voice-First Pipeline, Persistent Memory, & Agentic Processing
 // ==========================================
 
 const SYSTEM_INSTRUCTION = `You are Bosompem Pro, an advanced AI personal assistant.
-Answer thoroughly, accurately, and directly using clean Markdown formatting.`;
+Provide clear, accurate, and direct responses using standard Markdown formatting.`;
 
+// --- 1. SPEECH SANITIZER ---
+class SpeechSanitizer {
+  /**
+   * Sanitizes markdown, symbols, URLs, and syntax elements into clear spoken prose.
+   * Visual UI output remains unmodified.
+   */
+  static cleanTextForSpeech(text) {
+    if (!text) return '';
+    let clean = text;
+
+    clean = clean.replace(/```[\s\S]*?```/g, ' [Code block omitted] ');
+    clean = clean.replace(/`([^`]+)`/g, '$1');
+    clean = clean.replace(/^#{1,6}\s+(.*)$/gm, '$1. ');
+    clean = clean.replace(/(\*\*|__)(.*?)\1/g, '$2');
+    clean = clean.replace(/(\*|_)(.*?)\1/g, '$2');
+    clean = clean.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    clean = clean.replace(/https?:\/\/\S+/g, '');
+    clean = clean.replace(/<[^>]*>/g, '');
+    clean = clean.replace(/^\s*[\*\-\+]\s+/gm, ' ');
+    clean = clean.replace(/^\s*\d+\.\s+/gm, ' ');
+    clean = clean.replace(/\s+/g, ' ').trim();
+
+    return clean;
+  }
+}
+
+// --- 2. PERSISTENT LONG-TERM MEMORY ENGINE ---
+class MemoryVault {
+  constructor() {
+    this.dbName = 'BosompemMemoryVault';
+    this.db = null;
+  }
+
+  async init() {
+    return new Promise((resolve) => {
+      if (!window.indexedDB) return resolve();
+      const request = indexedDB.open(this.dbName, 1);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('memories')) {
+          db.createObjectStore('memories', { keyPath: 'id' });
+        }
+      };
+      request.onsuccess = (e) => {
+        this.db = e.target.result;
+        resolve();
+      };
+      request.onerror = () => resolve();
+    });
+  }
+
+  generateTokens(text) {
+    return text.toLowerCase().replace(/[^\w\s]/gi, '').split(/\s+/).filter(w => w.length > 2);
+  }
+
+  async storeMemory(fact) {
+    if (!this.db || !fact) return;
+    const item = {
+      id: 'mem_' + Date.now(),
+      fact: fact.trim(),
+      tokens: this.generateTokens(fact),
+      date: new Date().toISOString()
+    };
+    return new Promise((resolve) => {
+      const tx = this.db.transaction('memories', 'readwrite');
+      tx.objectStore('memories').put(item);
+      tx.oncomplete = () => resolve(item);
+    });
+  }
+
+  async retrieveRelevant(query) {
+    if (!this.db) return [];
+    const qTokens = this.generateTokens(query);
+    if (qTokens.length === 0) return [];
+
+    return new Promise((resolve) => {
+      const tx = this.db.transaction('memories', 'readonly');
+      const store = tx.objectStore('memories');
+      store.getAll().onsuccess = (e) => {
+        const all = e.target.result || [];
+        const matches = all.filter(m => qTokens.some(t => m.tokens.includes(t)));
+        resolve(matches.map(m => m.fact));
+      };
+    });
+  }
+
+  async getAllMemories() {
+    if (!this.db) return [];
+    return new Promise((resolve) => {
+      const tx = this.db.transaction('memories', 'readonly');
+      tx.objectStore('memories').getAll().onsuccess = (e) => resolve(e.target.result || []);
+    });
+  }
+
+  async deleteMemory(id) {
+    if (!this.db) return;
+    return new Promise((resolve) => {
+      const tx = this.db.transaction('memories', 'readwrite');
+      tx.objectStore('memories').delete(id).oncomplete = () => resolve();
+    });
+  }
+}
+
+// --- 3. DEVICE BRIDGE & AGENT PIPELINE ---
+class DeviceBridge {
+  static async executeLocalTask(taskName, payload = {}) {
+    console.log(`[Device Bridge Dispatch]: ${taskName}`, payload);
+    return { status: "success", message: `Task ${taskName} processed locally.` };
+  }
+}
+
+// --- 4. STATE MANAGEMENT ---
 const state = {
   activeScreen: 'chat',
   userName: localStorage.getItem('bosompem_user_name') || '',
@@ -15,23 +128,26 @@ const state = {
   sessions: JSON.parse(localStorage.getItem('bosompem_sessions') || '[]'),
   activeSessionId: null,
   
+  voiceState: 'IDLE', // 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING'
   isLiveVoiceActive: false,
   isVoiceNoteRecording: false,
   reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]'),
   selectedImageData: null
 };
 
-// Web Speech API
+const memoryEngine = new MemoryVault();
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let liveRecognition = null;
 let voiceNoteRecognition = null;
 
 // --- INITIALIZATION ---
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  await memoryEngine.init();
   initVoiceEngines();
   loadSavedSettings();
   updateGreeting();
   renderReminders();
+  renderMemoryList();
   updateClock();
   setInterval(updateClock, 30000);
 
@@ -66,12 +182,15 @@ function openScreen(screenId) {
     'chat': 'Chat Studio',
     'live-voice': 'Live Voice Mode',
     'media-lab': 'Photo & Media Lab',
+    'memory-vault': 'Memory Vault',
     'tasks': 'Tasks & Reminders',
     'profile': 'User Profile',
     'settings': 'System Settings'
   };
   const titleEl = document.getElementById('active-screen-title');
   if (titleEl) titleEl.innerText = titleMap[screenId] || 'Bosompem AI';
+
+  if (screenId === 'memory-vault') renderMemoryList();
 }
 
 // --- NAVIGATION DRAWER ---
@@ -166,10 +285,29 @@ async function sendChatMessage(text, imageData = null) {
   const messagesBox = document.getElementById('chat-messages-container');
   if (messagesBox) messagesBox.style.display = 'flex';
 
+  // Check for memory creation command
+  if (text.toLowerCase().startsWith('remember that') || text.toLowerCase().startsWith('remember')) {
+    const fact = text.replace(/^remember\s+(that\s+)?/i, '').trim();
+    await memoryEngine.storeMemory(fact);
+  }
+
   session.messages.push({ role: 'user', text });
   renderMessages();
   saveSessionsToStorage();
 
+  // Retrieve relevant memories to augment prompt context
+  const memories = await memoryEngine.retrieveRelevant(text);
+  let memoryContext = '';
+  if (memories.length > 0) {
+    memoryContext = `[Context from User Memory Vault: ${memories.join('; ')}]\n`;
+  }
+
+  // Display Agent Steps UI if research mode active or prompt is long
+  if (state.deepResearchMode || text.length > 80) {
+    renderAgentSteps(["Extract query intent", "Query Persistent Memory Vault", "Synthesize Gemini reasoning"]);
+  }
+
+  setVoiceState('THINKING');
   const thinkingId = appendThinkingIndicator();
 
   const textarea = document.getElementById('chat-input');
@@ -178,12 +316,13 @@ async function sendChatMessage(text, imageData = null) {
     autoExpandTextarea(textarea);
   }
 
-  // Build Payload including Multimodal Base64 Image handling
+  // Build Payload including Multimodal Base64 Image handling and memory context
   const contentsPayload = session.messages.map((m, idx) => {
-    const parts = [{ text: m.text }];
+    const isLatest = idx === session.messages.length - 1;
+    const promptText = isLatest && m.role === 'user' ? `${memoryContext}${m.text}` : m.text;
+    const parts = [{ text: promptText }];
     
-    // Attach selected image payload to the latest user prompt if present
-    if (idx === session.messages.length - 1 && imageData) {
+    if (isLatest && imageData) {
       const base64Data = imageData.split(',')[1];
       const mimeType = imageData.substring(imageData.indexOf(':') + 1, imageData.indexOf(';'));
       parts.push({
@@ -215,33 +354,35 @@ async function sendChatMessage(text, imageData = null) {
 
     const data = await response.json();
     removeThinkingIndicator(thinkingId);
+    hideAgentSteps();
 
     if (data.error) {
-      session.messages.push({ 
-        role: 'assistant', 
-        text: `API Error: ${data.error.message || 'Check API key or selection.'}` 
-      });
+      const errText = `API Error: ${data.error.message || 'Check API key or selection.'}`;
+      session.messages.push({ role: 'assistant', text: errText });
+      setVoiceState('IDLE');
     } else {
       const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response received.";
       session.messages.push({ role: 'assistant', text: reply });
       
-      if (state.isLiveVoiceActive) {
-        speakText(reply.length > 250 ? reply.substring(0, 250) + "..." : reply);
+      if (state.isLiveVoiceActive || state.activeScreen === 'live-voice') {
+        speakText(reply);
+      } else {
+        setVoiceState('IDLE');
       }
     }
 
-    // Reset attached image data post request
     state.selectedImageData = null;
-
     saveSessionsToStorage();
     renderMessages();
 
   } catch (err) {
     removeThinkingIndicator(thinkingId);
+    hideAgentSteps();
     session.messages.push({ 
       role: 'assistant', 
       text: "Connection error reaching Gemini API." 
     });
+    setVoiceState('IDLE');
     saveSessionsToStorage();
     renderMessages();
   }
@@ -252,10 +393,16 @@ function renderMessages() {
   const session = getActiveSession();
   if (!box || !session) return;
 
-  box.innerHTML = session.messages.map(m => `
+  box.innerHTML = session.messages.map((m, idx) => `
     <div class="chat-bubble ${m.role}">
       <div class="bubble-content">
         ${m.role === 'assistant' ? formatMarkdown(m.text) : escapeHtml(m.text)}
+        ${m.role === 'assistant' ? `
+          <div class="bubble-actions">
+            <button class="btn-bubble-action" onclick="speakText(state.sessions.find(s => s.id === '${state.activeSessionId}').messages[${idx}].text)"><i class="fa-solid fa-volume-high"></i> Speak</button>
+            <button class="btn-bubble-action" onclick="navigator.clipboard.writeText(state.sessions.find(s => s.id === '${state.activeSessionId}').messages[${idx}].text)"><i class="fa-solid fa-copy"></i> Copy</button>
+          </div>
+        ` : ''}
       </div>
     </div>
   `).join('');
@@ -274,7 +421,30 @@ function usePromptPreset(type) {
   else if (type === 'deep') sendChatMessage("Provide an architectural and technical deep dive for:");
 }
 
-// --- LIVE VOICE MODE ---
+// --- 5. VOICE PIPELINE & ORB CONTROLLER ---
+function setVoiceState(newState) {
+  state.voiceState = newState;
+  const orb = document.getElementById('voice-orb');
+  const orbIcon = document.getElementById('orb-icon');
+  const speechBar = document.getElementById('speech-state-bar');
+
+  if (orb) {
+    orb.className = `voice-orb ${newState.toLowerCase()}`;
+  }
+
+  if (orbIcon) {
+    if (newState === 'LISTENING') orbIcon.className = 'fa-solid fa-microphone';
+    else if (newState === 'THINKING') orbIcon.className = 'fa-solid fa-circle-notch fa-spin';
+    else if (newState === 'SPEAKING') orbIcon.className = 'fa-solid fa-waveform';
+    else orbIcon.className = 'fa-solid fa-microphone';
+  }
+
+  if (speechBar) {
+    if (newState === 'SPEAKING') speechBar.classList.remove('hidden');
+    else speechBar.classList.add('hidden');
+  }
+}
+
 function initVoiceEngines() {
   if (!SpeechRecognition) return;
 
@@ -282,6 +452,10 @@ function initVoiceEngines() {
   liveRecognition.continuous = false;
   liveRecognition.interimResults = true;
   liveRecognition.lang = 'en-US';
+
+  liveRecognition.onstart = () => {
+    setVoiceState('LISTENING');
+  };
 
   liveRecognition.onresult = (e) => {
     const transcript = e.results[0][0].transcript;
@@ -294,8 +468,10 @@ function initVoiceEngines() {
   };
 
   liveRecognition.onend = () => {
-    if (state.isLiveVoiceActive) {
+    if (state.isLiveVoiceActive && state.voiceState !== 'SPEAKING' && state.voiceState !== 'THINKING') {
       setTimeout(() => { try { liveRecognition.start(); } catch(e){} }, 300);
+    } else if (!state.isLiveVoiceActive && state.voiceState !== 'SPEAKING' && state.voiceState !== 'THINKING') {
+      setVoiceState('IDLE');
     }
   };
 
@@ -329,11 +505,13 @@ function toggleLiveVoiceMode() {
   if (state.isLiveVoiceActive) {
     if (btn) btn.innerHTML = `<i class="fa-solid fa-stop"></i> Stop Live Mode`;
     if (title) title.innerText = "Listening...";
+    stopSpeechPlayback();
     try { liveRecognition.start(); } catch(e){}
   } else {
     if (btn) btn.innerHTML = `<i class="fa-solid fa-microphone"></i> Start Live Mode`;
     if (title) title.innerText = "Live Voice Paused";
     try { liveRecognition.stop(); } catch(e){}
+    setVoiceState('IDLE');
   }
 }
 
@@ -349,6 +527,60 @@ function toggleVoiceNoteRecording() {
     if (btn) btn.style.color = 'var(--text-sub)';
     try { voiceNoteRecognition.stop(); } catch(e){}
   }
+}
+
+function speakText(rawText) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+
+  const cleanSpokenText = SpeechSanitizer.cleanTextForSpeech(rawText);
+  if (!cleanSpokenText) return;
+
+  const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
+  utterance.rate = 1.0;
+  
+  utterance.onstart = () => {
+    setVoiceState('SPEAKING');
+  };
+
+  utterance.onend = () => {
+    setVoiceState('IDLE');
+    if (state.isLiveVoiceActive) {
+      setTimeout(() => { try { liveRecognition.start(); } catch(e){} }, 300);
+    }
+  };
+
+  utterance.onerror = () => {
+    setVoiceState('IDLE');
+  };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+function stopSpeechPlayback() {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  setVoiceState('IDLE');
+}
+
+// --- 6. AGENT WORKFLOW & AGGREGATION ---
+function renderAgentSteps(steps) {
+  const card = document.getElementById('agent-planner-card');
+  const list = document.getElementById('agent-steps-list');
+  if (!card || !list) return;
+
+  list.innerHTML = steps.map((s, idx) => `
+    <div class="agent-step-item">
+      <i class="fa-solid fa-circle-notch fa-spin"></i> Step ${idx + 1}: ${s}
+    </div>
+  `).join('');
+  card.classList.remove('hidden');
+}
+
+function hideAgentSteps() {
+  const card = document.getElementById('agent-planner-card');
+  if (card) card.classList.add('hidden');
 }
 
 // --- PHOTO & MEDIA LAB ---
@@ -381,135 +613,27 @@ function processMediaLabTask() {
   sendChatMessage(`[Media Lab Request]: ${query}`, state.selectedImageData);
 }
 
-// --- SETTINGS & PROFILE ---
-function saveSettings() {
-  const keyInput = document.getElementById('api-key');
-  const modelSelect = document.getElementById('model-select');
-  const deepToggle = document.getElementById('deep-research-toggle');
-
-  if (keyInput) state.apiKey = keyInput.value.trim();
-  if (modelSelect) state.model = modelSelect.value;
-  if (deepToggle) state.deepResearchMode = deepToggle.checked;
-
-  localStorage.setItem('bosompem_api_key', state.apiKey);
-  localStorage.setItem('bosompem_model', state.model);
-  localStorage.setItem('bosompem_research_mode', state.deepResearchMode);
-
-  alert("Settings updated!");
-}
-
-function loadSavedSettings() {
-  const keyInput = document.getElementById('api-key');
-  const modelSelect = document.getElementById('model-select');
-  const deepToggle = document.getElementById('deep-research-toggle');
-  const nameInput = document.getElementById('user-name-input');
-
-  if (keyInput) keyInput.value = state.apiKey;
-  if (modelSelect) modelSelect.value = state.model;
-  if (deepToggle) deepToggle.checked = state.deepResearchMode;
-  if (nameInput) nameInput.value = state.userName;
-}
-
-function switchModel(val) {
-  state.model = val;
-  localStorage.setItem('bosompem_model', val);
-}
-
-function saveUserProfile() {
-  const nameInput = document.getElementById('user-name-input');
-  if (nameInput) {
-    state.userName = nameInput.value.trim();
-    localStorage.setItem('bosompem_user_name', state.userName);
-    updateGreeting();
-  }
-  alert("Profile saved!");
-}
-
-function updateGreeting() {
-  const greetingEl = document.getElementById('dynamic-greeting');
-  const drawerUserEl = document.getElementById('drawer-user-name');
-  
-  if (greetingEl) {
-    greetingEl.innerText = `Hello${state.userName ? ', ' + state.userName : ''}`;
-  }
-  if (drawerUserEl && state.userName) {
-    drawerUserEl.innerText = state.userName;
+// --- MEMORY VAULT UI ---
+async function addCustomMemory() {
+  const input = document.getElementById('memory-add-input');
+  if (input && input.value.trim()) {
+    await memoryEngine.storeMemory(input.value.trim());
+    input.value = '';
+    renderMemoryList();
   }
 }
 
-// --- REMINDERS & UTILITIES ---
-function addReminder() {
-  const text = prompt("Enter task or reminder:");
-  if (text) {
-    state.reminders.unshift({ id: Date.now(), text });
-    localStorage.setItem('bosompem_reminders', JSON.stringify(state.reminders));
-    renderReminders();
-  }
-}
-
-function renderReminders() {
-  const list = document.getElementById('full-reminders-list');
+async function renderMemoryList() {
+  const list = document.getElementById('memory-items-list');
   if (!list) return;
-  if (state.reminders.length === 0) {
-    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No scheduled tasks.</p>`;
+
+  const memories = await memoryEngine.getAllMemories();
+  if (memories.length === 0) {
+    list.innerHTML = `<p style="font-size: 0.8rem; color: var(--text-muted);">No facts stored in long-term memory.</p>`;
     return;
   }
-  list.innerHTML = state.reminders.map(r => `
+
+  list.innerHTML = memories.map(m => `
     <div class="task-item">
-      <span>${escapeHtml(r.text)}</span>
-      <i class="fa-solid fa-check" style="color:var(--accent-cyan)"></i>
-    </div>
-  `).join('');
-}
-
-function scrollToBottom() {
-  const box = document.getElementById('chat-messages-container');
-  if (box) box.scrollTop = box.scrollHeight;
-}
-
-function appendThinkingIndicator() {
-  const box = document.getElementById('chat-messages-container');
-  if (!box) return null;
-  const id = 'thinking-' + Date.now();
-  const el = document.createElement('div');
-  el.className = 'chat-bubble assistant';
-  el.id = id;
-  el.innerHTML = `<div class="bubble-content" style="color: var(--accent-cyan);"><i class="fa-solid fa-brain fa-spin"></i> Processing...</div>`;
-  box.appendChild(el);
-  scrollToBottom();
-  return id;
-}
-
-function removeThinkingIndicator(id) {
-  if (!id) return;
-  const el = document.getElementById(id);
-  if (el) el.remove();
-}
-
-function formatMarkdown(str) {
-  return str
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n- /g, '<br>• ');
-}
-
-function escapeHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function webSearchFallback() {
-  const input = document.getElementById('chat-input');
-  if (input && input.value) {
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(input.value)}`, '_blank');
-  }
-}
-
-function speakText(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  window.speechSynthesis.speak(u);
-}
+      <span>${escapeHtml(m.fact)}</span>
+      <button class="btn-icon-danger" onclick="deleteMemoryIte
