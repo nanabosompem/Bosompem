@@ -285,7 +285,6 @@ async function sendChatMessage(text, imageData = null) {
   const messagesBox = document.getElementById('chat-messages-container');
   if (messagesBox) messagesBox.style.display = 'flex';
 
-  // Check for memory creation command
   if (text.toLowerCase().startsWith('remember that') || text.toLowerCase().startsWith('remember')) {
     const fact = text.replace(/^remember\s+(that\s+)?/i, '').trim();
     await memoryEngine.storeMemory(fact);
@@ -295,14 +294,12 @@ async function sendChatMessage(text, imageData = null) {
   renderMessages();
   saveSessionsToStorage();
 
-  // Retrieve relevant memories to augment prompt context
   const memories = await memoryEngine.retrieveRelevant(text);
   let memoryContext = '';
   if (memories.length > 0) {
     memoryContext = `[Context from User Memory Vault: ${memories.join('; ')}]\n`;
   }
 
-  // Display Agent Steps UI if research mode active or prompt is long
   if (state.deepResearchMode || text.length > 80) {
     renderAgentSteps(["Extract query intent", "Query Persistent Memory Vault", "Synthesize Gemini reasoning"]);
   }
@@ -316,7 +313,6 @@ async function sendChatMessage(text, imageData = null) {
     autoExpandTextarea(textarea);
   }
 
-  // Build Payload including Multimodal Base64 Image handling and memory context
   const contentsPayload = session.messages.map((m, idx) => {
     const isLatest = idx === session.messages.length - 1;
     const promptText = isLatest && m.role === 'user' ? `${memoryContext}${m.text}` : m.text;
@@ -419,6 +415,16 @@ function handleChatSubmit() {
 function usePromptPreset(type) {
   if (type === 'code') sendChatMessage("Write a clean, modular Javascript function for:");
   else if (type === 'deep') sendChatMessage("Provide an architectural and technical deep dive for:");
+}
+
+function webSearchFallback() {
+  const input = document.getElementById('chat-input');
+  const query = input ? input.value.trim() : '';
+  if (query) {
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+  } else {
+    alert("Enter a search term in the input box first.");
+  }
 }
 
 // --- 5. VOICE PIPELINE & ORB CONTROLLER ---
@@ -635,5 +641,4 @@ async function renderMemoryList() {
 
   list.innerHTML = memories.map(m => `
     <div class="task-item">
-      <span>${escapeHtml(m.fact)}</span>
-      <button class="btn-icon-danger" onclick="deleteMemoryIte
+      <span>${escapeHtml(m.fact)}<
