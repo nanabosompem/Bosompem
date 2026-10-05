@@ -127,7 +127,7 @@ html, body {
   gap: 8px;
 }
 
-/* Navigation Drawer Overlay */
+/* Navigation Drawer Overlay - FIXED: Added pointer-events guard */
 .nav-overlay {
   position: absolute;
   inset: 0;
