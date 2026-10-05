@@ -8,10 +8,6 @@ Provide clear, accurate, and direct responses using standard Markdown formatting
 
 // --- 1. SPEECH SANITIZER ---
 class SpeechSanitizer {
-  /**
-   * Sanitizes markdown, symbols, URLs, and syntax elements into clear spoken prose.
-   * Visual UI output remains unmodified.
-   */
   static cleanTextForSpeech(text) {
     if (!text) return '';
     let clean = text;
@@ -109,15 +105,7 @@ class MemoryVault {
   }
 }
 
-// --- 3. DEVICE BRIDGE & AGENT PIPELINE ---
-class DeviceBridge {
-  static async executeLocalTask(taskName, payload = {}) {
-    console.log(`[Device Bridge Dispatch]: ${taskName}`, payload);
-    return { status: "success", message: `Task ${taskName} processed locally.` };
-  }
-}
-
-// --- 4. STATE MANAGEMENT ---
+// --- 3. STATE MANAGEMENT ---
 const state = {
   activeScreen: 'chat',
   userName: localStorage.getItem('bosompem_user_name') || '',
@@ -128,7 +116,7 @@ const state = {
   sessions: JSON.parse(localStorage.getItem('bosompem_sessions') || '[]'),
   activeSessionId: null,
   
-  voiceState: 'IDLE', // 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING'
+  voiceState: 'IDLE',
   isLiveVoiceActive: false,
   isVoiceNoteRecording: false,
   reminders: JSON.parse(localStorage.getItem('bosompem_reminders') || '[]'),
@@ -136,14 +124,15 @@ const state = {
 };
 
 const memoryEngine = new MemoryVault();
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 let liveRecognition = null;
 let voiceNoteRecognition = null;
 
 // --- INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', async () => {
-  await memoryEngine.init();
-  initVoiceEngines();
+  try { await memoryEngine.init(); } catch(e) {}
+  try { initVoiceEngines(); } catch(e) {}
+
   loadSavedSettings();
   updateGreeting();
   renderReminders();
@@ -176,6 +165,10 @@ function openScreen(screenId) {
 
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.screen === screenId);
+  });
+
+  document.querySelectorAll('.menu-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.screen === screenId);
   });
 
   const titleMap = {
@@ -353,7 +346,7 @@ async function sendChatMessage(text, imageData = null) {
     hideAgentSteps();
 
     if (data.error) {
-      const errText = `API Error: ${data.error.message || 'Check API key or selection.'}`;
+      const errText = `API Error: ${data.error.message || 'Check API key or model.'}`;
       session.messages.push({ role: 'assistant', text: errText });
       setVoiceState('IDLE');
     } else {
@@ -423,11 +416,11 @@ function webSearchFallback() {
   if (query) {
     window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
   } else {
-    alert("Enter a search term in the input box first.");
+    alert("Enter a search query in the text box first.");
   }
 }
 
-// --- 5. VOICE PIPELINE & ORB CONTROLLER ---
+// --- 4. VOICE PIPELINE & ORB CONTROLLER ---
 function setVoiceState(newState) {
   state.voiceState = newState;
   const orb = document.getElementById('voice-orb');
@@ -500,7 +493,7 @@ function initVoiceEngines() {
 
 function toggleLiveVoiceMode() {
   if (!SpeechRecognition) {
-    alert("Voice recognition not supported on this device.");
+    alert("Voice recognition is not supported on this browser.");
     return;
   }
 
@@ -522,7 +515,10 @@ function toggleLiveVoiceMode() {
 }
 
 function toggleVoiceNoteRecording() {
-  if (!SpeechRecognition) return;
+  if (!SpeechRecognition) {
+    alert("Speech recognition unavailable.");
+    return;
+  }
   state.isVoiceNoteRecording = !state.isVoiceNoteRecording;
   const btn = document.getElementById('voice-note-btn');
 
@@ -570,7 +566,7 @@ function stopSpeechPlayback() {
   setVoiceState('IDLE');
 }
 
-// --- 6. AGENT WORKFLOW & AGGREGATION ---
+// --- 5. AGENT WORKFLOW & MEDIA LAB ---
 function renderAgentSteps(steps) {
   const card = document.getElementById('agent-planner-card');
   const list = document.getElementById('agent-steps-list');
@@ -589,7 +585,6 @@ function hideAgentSteps() {
   if (card) card.classList.add('hidden');
 }
 
-// --- PHOTO & MEDIA LAB ---
 function handleImageUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -619,7 +614,7 @@ function processMediaLabTask() {
   sendChatMessage(`[Media Lab Request]: ${query}`, state.selectedImageData);
 }
 
-// --- MEMORY VAULT UI ---
+// --- 6. MEMORY VAULT & TASKS ---
 async function addCustomMemory() {
   const input = document.getElementById('memory-add-input');
   if (input && input.value.trim()) {
@@ -641,4 +636,12 @@ async function renderMemoryList() {
 
   list.innerHTML = memories.map(m => `
     <div class="task-item">
-      <span>${escapeHtml(m.fact)}<
+      <span>${escapeHtml(m.fact)}</span>
+      <button class="btn-icon-danger" onclick="deleteMemoryItem('${m.id}')"><i class="fa-solid fa-trash"></i></button>
+    </div>
+  `).join('');
+}
+
+async function deleteMemoryItem(id) {
+  await memoryEngine.deleteMemory(id);
+  renderMemoryLis
