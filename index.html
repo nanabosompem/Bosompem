@@ -16,13 +16,11 @@
 <div class="phone-container">
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
 
-  <div class="status-bar"><span class="status-time" id="status-time">09:41</span><div class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-full"></i></div></div>
-
   <header class="app-topbar">
     <button class="topbar-btn glass-btn" onclick="toggleNavDrawer()" aria-label="Open navigation"><i class="fa-solid fa-bars"></i></button>
     <div class="brand-lockup"><div class="brand-orb-mini"></div><div><div class="brand-name">BOSOMPEM</div><div class="brand-status">PERSONAL AI</div></div></div>
     <div class="topbar-actions">
-      <button class="topbar-btn glass-btn voice-top" onclick="openScreen('live-voice')" aria-label="Live Voice"><i class="fa-solid fa-waveform-lines"></i></button>
+      <button class="topbar-btn glass-btn voice-top" onclick="openScreen('live-voice')" aria-label="Live Voice"><i class="fa-solid fa-microphone-lines"></i></button>
       <button class="topbar-btn glass-btn" onclick="openScreen('settings')" aria-label="Settings"><i class="fa-solid fa-sliders"></i></button>
     </div>
   </header>
@@ -60,7 +58,7 @@
       </div>
 
       <div id="agent-planner-card" class="agent-planner-card hidden"><div class="planner-header"><span class="planner-live"></span><i class="fa-solid fa-diagram-project"></i><span>LIVE EXECUTION</span></div><div id="agent-steps-list" class="agent-steps-list"></div></div>
-      <div id="chat-messages-container" class="messages-container" style="display:none;"></div>
+      <div id="chat-messages-container" class="messages-container"></div>
 
       <div class="console-wrapper">
         <div id="speech-state-bar" class="speech-state-bar hidden"><div class="speech-wave"><span></span><span></span><span></span><span></span><span></span></div><span id="speech-state-text">Bosompem is speaking</span><button class="stop-speech-btn" onclick="stopSpeechPlayback()"><i class="fa-solid fa-stop"></i></button></div>
