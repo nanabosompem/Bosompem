@@ -16,7 +16,6 @@
 <div class="phone-container">
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
 
-  <div class="status-bar"><span class="status-time" id="status-time">09:41</span><div class="status-icons"><i class="fa-solid fa-signal"></i><i class="fa-solid fa-wifi"></i><i class="fa-solid fa-battery-full"></i></div></div>
 
   <header class="app-topbar">
     <button class="topbar-btn glass-btn" onclick="toggleNavDrawer()" aria-label="Open navigation"><i class="fa-solid fa-bars"></i></button>
@@ -76,7 +75,7 @@
         <div id="console-box" class="console-box">
           <button class="console-btn plus-btn" onclick="toggleAttachmentMenu()" aria-label="Add attachment"><i class="fa-solid fa-plus"></i></button>
           <input type="file" id="chat-image-input" accept="image/*" hidden onchange="handleChatImageUpload(event)">
-          <textarea id="chat-input" placeholder="Message Bosompem..." rows="1" oninput="autoExpandTextarea(this)" onkeydown="handleTextareaKeyDown(event)"></textarea>
+          <textarea id="chat-input" placeholder="Message Bosompem..." rows="1" oninput="autoExpandTextarea(this);updateComposerState()" onkeydown="handleTextareaKeyDown(event)"></textarea>
           <button id="voice-note-btn" class="console-btn mic-btn" onclick="toggleVoiceNoteRecording()" title="Voice input" aria-label="Voice input"><i class="fa-solid fa-microphone"></i></button>
           <button class="send-btn" onclick="state.isSending?stopGeneration():handleChatSubmit()" aria-label="Send" title="Send message"><i class="fa-solid fa-arrow-up"></i></button>
         </div>
