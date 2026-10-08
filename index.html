@@ -16,12 +16,24 @@
 <div class="phone-container">
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
 
-  <header class="app-topbar">
-    <button class="topbar-btn glass-btn" onclick="toggleNavDrawer()" aria-label="Open navigation"><i class="fa-solid fa-bars"></i></button>
-    <div class="brand-lockup"><div class="brand-orb-mini"></div><div><div class="brand-name">BOSOMPEM</div><div class="brand-status">PERSONAL AI</div></div></div>
+  <header class="app-topbar" id="app-topbar">
+    <button class="topbar-btn" onclick="toggleNavDrawer()" aria-label="Open navigation" title="Menu">
+      <i class="fa-solid fa-bars-staggered"></i>
+    </button>
+    <div class="screen-title-wrap">
+      <div class="brand-mark-mini"><i class="fa-solid fa-brain"></i></div>
+      <div>
+        <div class="screen-title" id="active-screen-title">Chat Studio</div>
+        <div class="screen-subtitle">BOSOMPEM PERSONAL AI</div>
+      </div>
+    </div>
     <div class="topbar-actions">
-      <button class="topbar-btn glass-btn voice-top" onclick="openScreen('live-voice')" aria-label="Live Voice"><i class="fa-solid fa-microphone-lines"></i></button>
-      <button class="topbar-btn glass-btn" onclick="openScreen('settings')" aria-label="Settings"><i class="fa-solid fa-sliders"></i></button>
+      <button class="topbar-btn live-voice-btn" onclick="openScreen('live-voice')" title="Live Voice" aria-label="Live Voice">
+        <i class="fa-solid fa-microphone-lines"></i>
+      </button>
+      <button class="topbar-btn" onclick="openScreen('settings')" title="Settings" aria-label="Settings">
+        <i class="fa-solid fa-sliders"></i>
+      </button>
     </div>
   </header>
 
@@ -64,21 +76,21 @@
         <div id="speech-state-bar" class="speech-state-bar hidden"><div class="speech-wave"><span></span><span></span><span></span><span></span><span></span></div><span id="speech-state-text">Bosompem is speaking</span><button class="stop-speech-btn" onclick="stopSpeechPlayback()"><i class="fa-solid fa-stop"></i></button></div>
         <div id="attachment-preview" class="attachment-preview hidden"><img id="attachment-preview-image" alt="Selected image"><div><strong>Image attached</strong><small>Ready for Bosompem</small></div><button onclick="clearSelectedImage()" aria-label="Remove image"><i class="fa-solid fa-xmark"></i></button></div>
 
-        <div id="attachment-menu" class="attachment-menu">
-          <button onclick="triggerChatImage()"><i class="fa-solid fa-image"></i><span>Gallery</span></button>
-          <button onclick="triggerChatImage()"><i class="fa-solid fa-camera"></i><span>Camera</span></button>
-          <button onclick="triggerScreenshot()"><i class="fa-solid fa-display"></i><span>Screen</span></button>
-          <button onclick="attachLocation()"><i class="fa-solid fa-location-dot"></i><span>Location</span></button>
+        <div class="composer-wrap">
+          <div id="attachment-menu" class="attachment-menu" aria-hidden="true">
+            <button class="attachment-item" onclick="triggerChatImage('gallery')"><span class="attachment-icon"><i class="fa-solid fa-images"></i></span><span>Gallery</span></button>
+            <button class="attachment-item" onclick="triggerChatImage('camera')"><span class="attachment-icon"><i class="fa-solid fa-camera"></i></span><span>Camera</span></button>
+            <button class="attachment-item" onclick="triggerScreenshot()"><span class="attachment-icon"><i class="fa-solid fa-display"></i></span><span>Screen</span></button>
+            <button class="attachment-item" onclick="attachLocation()"><span class="attachment-icon"><i class="fa-solid fa-location-dot"></i></span><span>Location</span></button>
+          </div>
+          <div id="console-box" class="console-box">
+            <button id="plus-btn" class="console-btn plus-btn" onclick="toggleAttachmentMenu()" title="Tools & attachments" aria-label="Open tools" aria-expanded="false"><i class="fa-solid fa-plus"></i></button>
+            <input type="file" id="chat-image-input" accept="image/*" hidden onchange="handleChatImageUpload(event)">
+            <textarea id="chat-input" placeholder="Message Bosompem..." rows="1" oninput="autoExpandTextarea(this);updateSendButton()" onkeydown="handleTextareaKeyDown(event)"></textarea>
+            <button id="voice-note-btn" class="console-btn" onclick="toggleVoiceNoteRecording()" title="Voice input" aria-label="Voice input"><i class="fa-solid fa-microphone"></i></button>
+            <button id="send-btn" class="send-btn" onclick="state.isSending?stopGeneration():handleChatSubmit()" aria-label="Send" title="Send"><i class="fa-solid fa-arrow-up"></i></button>
+          </div>
         </div>
-
-        <div id="console-box" class="console-box">
-          <button class="console-btn plus-btn" onclick="toggleAttachmentMenu()" aria-label="Add attachment"><i class="fa-solid fa-plus"></i></button>
-          <input type="file" id="chat-image-input" accept="image/*" hidden onchange="handleChatImageUpload(event)">
-          <textarea id="chat-input" placeholder="Message Bosompem..." rows="1" oninput="autoExpandTextarea(this)" onkeydown="handleTextareaKeyDown(event)"></textarea>
-          <button id="voice-note-btn" class="console-btn mic-btn" onclick="toggleVoiceNoteRecording()" title="Voice input" aria-label="Voice input"><i class="fa-solid fa-microphone"></i></button>
-          <button class="send-btn" onclick="state.isSending?stopGeneration():handleChatSubmit()" aria-label="Send" title="Send message"><i class="fa-solid fa-arrow-up"></i></button>
-        </div>
-        <div class="composer-caption"><span><i class="fa-solid fa-shield-halved"></i> Your controls. Your context.</span><span>Shift + Enter for new line</span></div>
       </div>
     </section>
 
@@ -94,7 +106,46 @@
     <section id="screen-media-lab" class="screen-view"><div class="screen-scroll-container"><div class="page-hero"><div class="eyebrow">MULTIMODAL</div><h2>Vision Studio</h2><p>Show Bosompem what you're seeing and ask what to do next.</p></div><div class="lab-card"><h3><i class="fa-solid fa-eye"></i> Image workspace</h3><p>Choose an image from your device.</p><div class="drop-zone" onclick="document.getElementById('lab-file-input').click()"><i class="fa-solid fa-arrow-up-from-bracket"></i><strong>Select image</strong><small>PNG, JPG and other supported images</small><input type="file" id="lab-file-input" accept="image/*" hidden onchange="handleImageUpload(event)"></div><div id="image-preview-box" class="image-preview-box hidden"><img id="lab-image-preview" alt="Vision preview"></div></div><div class="lab-card"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Ask about it</h3><textarea id="media-prompt-input" class="glass-textarea" placeholder="What's happening here? What should I change?"></textarea><button class="primary-btn" onclick="processMediaLabTask()"><i class="fa-solid fa-bolt"></i> Ask Bosompem</button></div></div></section>
     <section id="screen-memory-vault" class="screen-view"><div class="screen-scroll-container"><div class="page-hero"><div class="eyebrow">PERSONAL CONTEXT</div><h2>Memory</h2><p>See and control the useful context Bosompem keeps locally.</p></div><div class="lab-card"><div class="memory-input-row"><input type="text" id="memory-add-input" class="glass-input" placeholder="Add something useful to remember"><button class="primary-btn-sm" onclick="addCustomMemory()"><i class="fa-solid fa-plus"></i></button></div></div><div id="memory-items-list" class="tasks-list"></div></div></section>
     <section id="screen-tasks" class="screen-view"><div class="screen-scroll-container"><div class="section-heading"><div><div class="eyebrow">AUTOMATION</div><h2>Tasks</h2><p>Reminders and future automation hooks.</p></div><button class="icon-action-btn" onclick="addReminder()"><i class="fa-solid fa-plus"></i></button></div><div class="tasks-header-card"><div class="task-stat"><span id="task-count">0</span><small>scheduled locally</small></div><div class="status-pill">READY</div></div><div id="full-reminders-list" class="tasks-list"></div></div></section>
-    <section id="screen-profile" class="screen-view"><div class="screen-scroll-container"><div class="page-hero"><div class="eyebrow">IDENTITY</div><h2>Your profile</h2><p>Personalize how Bosompem addresses you.</p></div><div class="profile-card"><div class="profile-avatar"><i class="fa-solid fa-user"></i></div><div class="setting-group"><label for="user-name-input">Display name</label><input type="text" id="user-name-input" class="glass-input" placeholder="Your name"></div><button class="primary-btn" onclick="saveUserProfile()"><i class="fa-solid fa-floppy-disk"></i> Save profile</button></div></div></section>
+    <section id="screen-profile" class="screen-view">
+      <div class="screen-scroll-container profile-scroll">
+        <div class="profile-hero-card">
+          <div class="profile-hero-top">
+            <div id="profile-avatar" class="profile-avatar-large">B</div>
+            <div class="profile-identity">
+              <span class="profile-eyebrow">PERSONAL AI PROFILE</span>
+              <h1 id="profile-display-name">Your Profile</h1>
+              <p id="profile-profile-line">Bosompem is personalized for you.</p>
+            </div>
+            <span class="profile-online"><i class="fa-solid fa-circle"></i> Active</span>
+          </div>
+          <div class="profile-completion"><div><span>Profile setup</span><strong id="profile-completion-value">40%</strong></div><div class="completion-track"><span id="profile-completion-bar"></span></div></div>
+        </div>
+
+        <div class="profile-section-card">
+          <div class="profile-section-heading"><div><span class="section-kicker">IDENTITY</span><h2>About you</h2></div><i class="fa-solid fa-id-card"></i></div>
+          <div class="profile-fields">
+            <div class="setting-group"><label for="user-name-input">Display name</label><input type="text" id="user-name-input" class="glass-input" placeholder="Enter your name" oninput="updateProfilePreview()"></div>
+            <div class="setting-group"><label for="user-role-input">Role / profession</label><input type="text" id="user-role-input" class="glass-input" placeholder="e.g. Designer, Developer, Student" oninput="updateProfilePreview()"></div>
+            <div class="setting-group"><label for="user-bio-input">Short bio</label><textarea id="user-bio-input" class="glass-textarea profile-bio" placeholder="Tell Bosompem what matters about you..."></textarea></div>
+          </div>
+          <button class="primary-btn" onclick="saveUserProfile()"><i class="fa-solid fa-check"></i> Save Profile</button>
+        </div>
+
+        <div class="profile-section-card profile-grid-card">
+          <div class="profile-section-heading"><div><span class="section-kicker">PERSONALIZATION</span><h2>How Bosompem works for you</h2></div><i class="fa-solid fa-sliders"></i></div>
+          <div class="profile-info-row"><span><i class="fa-solid fa-brain"></i><b>Memory</b><small>Relevant memories can personalize conversations.</small></span><strong id="profile-memory-status">On</strong></div>
+          <div class="profile-info-row"><span><i class="fa-solid fa-bolt"></i><b>Proactive assistance</b><small>Suggestions based on your enabled preferences.</small></span><strong id="profile-proactive-status">Off</strong></div>
+          <div class="profile-info-row"><span><i class="fa-solid fa-shield-halved"></i><b>Privacy</b><small>Browser data remains under your control.</small></span><strong class="secure-status">Protected</strong></div>
+        </div>
+
+        <div class="profile-section-card">
+          <div class="profile-section-heading"><div><span class="section-kicker">ACCOUNT</span><h2>Profile controls</h2></div><i class="fa-solid fa-user-check"></i></div>
+          <button class="profile-action-row" onclick="openScreen('settings')"><span><i class="fa-solid fa-gear"></i><b>System settings</b><small>AI engine, autonomy and privacy controls</small></span><i class="fa-solid fa-chevron-right"></i></button>
+          <button class="profile-action-row" onclick="openScreen('memory-vault')"><span><i class="fa-solid fa-brain"></i><b>Manage memory</b><small>Review what Bosompem remembers</small></span><i class="fa-solid fa-chevron-right"></i></button>
+          <button class="profile-action-row" onclick="openScreen('projects')"><span><i class="fa-solid fa-folder-tree"></i><b>Your projects</b><small>Continue long-term work and context</small></span><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>
+    </section>
     <section id="screen-settings" class="screen-view"><div class="screen-scroll-container"><div class="page-hero"><div class="eyebrow">CONTROL CENTER</div><h2>Settings</h2><p>Configure intelligence, autonomy and privacy.</p></div><div class="settings-card"><div class="settings-section-title"><i class="fa-solid fa-microchip"></i><span>AI engine</span></div><div class="setting-group"><label for="api-key">Gemini API key</label><input type="password" id="api-key" class="glass-input" placeholder="Paste your Gemini API key"></div><div class="setting-group"><label for="model-select">Primary model</label><select id="model-select" class="glass-select" onchange="switchModel(this.value)"><option value="gemini-2.5-flash">Gemini 2.5 Flash</option><option value="gemini-2.5-pro">Gemini 2.5 Pro</option></select></div></div><div class="settings-card"><div class="settings-section-title"><i class="fa-solid fa-volume-high"></i><span>Voice</span></div><div class="voice-setting"><div><label>Voice character</label><small>Bosompem prefers the best available male English voice.</small></div><span class="status-pill">MALE PREFERRED</span></div><div class="voice-setting"><div><label>Speech speed</label><small>Optimized for a faster, natural response.</small></div><span class="status-pill">1.12×</span></div></div><div class="settings-card"><div class="settings-section-title"><i class="fa-solid fa-shield-halved"></i><span>Autonomy & privacy</span></div><div class="setting-group flex-row"><div><label>Memory context</label><small>Use relevant saved memories in conversations.</small></div><input type="checkbox" id="memory-context-toggle"></div><div class="setting-group flex-row"><div><label>Proactive suggestions</label><small>Allow useful contextual suggestions.</small></div><input type="checkbox" id="proactive-toggle"></div><div class="setting-group"><label for="autonomy-level">Autonomy level</label><select id="autonomy-level" class="glass-select"><option value="ask">Always ask</option><option value="important">Ask for important actions</option><option value="autonomous">Autonomous</option></select></div><button class="primary-btn" onclick="saveSettings()"><i class="fa-solid fa-check"></i> Save preferences</button></div><div class="capability-card"><div><strong>Device bridge</strong><p>Web Bosompem respects Android security. Approved native actions can be connected through the permissioned bridge.</p></div><span class="status-pill">WEB READY</span></div></div></section>
   </main>
 
@@ -104,3 +155,5 @@
 <script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker:',err)));}</script>
 </body>
 </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            </html>
+  
