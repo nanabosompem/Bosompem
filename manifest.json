@@ -2,6 +2,7 @@
   "name": "Bosompem AI — Personal Assistant",
   "short_name": "Bosompem",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#070a10",
   "theme_color": "#070a10",
