@@ -201,6 +201,24 @@ function loadSession(id){
 }
 function saveSessions(){saveJSON(STORAGE.sessions,state.sessions);}
 
+/* Cost-conscious Gemini router.
+   Auto uses Flash for ordinary requests and Pro for requests that
+   appear to need deeper reasoning. Manual model choices are respected. */
+function chooseModelForRequest(text,imageData=null){
+  const selected=state.model||'auto';
+  if(selected!=='auto')return selected;
+  const message=String(text||'').toLowerCase();
+  const complexPatterns=[
+    /\b(debug|debugging|refactor|architecture|architect|implement|algorithm|optimi[sz]e|root cause|production issue|security review|complex reasoning|step.by.step proof)\b/,
+    /\b(build|create|write|review|fix|rewrite)\b.{0,45}\b(code|function|script|app|website|api|database|system|program)\b/,
+    /\b(compare|evaluate|design)\b.{0,60}\b(architecture|approaches|strategies|systems|trade.off)\b/
+  ];
+  const likelyComplex=complexPatterns.some(pattern=>pattern.test(message)) || message.length>700;
+  // Image questions stay on Flash by default unless the text asks for a complex task.
+  if(likelyComplex)return 'gemini-2.5-pro';
+  return 'gemini-2.5-flash';
+}
+
 async function sendChatMessage(text,imageData=null){
   if(state.isSending)return;
   text=(text||'').trim();
@@ -249,7 +267,8 @@ async function sendChatMessage(text,imageData=null){
 
   try{
     state.activeRequestController=new AbortController();
-    const endpoint=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const requestModel=chooseModelForRequest(text,imageData);
+    const endpoint=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(requestModel)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
     const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},signal:state.activeRequestController.signal,body:JSON.stringify({
       contents,systemInstruction:{parts:[{text:SYSTEM_INSTRUCTION}]},
       generationConfig:{temperature:.55,topP:.9,maxOutputTokens:4096}
@@ -373,7 +392,7 @@ function initVoiceEngines(){
         setVoiceState('IDLE');
         const sub=document.getElementById('voice-status-sub');
         if(sub)sub.textContent='Microphone access was blocked. Allow microphone access for this site and try again.';
-      } else if(recoverable.includes(e.error)) setVoiceState('IDLE');
+             } else if(recoverable.includes(e.error)) setVoiceState('IDLE');
     }
   };
   liveRecognition.onend=()=>{
@@ -397,7 +416,6 @@ function initVoiceEngines(){
     if(state.isVoiceNoteRecording){try{voiceNoteRecognition.start();}catch{}}
     else document.getElementById('voice-note-btn')?.classList.remove('recording');
   };
-   
 }
 function startLiveRecognition(){
   if(!state.isLiveVoiceActive||!liveRecognition||state.isSending||state.voiceState==='SPEAKING')return;
@@ -603,7 +621,12 @@ function saveUserProfile(){
   const btn=document.querySelector('#screen-profile .primary-btn');
   if(btn){const old=btn.innerHTML;btn.innerHTML='<i class="fa-solid fa-check"></i> Saved';setTimeout(()=>{btn.innerHTML=old;},1200);}
 }
-function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
+function switchModel(model){
+  const allowed=['auto','gemini-2.5-flash','gemini-2.5-pro'];
+  if(!allowed.includes(model))return;
+  state.model=model;
+  localStorage.setItem(STORAGE.model,model);
+}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
   state.memoryMode=!!document.getElementById('memory-context-toggle')?.checked;
@@ -640,4 +663,4 @@ const DeviceBridge={
 };
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen};
-       
+     
