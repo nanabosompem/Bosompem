@@ -31,9 +31,7 @@ const STORAGE = {
   proactive: 'bosompem_proactive',
   autonomy: 'bosompem_autonomy',
   reminders: 'bosompem_reminders',
-  projects: 'bosompem_projects',
-  userRole: 'bosompem_user_role',
-  userBio: 'bosompem_user_bio'
+  projects: 'bosompem_projects'
 };
 
 class SpeechSanitizer {
@@ -56,49 +54,162 @@ class SpeechSanitizer {
 
 class MemoryVault {
   constructor() { this.db = null; this.dbName = 'BosompemMemoryVault'; }
+
   async init() {
     if (!window.indexedDB) return;
     return new Promise(resolve => {
       const request = indexedDB.open(this.dbName, 1);
       request.onupgradeneeded = e => {
         const db = e.target.result;
-        if (!db.objectStoreNames.contains('memories')) db.createObjectStore('memories', {keyPath:'id'});
+        if (!db.objectStoreNames.contains('memories')) {
+          db.createObjectStore('memories', { keyPath: 'id' });
+        }
       };
-      request.onsuccess = e => { this.db = e.target.result; resolve(); };
+      request.onsuccess = e => {
+        this.db = e.target.result;
+        this.db.onversionchange = () => this.db?.close();
+        resolve();
+      };
       request.onerror = () => resolve();
+      request.onblocked = () => resolve();
     });
   }
+
+  normalize(text) {
+    return String(text || '')
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   tokens(text) {
-    return String(text).toLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').split(/\s+/).filter(x=>x.length>2);
+    const stopWords = new Set([
+      'the','and','for','that','this','with','from','have','has','had','are','was','were',
+      'you','your','yours','about','into','onto','then','than','them','they','their','there',
+      'here','what','when','where','which','while','who','how','why','can','could','would',
+      'should','will','just','also','very','more','most','some','any','all','not','but','because',
+      'please','remember','that','user','fact','like','want','need'
+    ]);
+    return this.normalize(text).split(' ').filter(token => token.length > 2 && !stopWords.has(token));
   }
+
+  // Small, offline synonym groups improve recall without an external API.
+  expandTokens(tokens) {
+    const groups = [
+      ['cheap','affordable','inexpensive','budget'],
+      ['shoe','shoes','sneaker','sneakers','footwear'],
+      ['job','work','working','employment'],
+      ['home','house','residence'],
+      ['phone','mobile','smartphone','device'],
+      ['buy','purchase','shopping','shop'],
+      ['like','love','enjoy','prefer','favorite','favourite'],
+      ['fast','quick','rapid'],
+      ['remember','memory','recall'],
+      ['money','cash','income','salary','pay']
+    ];
+    const expanded = new Set(tokens);
+    for (const group of groups) {
+      if (group.some(word => expanded.has(word))) group.forEach(word => expanded.add(word));
+    }
+    return expanded;
+  }
+
   async storeMemory(fact) {
-    if (!this.db || !fact?.trim()) return null;
-    const item = {id:'mem_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), fact:fact.trim(), tokens:this.tokens(fact), date:new Date().toISOString()};
-    return new Promise(resolve=>{
-      const tx=this.db.transaction('memories','readwrite');
-      tx.objectStore('memories').put(item);
-      tx.oncomplete=()=>resolve(item);
-      tx.onerror=()=>resolve(null);
+    const cleanFact = String(fact || '').trim().replace(/\s+/g, ' ');
+    if (!this.db || !cleanFact) return null;
+
+    const all = await this.getAllMemories();
+    const normalizedFact = this.normalize(cleanFact);
+    const duplicate = all.find(item => this.normalize(item.fact) === normalizedFact);
+    const item = {
+      id: duplicate?.id || 'mem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      fact: duplicate ? duplicate.fact : cleanFact,
+      tokens: this.tokens(duplicate ? duplicate.fact : cleanFact),
+      date: duplicate?.date || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      timesSaved: (duplicate?.timesSaved || 0) + 1
+    };
+
+    return new Promise(resolve => {
+      let tx;
+      try {
+        tx = this.db.transaction('memories', 'readwrite');
+        tx.objectStore('memories').put(item);
+        tx.oncomplete = () => resolve(item);
+        tx.onerror = () => resolve(null);
+        tx.onabort = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
     });
   }
+
   async getAllMemories() {
     if (!this.db) return [];
-    return new Promise(resolve=>{
-      const req=this.db.transaction('memories','readonly').objectStore('memories').getAll();
-      req.onsuccess=()=>resolve(req.result||[]); req.onerror=()=>resolve([]);
+    return new Promise(resolve => {
+      let req;
+      try {
+        req = this.db.transaction('memories', 'readonly').objectStore('memories').getAll();
+      } catch {
+        resolve([]);
+        return;
+      }
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
     });
   }
+
   async retrieveRelevant(query) {
-    const all=await this.getAllMemories(); const q=this.tokens(query);
-    if(!q.length) return [];
-    return all.map(m=>({m,score:q.reduce((n,t)=>n+(m.tokens.includes(t)?1:0),0)}))
-      .filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(x=>x.m.fact);
+    const all = await this.getAllMemories();
+    const queryTokens = this.tokens(query);
+    if (!queryTokens.length || !all.length) return [];
+
+    const queryExpanded = this.expandTokens(queryTokens);
+    const querySet = new Set(queryTokens);
+    const normalizedQuery = this.normalize(query);
+
+    return all.map(memory => {
+      const memoryTokens = this.tokens(memory.fact || '');
+      const memoryExpanded = this.expandTokens(memoryTokens);
+      const memorySet = new Set(memoryTokens);
+      let exactMatches = 0;
+      let semanticMatches = 0;
+
+      for (const token of querySet) {
+        if (memorySet.has(token)) exactMatches++;
+      }
+      for (const token of queryExpanded) {
+        if (memoryExpanded.has(token)) semanticMatches++;
+      }
+
+      const union = new Set([...queryExpanded, ...memoryExpanded]).size || 1;
+      const overlap = semanticMatches / union;
+      const coverage = semanticMatches / Math.max(1, queryExpanded.size);
+      const phraseBonus = normalizedQuery.length > 5 && this.normalize(memory.fact).includes(normalizedQuery) ? 0.6 : 0;
+      const exactBonus = exactMatches ? Math.min(0.5, exactMatches * 0.12) : 0;
+      const score = overlap + coverage * 0.55 + exactBonus + phraseBonus;
+      return { memory, score, exactMatches, semanticMatches };
+    })
+      .filter(item => item.score >= 0.22 && item.semanticMatches > 0)
+      .sort((a, b) => b.score - a.score || new Date(b.memory.updatedAt || b.memory.date || 0) - new Date(a.memory.updatedAt || a.memory.date || 0))
+      .slice(0, 8)
+      .map(item => item.memory.fact);
   }
+
   async deleteMemory(id) {
-    if(!this.db)return;
-    return new Promise(resolve=>{
-      const tx=this.db.transaction('memories','readwrite');
-      tx.objectStore('memories').delete(id); tx.oncomplete=()=>resolve();
+    if (!this.db) return;
+    return new Promise(resolve => {
+      try {
+        const tx = this.db.transaction('memories', 'readwrite');
+        tx.objectStore('memories').delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 }
@@ -119,13 +230,7 @@ const state = {
   isLiveVoiceActive:false,
   isVoiceNoteRecording:false,
   selectedImageData:null,
-  isSending:false,
-  activeRequestController:null,
-  attachmentMenuOpen:false,
-  profileRole:localStorage.getItem('bosompem_user_role')||'',
-  profileBio:localStorage.getItem('bosompem_user_bio')||'',
-  touchStartX:0,
-  touchStartY:0
+  isSending:false
 };
 
 const memoryEngine=new MemoryVault();
@@ -139,7 +244,6 @@ function saveJSON(key,value){localStorage.setItem(key,JSON.stringify(value));}
 window.addEventListener('DOMContentLoaded',async()=>{
   await memoryEngine.init();
   initVoiceEngines();
-  initSwipeNavigation();
   loadSavedSettings();
   updateGreeting();
   updateClock();
@@ -148,21 +252,21 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderMemoryList();
   renderProjects();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
-  updateSendButton();
 });
 
-function updateClock(){}
+function updateClock(){
+  const el=document.getElementById('status-time');
+  if(el)el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
+}
 function updateGreeting(){
   const el=document.getElementById('dynamic-greeting');
   if(el)el.textContent=`Hello${state.userName?', '+state.userName:''}`;
   const name=document.getElementById('drawer-user-name');
-  if(name)name.textContent=state.userName?state.userName:'Bosompem Pro';
-  updateProfilePreview();
+  if(name)name.textContent=state.userName?`Bosompem for ${state.userName}`:'Bosompem Pro';
 }
 
 function openScreen(screenId){
   state.activeScreen=screenId;
-  closeAttachmentMenu();
   document.querySelectorAll('.screen-view').forEach(x=>x.classList.toggle('active',x.id===`screen-${screenId}`));
   document.querySelectorAll('.nav-tab,.menu-item').forEach(x=>x.classList.toggle('active',x.dataset.screen===screenId));
   const titles={chat:'Chat Studio','live-voice':'Live Voice',projects:'Projects','media-lab':'Media & Vision','memory-vault':'Memory Vault',tasks:'Tasks & Reminders',profile:'User Profile',settings:'System Settings'};
@@ -170,13 +274,12 @@ function openScreen(screenId){
   if(screenId==='memory-vault')renderMemoryList();
   if(screenId==='projects')renderProjects();
   if(screenId==='tasks')renderReminders();
-  if(screenId==='profile'){loadSavedSettings();updateProfilePreview();updateProfileStatus();}
 }
 function toggleNavDrawer(){
-  const drawer=document.getElementById('nav-drawer');
-  if(drawer?.classList.contains('open'))closeNavDrawer();else openNavDrawer();
+  document.getElementById('nav-drawer')?.classList.toggle('open');
+  document.getElementById('nav-overlay')?.classList.toggle('active');
 }
-function switchScreenFromDrawer(id){openScreen(id);closeNavDrawer();}
+function switchScreenFromDrawer(id){openScreen(id);toggleNavDrawer();}
 
 function autoExpandTextarea(el){if(!el)return;el.style.height='24px';el.style.height=Math.min(el.scrollHeight,120)+'px';}
 function handleTextareaKeyDown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleChatSubmit();}}
@@ -189,35 +292,10 @@ function getActiveSession(){return state.sessions.find(s=>s.id===state.activeSes
 function loadSession(id){
   state.activeSessionId=id;
   const s=getActiveSession(),hero=document.getElementById('welcome-hero'),box=document.getElementById('chat-messages-container');
-  if(!s||!s.messages.length){
-    if(hero)hero.style.display='flex';
-    if(box){box.style.display='none';box.innerHTML='';}
-  } else {
-    if(hero)hero.style.display='none';
-    if(box)box.style.display='flex';
-    renderMessages();
-  }
-  updateSendButton();
+  if(!s||!s.messages.length){if(hero)hero.style.display='flex';if(box){box.style.display='none';box.innerHTML='';}}
+  else{if(hero)hero.style.display='none';if(box)box.style.display='flex';renderMessages();}
 }
 function saveSessions(){saveJSON(STORAGE.sessions,state.sessions);}
-
-/* Cost-conscious Gemini router.
-   Auto uses Flash for ordinary requests and Pro for requests that
-   appear to need deeper reasoning. Manual model choices are respected. */
-function chooseModelForRequest(text,imageData=null){
-  const selected=state.model||'auto';
-  if(selected!=='auto')return selected;
-  const message=String(text||'').toLowerCase();
-  const complexPatterns=[
-    /\b(debug|debugging|refactor|architecture|architect|implement|algorithm|optimi[sz]e|root cause|production issue|security review|complex reasoning|step.by.step proof)\b/,
-    /\b(build|create|write|review|fix|rewrite)\b.{0,45}\b(code|function|script|app|website|api|database|system|program)\b/,
-    /\b(compare|evaluate|design)\b.{0,60}\b(architecture|approaches|strategies|systems|trade.off)\b/
-  ];
-  const likelyComplex=complexPatterns.some(pattern=>pattern.test(message)) || message.length>700;
-  // Image questions stay on Flash by default unless the text asks for a complex task.
-  if(likelyComplex)return 'gemini-2.5-pro';
-  return 'gemini-2.5-flash';
-}
 
 async function sendChatMessage(text,imageData=null){
   if(state.isSending)return;
@@ -266,10 +344,8 @@ async function sendChatMessage(text,imageData=null){
   });
 
   try{
-    state.activeRequestController=new AbortController();
-    const requestModel=chooseModelForRequest(text,imageData);
-    const endpoint=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(requestModel)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},signal:state.activeRequestController.signal,body:JSON.stringify({
+    const endpoint=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
       contents,systemInstruction:{parts:[{text:SYSTEM_INSTRUCTION}]},
       generationConfig:{temperature:.55,topP:.9,maxOutputTokens:4096}
     })});
@@ -285,13 +361,10 @@ async function sendChatMessage(text,imageData=null){
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
   }catch(err){
     removeThinkingIndicator(thinkingId);hideAgentSteps();
-    if(err?.name==='AbortError')return;
     session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${err.message||'Connection error.'}`,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();setVoiceState('IDLE');
   }finally{
     state.isSending=false;
-    state.activeRequestController=null;
-    updateSendButton();
   }
 }
 
@@ -317,7 +390,7 @@ function handleChatImageUpload(e){
   };
   reader.readAsDataURL(file);e.target.value='';
 }
-function clearSelectedImage(){state.selectedImageData=null;document.getElementById('attachment-preview')?.classList.add('hidden');updateSendButton();}
+function clearSelectedImage(){state.selectedImageData=null;document.getElementById('attachment-preview')?.classList.add('hidden');}
 
 function renderMessages(){
   const box=document.getElementById('chat-messages-container'),session=getActiveSession();if(!box||!session)return;
@@ -365,86 +438,42 @@ function setVoiceState(newState){
 function initVoiceEngines(){
   if(!SpeechRecognition)return;
   liveRecognition=new SpeechRecognition();
-  liveRecognition.continuous=false;
-  liveRecognition.interimResults=true;
-  liveRecognition.lang='en-US';
-  liveRecognition.maxAlternatives=1;
+  liveRecognition.continuous=false;liveRecognition.interimResults=true;liveRecognition.lang='en-US';
   liveRecognition.onstart=()=>setVoiceState('LISTENING');
   liveRecognition.onresult=e=>{
     let transcript='';
     for(let i=e.resultIndex;i<e.results.length;i++)transcript+=e.results[i][0].transcript;
-    const card=document.getElementById('voice-live-transcript');
-    if(card)card.textContent=transcript.trim()||'Listening…';
-    const last=e.results[e.results.length-1];
-    if(last?.isFinal&&transcript.trim()){
-      state.voicePendingTranscript=transcript.trim();
-      setVoiceState('THINKING');
-      try{liveRecognition.stop();}catch{}
-      sendChatMessage(state.voicePendingTranscript);
-    }
+    const card=document.getElementById('voice-live-transcript');if(card)card.textContent=transcript;
+    if(e.results[e.results.length-1].isFinal&&transcript.trim())sendChatMessage(transcript);
   };
-  liveRecognition.onerror=e=>{
-    const recoverable=['no-speech','aborted','audio-capture'];
-    if(state.isLiveVoiceActive){
-      if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-        state.isLiveVoiceActive=false;
-        updateLiveVoiceButton();
-        setVoiceState('IDLE');
-        const sub=document.getElementById('voice-status-sub');
-        if(sub)sub.textContent='Microphone access was blocked. Allow microphone access for this site and try again.';
-             } else if(recoverable.includes(e.error)) setVoiceState('IDLE');
-    }
-  };
+  liveRecognition.onerror=()=>{if(state.isLiveVoiceActive)setVoiceState('IDLE');};
   liveRecognition.onend=()=>{
-    if(!state.isLiveVoiceActive)return setVoiceState('IDLE');
-    if(state.isSending||state.voiceState==='SPEAKING'||state.voiceState==='THINKING')return;
-    setTimeout(()=>startLiveRecognition(),450);
+    if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING'){
+      setTimeout(()=>{try{liveRecognition.start();}catch{}},350);
+    }else if(!state.isLiveVoiceActive)setVoiceState('IDLE');
   };
 
   voiceNoteRecognition=new SpeechRecognition();
-  voiceNoteRecognition.continuous=true;
-  voiceNoteRecognition.interimResults=true;
-  voiceNoteRecognition.lang='en-US';
-  voiceNoteRecognition.onstart=()=>{const b=document.getElementById('voice-note-btn');if(b)b.classList.add('recording');};
+  voiceNoteRecognition.continuous=true;voiceNoteRecognition.interimResults=true;voiceNoteRecognition.lang='en-US';
   voiceNoteRecognition.onresult=e=>{
     let transcript='';
     for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';
-    const input=document.getElementById('chat-input');
-    if(input){input.value=transcript.trim();autoExpandTextarea(input);updateSendButton();}
+    const input=document.getElementById('chat-input');if(input){input.value=transcript.trim();autoExpandTextarea(input);}
   };
-  voiceNoteRecognition.onend=()=>{
-    if(state.isVoiceNoteRecording){try{voiceNoteRecognition.start();}catch{}}
-    else document.getElementById('voice-note-btn')?.classList.remove('recording');
-  };
-}
-function startLiveRecognition(){
-  if(!state.isLiveVoiceActive||!liveRecognition||state.isSending||state.voiceState==='SPEAKING')return;
-  try{liveRecognition.start();}catch{}
-}
-function updateLiveVoiceButton(){
-  const btn=document.getElementById('live-voice-toggle-btn');
-  if(!btn)return;
-  btn.innerHTML=state.isLiveVoiceActive?'<i class="fa-solid fa-stop"></i> Stop Live Mode':'<i class="fa-solid fa-microphone"></i> Start Live Mode';
-  btn.classList.toggle('active',state.isLiveVoiceActive);
+  voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording){try{voiceNoteRecognition.start();}catch{}}};
 }
 function toggleLiveVoiceMode(){
-  if(!SpeechRecognition)return alert('Live Voice is not supported by this browser. Try Chrome on Android.');
+  if(!SpeechRecognition)return alert('Live speech recognition is not supported by this browser.');
   state.isLiveVoiceActive=!state.isLiveVoiceActive;
-  updateLiveVoiceButton();
-  const sub=document.getElementById('voice-status-sub');
+  const btn=document.getElementById('live-voice-toggle-btn');
   if(state.isLiveVoiceActive){
-    stopSpeechPlayback();
-    if(sub)sub.textContent='Listening continuously. Speak naturally and pause when you are finished.';
-    setVoiceState('LISTENING');
-    setTimeout(()=>startLiveRecognition(),120);
+    if(btn)btn.innerHTML='<i class="fa-solid fa-stop"></i> Stop Live Mode';
+    stopSpeechPlayback();try{liveRecognition.start();}catch{}
   }else{
-    try{liveRecognition.stop();}catch{}
-    stopSpeechPlayback();
-    setVoiceState('IDLE');
-    if(sub)sub.textContent='Live Voice is paused. Tap Start Live Mode to continue.';
+    if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i> Start Live Mode';
+    try{liveRecognition.stop();}catch{};stopSpeechPlayback();setVoiceState('IDLE');
   }
 }
-
 function toggleVoiceNoteRecording(){
   if(!SpeechRecognition)return alert('Speech recognition is unavailable in this browser.');
   state.isVoiceNoteRecording=!state.isVoiceNoteRecording;
@@ -454,92 +483,13 @@ function toggleVoiceNoteRecording(){
 function speakText(rawText){
   if(!('speechSynthesis' in window))return;
   const clean=SpeechSanitizer.cleanTextForSpeech(rawText);if(!clean)return;
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(clean);
-  const voices=speechSynthesis.getVoices();
-  const male=voices.find(v=>/male|david|mark|guy|daniel|alex|fred|tom/i.test((v.name||'')+' '+(v.voiceURI||''))) || voices.find(v=>/^en/i.test(v.lang));
-  if(male)u.voice=male;
-  u.rate=1.12;u.pitch=.82;u.volume=1;
+  speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(clean);u.rate=1;u.pitch=1;
   u.onstart=()=>setVoiceState('SPEAKING');
-  u.onend=()=>{
-    if(state.isLiveVoiceActive){
-      setVoiceState('IDLE');
-      setTimeout(()=>startLiveRecognition(),450);
-    } else setVoiceState('IDLE');
-  };
-  u.onerror=()=>setVoiceState('IDLE');
-  speechSynthesis.speak(u);
+  u.onend=()=>{setVoiceState('IDLE');if(state.isLiveVoiceActive)setTimeout(()=>{try{liveRecognition.start();}catch{}},350);};
+  u.onerror=()=>setVoiceState('IDLE');speechSynthesis.speak(u);
 }
 function stopSpeechPlayback(){if('speechSynthesis'in window)speechSynthesis.cancel();setVoiceState('IDLE');}
-if('speechSynthesis' in window)window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();
 
-function updateSendButton(){
-  const btn=document.getElementById('send-btn');if(!btn)return;
-  const input=document.getElementById('chat-input');
-  const hasText=Boolean(input?.value.trim()||state.selectedImageData);
-  if(state.isSending){btn.innerHTML='<i class="fa-solid fa-stop"></i>';btn.title='Stop';btn.disabled=false;btn.classList.add('stop-mode');}
-  else{btn.innerHTML='<i class="fa-solid fa-arrow-up"></i>';btn.title='Send';btn.disabled=!hasText;btn.classList.remove('stop-mode');}
-}
-function stopGeneration(){
-  if(state.activeRequestController)state.activeRequestController.abort();
-  stopSpeechPlayback();
-  state.isSending=false;state.activeRequestController=null;
-  setVoiceState(state.isLiveVoiceActive?'IDLE':'IDLE');
-  updateSendButton();
-}
-function toggleAttachmentMenu(){
-  state.attachmentMenuOpen=!state.attachmentMenuOpen;
-  const menu=document.getElementById('attachment-menu'),btn=document.getElementById('plus-btn');
-  if(menu){menu.classList.toggle('open',state.attachmentMenuOpen);menu.setAttribute('aria-hidden',String(!state.attachmentMenuOpen));}
-  if(btn){btn.classList.toggle('open',state.attachmentMenuOpen);btn.setAttribute('aria-expanded',String(state.attachmentMenuOpen));}
-}
-function closeAttachmentMenu(){if(state.attachmentMenuOpen){state.attachmentMenuOpen=false;document.getElementById('attachment-menu')?.classList.remove('open');document.getElementById('plus-btn')?.classList.remove('open');document.getElementById('plus-btn')?.setAttribute('aria-expanded','false');}}
-function triggerChatImage(mode='gallery'){
-  closeAttachmentMenu();
-  const input=document.getElementById('chat-image-input');if(!input)return;
-  input.setAttribute('accept','image/*');
-  if(mode==='camera')input.setAttribute('capture','environment');else input.removeAttribute('capture');
-  input.click();
-}
-async function triggerScreenshot(){
-  closeAttachmentMenu();
-  if(!navigator.mediaDevices?.getDisplayMedia)return alert('Screen capture is not supported by this browser.');
-  try{
-    const stream=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'browser'},audio:false});
-    const video=document.createElement('video');video.srcObject=stream;video.muted=true;await video.play();
-    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-    const canvas=document.createElement('canvas');canvas.width=video.videoWidth||window.innerWidth;canvas.height=video.videoHeight||window.innerHeight;
-    canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
-    stream.getTracks().forEach(t=>t.stop());
-    state.selectedImageData=canvas.toDataURL('image/jpeg',.88);
-    const img=document.getElementById('attachment-preview-image'),box=document.getElementById('attachment-preview');
-    if(img)img.src=state.selectedImageData;if(box)box.classList.remove('hidden');updateSendButton();
-  }catch(error){if(error?.name!=='AbortError')alert('Screen capture was cancelled or unavailable.');}
-}
-function attachLocation(){
-  closeAttachmentMenu();
-  if(!navigator.geolocation)return alert('Location is not supported by this browser.');
-  navigator.geolocation.getCurrentPosition(pos=>{
-    const {latitude,longitude,accuracy}=pos.coords;
-    const input=document.getElementById('chat-input');
-    if(input){input.value=`My current location is approximately ${latitude.toFixed(5)}, ${longitude.toFixed(5)} (accuracy ${Math.round(accuracy)}m). Help me use this location.`;autoExpandTextarea(input);updateSendButton();input.focus();}
-  },err=>alert(err.code===1?'Location permission was denied.':'Unable to get your location.'),{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
-}
-function initSwipeNavigation(){
-  const root=document.querySelector('.phone-container');if(!root)return;
-  root.addEventListener('touchstart',e=>{if(e.touches.length!==1)return;state.touchStartX=e.touches[0].clientX;state.touchStartY=e.touches[0].clientY;},{passive:true});
-  root.addEventListener('touchend',e=>{
-    if(e.changedTouches.length!==1)return;
-    const x=e.changedTouches[0].clientX,y=e.changedTouches[0].clientY,dx=x-state.touchStartX,dy=y-state.touchStartY;
-    if(Math.abs(dx)<55||Math.abs(dx)<Math.abs(dy)*1.25)return;
-    const drawer=document.getElementById('nav-drawer');
-    if(dx>0 && state.touchStartX<38 && !drawer?.classList.contains('open')){openNavDrawer();}
-    else if(dx<0 && drawer?.classList.contains('open')){closeNavDrawer();}
-  },{passive:true});
-  document.addEventListener('click',e=>{const menu=document.getElementById('attachment-menu'),btn=document.getElementById('plus-btn');if(state.attachmentMenuOpen&&menu&&!menu.contains(e.target)&&btn&&!btn.contains(e.target))closeAttachmentMenu();});
-}
-function openNavDrawer(){document.getElementById('nav-drawer')?.classList.add('open');document.getElementById('nav-overlay')?.classList.add('active');}
-function closeNavDrawer(){document.getElementById('nav-drawer')?.classList.remove('open');document.getElementById('nav-overlay')?.classList.remove('active');}
 function renderAgentSteps(steps){
   const card=document.getElementById('agent-planner-card'),list=document.getElementById('agent-steps-list');if(!card||!list)return;
   list.innerHTML=steps.map((s,i)=>`<div class="agent-step-item"><i class="fa-solid fa-circle-notch fa-spin"></i> Step ${i+1}: ${escapeHtml(s)}</div>`).join('');
@@ -596,37 +546,10 @@ function continueProject(id){
   openScreen('chat');const input=document.getElementById('chat-input');if(input){input.value=`Continue the project "${p.name}". Project goal: ${p.description||'not specified'}. Review the context you have and tell me the best next action.`;autoExpandTextarea(input);input.focus();}
 }
 
-function updateProfilePreview(){
-  const name=(document.getElementById('user-name-input')?.value||state.userName||'Your Profile').trim();
-  const role=(document.getElementById('user-role-input')?.value||state.profileRole||'').trim();
-  const title=document.getElementById('profile-display-name');if(title)title.textContent=name||'Your Profile';
-  const line=document.getElementById('profile-profile-line');if(line)line.textContent=role||'Bosompem is personalized for you.';
-  const avatar=document.getElementById('profile-avatar');if(avatar)avatar.textContent=(name||'B').split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
-  const completion=[name,role,(document.getElementById('user-bio-input')?.value||state.profileBio||'').trim()].filter(Boolean).length;
-  const pct=Math.round(40+(completion/3)*60);
-  const val=document.getElementById('profile-completion-value');if(val)val.textContent=pct+'%';
-  const bar=document.getElementById('profile-completion-bar');if(bar)bar.style.width=pct+'%';
-}
-function updateProfileStatus(){
-  const mem=document.getElementById('profile-memory-status');if(mem)mem.textContent=state.memoryMode?'On':'Off';
-  const pro=document.getElementById('profile-proactive-status');if(pro)pro.textContent=state.proactive?'On':'Off';
-}
 function saveUserProfile(){
-  const name=(document.getElementById('user-name-input')?.value||'').trim();
-  const role=(document.getElementById('user-role-input')?.value||'').trim();
-  const bio=(document.getElementById('user-bio-input')?.value||'').trim();
-  state.userName=name;state.profileRole=role;state.profileBio=bio;
-  localStorage.setItem(STORAGE.userName,name);localStorage.setItem(STORAGE.userRole,role);localStorage.setItem(STORAGE.userBio,bio);
-  updateGreeting();updateProfileStatus();
-  const btn=document.querySelector('#screen-profile .primary-btn');
-  if(btn){const old=btn.innerHTML;btn.innerHTML='<i class="fa-solid fa-check"></i> Saved';setTimeout(()=>{btn.innerHTML=old;},1200);}
+  const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();localStorage.setItem(STORAGE.userName,state.userName);updateGreeting();alert('Profile saved.');
 }
-function switchModel(model){
-  const allowed=['auto','gemini-2.5-flash','gemini-2.5-pro'];
-  if(!allowed.includes(model))return;
-  state.model=model;
-  localStorage.setItem(STORAGE.model,model);
-}
+function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
   state.memoryMode=!!document.getElementById('memory-context-toggle')?.checked;
@@ -641,9 +564,6 @@ function loadSavedSettings(){
   const key=document.getElementById('api-key');if(key)key.value=state.apiKey;
   const model=document.getElementById('model-select');if(model)model.value=state.model;
   const name=document.getElementById('user-name-input');if(name)name.value=state.userName;
-  const role=document.getElementById('user-role-input');if(role)role.value=state.profileRole;
-  const bio=document.getElementById('user-bio-input');if(bio)bio.value=state.profileBio;
-  updateProfileStatus();updateProfilePreview();
   const mem=document.getElementById('memory-context-toggle');if(mem)mem.checked=state.memoryMode;
   const pro=document.getElementById('proactive-toggle');if(pro)pro.checked=state.proactive;
   const auto=document.getElementById('autonomy-level');if(auto)auto.value=state.autonomy;
@@ -663,4 +583,4 @@ const DeviceBridge={
 };
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen};
-     
+   
