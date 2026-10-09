@@ -61,9 +61,7 @@ class MemoryVault {
       const request = indexedDB.open(this.dbName, 1);
       request.onupgradeneeded = e => {
         const db = e.target.result;
-        if (!db.objectStoreNames.contains('memories')) {
-          db.createObjectStore('memories', { keyPath: 'id' });
-        }
+        if (!db.objectStoreNames.contains('memories')) db.createObjectStore('memories', { keyPath: 'id' });
       };
       request.onsuccess = e => {
         this.db = e.target.result;
@@ -76,12 +74,10 @@ class MemoryVault {
   }
 
   normalize(text) {
-    return String(text || '')
-      .normalize('NFKC')
-      .toLowerCase()
+    return String(text || '').normalize('NFKC').toLowerCase()
+      .replace(/[’']/g, '')
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+      .replace(/\s+/g, ' ').trim();
   }
 
   tokens(text) {
@@ -90,48 +86,84 @@ class MemoryVault {
       'you','your','yours','about','into','onto','then','than','them','they','their','there',
       'here','what','when','where','which','while','who','how','why','can','could','would',
       'should','will','just','also','very','more','most','some','any','all','not','but','because',
-      'please','remember','that','user','fact','like','want','need'
+      'please','remember','user','fact','want','need','am','is','it','my','me','i','a','an','to',
+      'of','in','on','at','up','now','do','did','does','was','were','be','been','being','much'
     ]);
     return this.normalize(text).split(' ').filter(token => token.length > 2 && !stopWords.has(token));
   }
 
-  // Small, offline synonym groups improve recall without an external API.
   expandTokens(tokens) {
     const groups = [
-      ['cheap','affordable','inexpensive','budget'],
-      ['shoe','shoes','sneaker','sneakers','footwear'],
-      ['job','work','working','employment'],
-      ['home','house','residence'],
-      ['phone','mobile','smartphone','device'],
-      ['buy','purchase','shopping','shop'],
-      ['like','love','enjoy','prefer','favorite','favourite'],
+      ['cheap','affordable','inexpensive','budget','lowcost','lowcosts'],
+      ['shoe','shoes','sneaker','sneakers','footwear','trainer','trainers'],
+      ['job','work','working','employment','career'],
+      ['home','house','residence','apartment','flat'],
+      ['phone','mobile','smartphone','device','handset'],
+      ['buy','purchase','shopping','shop','get','obtain'],
+      ['like','likes','liked','love','loves','loved','enjoy','enjoys','prefer','prefers','preferred','favorite','favourite'],
       ['fast','quick','rapid'],
-      ['remember','memory','recall'],
-      ['money','cash','income','salary','pay']
+      ['remember','memory','recall','remind'],
+      ['money','cash','income','salary','pay','funds','savings','saving','save','saved'],
+      ['laptop','computer','notebook','pc'],
+      ['goal','goals','aim','target','plan','plans','planning','intend','intention'],
+      ['color','colour','colors','colours'],
+      ['now','currently','latest','new','updated'],
+      ['want','wants','wanted','wish','wishes','looking']
     ];
     const expanded = new Set(tokens);
     for (const group of groups) {
       if (group.some(word => expanded.has(word))) group.forEach(word => expanded.add(word));
     }
+    // Lightweight English word-form normalization for common memory phrasing.
+    for (const token of [...expanded]) {
+      if (token.endsWith('ies') && token.length > 4) expanded.add(token.slice(0, -3) + 'y');
+      if (token.endsWith('ing') && token.length > 5) expanded.add(token.slice(0, -3));
+      if (token.endsWith('s') && token.length > 4) expanded.add(token.slice(0, -1));
+    }
     return expanded;
+  }
+
+  // Detect a narrow, explicit preference subject so newer statements can replace
+  // an older statement about the same subject without deleting unrelated facts.
+  preferenceKey(fact) {
+    const n = this.normalize(fact);
+    let match = n.match(/\bmy (?:current )?(?:favorite|favourite) ([a-z]+)\b/);
+    if (match) return `favorite:${match[1]}`;
+    match = n.match(/\b(?:i|im|i am) (?:currently )?(?:prefer|like|love|dislike|hate) (?:the )?(.+)/);
+    if (match) {
+      let object = match[1].replace(/\b(now|currently|more|most|better|best|instead|these days)\b/g, ' ').trim();
+      const words = this.tokens(object);
+      if (words.length) return `preference:${words[words.length - 1]}`;
+    }
+    return null;
   }
 
   async storeMemory(fact) {
     const cleanFact = String(fact || '').trim().replace(/\s+/g, ' ');
     if (!this.db || !cleanFact) return null;
-
     const all = await this.getAllMemories();
     const normalizedFact = this.normalize(cleanFact);
     const duplicate = all.find(item => this.normalize(item.fact) === normalizedFact);
+    const newPreferenceKey = this.preferenceKey(cleanFact);
+    const replacedPreference = !duplicate && newPreferenceKey
+      ? all.find(item => this.preferenceKey(item.fact) === newPreferenceKey)
+      : null;
+    const now = new Date().toISOString();
     const item = {
-      id: duplicate?.id || 'mem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      id: duplicate?.id || replacedPreference?.id || 'mem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       fact: duplicate ? duplicate.fact : cleanFact,
       tokens: this.tokens(duplicate ? duplicate.fact : cleanFact),
-      date: duplicate?.date || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      date: duplicate?.date || replacedPreference?.date || now,
+      updatedAt: now,
       timesSaved: (duplicate?.timesSaved || 0) + 1
     };
-
+    // When a newer explicit preference replaces an older one, retain the same
+    // record ID/date so the Memory Vault stays compatible, but save the new fact.
+    if (replacedPreference) {
+      item.fact = cleanFact;
+      item.tokens = this.tokens(cleanFact);
+      item.timesSaved = (replacedPreference.timesSaved || 0) + 1;
+    }
     return new Promise(resolve => {
       let tx;
       try {
@@ -140,9 +172,7 @@ class MemoryVault {
         tx.oncomplete = () => resolve(item);
         tx.onerror = () => resolve(null);
         tx.onabort = () => resolve(null);
-      } catch {
-        resolve(null);
-      }
+      } catch { resolve(null); }
     });
   }
 
@@ -150,12 +180,8 @@ class MemoryVault {
     if (!this.db) return [];
     return new Promise(resolve => {
       let req;
-      try {
-        req = this.db.transaction('memories', 'readonly').objectStore('memories').getAll();
-      } catch {
-        resolve([]);
-        return;
-      }
+      try { req = this.db.transaction('memories', 'readonly').objectStore('memories').getAll(); }
+      catch { resolve([]); return; }
       req.onsuccess = () => resolve(req.result || []);
       req.onerror = () => resolve([]);
     });
@@ -165,34 +191,35 @@ class MemoryVault {
     const all = await this.getAllMemories();
     const queryTokens = this.tokens(query);
     if (!queryTokens.length || !all.length) return [];
-
     const queryExpanded = this.expandTokens(queryTokens);
     const querySet = new Set(queryTokens);
     const normalizedQuery = this.normalize(query);
+    const savingIntent = /\b(save|saving|saved|savings|put aside|setting aside|saving up)\b/.test(normalizedQuery);
+    const goalIntent = /\b(goal|plan|planning|intend|intending|aim|trying|working toward|saving|save up)\b/.test(normalizedQuery);
+    const preferenceIntent = /\b(prefer|favorite|favourite|like|love|dislike|hate|usually|always)\b/.test(normalizedQuery);
 
     return all.map(memory => {
-      const memoryTokens = this.tokens(memory.fact || '');
+      const fact = memory.fact || '';
+      const normalizedFact = this.normalize(fact);
+      const memoryTokens = this.tokens(fact);
       const memoryExpanded = this.expandTokens(memoryTokens);
       const memorySet = new Set(memoryTokens);
-      let exactMatches = 0;
-      let semanticMatches = 0;
-
-      for (const token of querySet) {
-        if (memorySet.has(token)) exactMatches++;
-      }
-      for (const token of queryExpanded) {
-        if (memoryExpanded.has(token)) semanticMatches++;
-      }
-
+      let exactMatches = 0, semanticMatches = 0;
+      for (const token of querySet) if (memorySet.has(token)) exactMatches++;
+      for (const token of queryExpanded) if (memoryExpanded.has(token)) semanticMatches++;
       const union = new Set([...queryExpanded, ...memoryExpanded]).size || 1;
       const overlap = semanticMatches / union;
       const coverage = semanticMatches / Math.max(1, queryExpanded.size);
-      const phraseBonus = normalizedQuery.length > 5 && this.normalize(memory.fact).includes(normalizedQuery) ? 0.6 : 0;
+      const phraseBonus = normalizedQuery.length > 5 && normalizedFact.includes(normalizedQuery) ? 0.6 : 0;
       const exactBonus = exactMatches ? Math.min(0.5, exactMatches * 0.12) : 0;
-      const score = overlap + coverage * 0.55 + exactBonus + phraseBonus;
+      let intentBonus = 0;
+      if (savingIntent && /\b(save|saving|saved|savings|money|fund|buy|purchase|goal|plan|laptop|computer)\b/.test(normalizedFact)) intentBonus += 0.48;
+      if (goalIntent && /\b(plan|goal|aim|intend|want|wish|trying|working toward|save|saving|buy|purchase)\b/.test(normalizedFact)) intentBonus += 0.18;
+      if (preferenceIntent && this.preferenceKey(fact)) intentBonus += 0.12;
+      const score = overlap + coverage * 0.55 + exactBonus + phraseBonus + intentBonus;
       return { memory, score, exactMatches, semanticMatches };
     })
-      .filter(item => item.score >= 0.22 && item.semanticMatches > 0)
+      .filter(item => item.score >= 0.22 && (item.semanticMatches > 0 || item.score >= 0.48))
       .sort((a, b) => b.score - a.score || new Date(b.memory.updatedAt || b.memory.date || 0) - new Date(a.memory.updatedAt || a.memory.date || 0))
       .slice(0, 8)
       .map(item => item.memory.fact);
@@ -207,9 +234,7 @@ class MemoryVault {
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
         tx.onabort = () => resolve();
-      } catch {
-        resolve();
-      }
+      } catch { resolve(); }
     });
   }
 }
@@ -331,7 +356,7 @@ async function sendChatMessage(text,imageData=null){
   const thinkingId=appendThinkingIndicator();
   const input=document.getElementById('chat-input');if(input){input.value='';autoExpandTextarea(input);}
   clearSelectedImage();
-
+  
   const contents=session.messages.map((m,i)=>{
     const parts=[{text:(i===session.messages.length-1&&m.role==='user'?memoryContext:'')+m.text}];
     if(i===session.messages.length-1&&imageData){
@@ -583,4 +608,4 @@ const DeviceBridge={
 };
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen};
-   
+       
