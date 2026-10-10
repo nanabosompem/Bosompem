@@ -20,6 +20,21 @@ When a task is complex:
 Respect user permissions and autonomy settings. Sensitive, irreversible or external actions
 must require appropriate confirmation unless the user explicitly enabled an autonomous level
 that permits them. Adapt response depth to the user's request.
+
+WEB RESEARCH:
+When current facts, prices, recent events, current availability, or up-to-date information matter,
+use the provided Google Search grounding tool when available. Distinguish sourced facts from inference
+and do not invent citations or claim you searched if search grounding was unavailable.
+
+TASK EXECUTION:
+Turn multi-step goals into clear steps. Use only capabilities actually available in this web app.
+You may help organize local projects, reminders, and saved memories when the user explicitly asks,
+but never claim to send messages, control Android, access private apps, or complete external actions
+unless a connected, authorized tool confirms success. Ask before sensitive, irreversible, or external actions.
+
+PERSONALIZATION:
+Use relevant memory context discreetly. Newer explicit preferences should take precedence over older ones.
+Do not infer sensitive personal traits from unrelated facts.
 `;
 
 const STORAGE = {
@@ -322,6 +337,78 @@ function loadSession(id){
 }
 function saveSessions(){saveJSON(STORAGE.sessions,state.sessions);}
 
+function classifyRequest(text) {
+  const t = String(text || '').toLowerCase();
+  const webResearch = /\b(latest|current|today|tonight|this week|recent|news|price|prices|cost|available|availability|weather|score|standings|compare.*(online|market|options)|research|search the web|look up|find online|source|sources|citation|202[5-9])\b/.test(t);
+  const complex = /\b(architecture|debug|debugging|code|program|programming|analy[sz]e|analysis|reasoning|step.by.step|multi.step|plan|strategy|compare|evaluate|design|build|project|research|report|long term|integrate|automation|automate)\b/.test(t) || String(text || '').length > 180;
+  return { webResearch, complex };
+}
+
+function chooseModelForRequest(text) {
+  const kind = classifyRequest(text);
+  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
+  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
+  const selected = state.model || 'gemini-2.5-flash';
+  const model = selected === 'gemini-2.5-pro'
+    ? 'gemini-2.5-pro'
+    : (kind.complex ? 'gemini-2.5-pro' : 'gemini-2.5-flash');
+  return { ...kind, model };
+}
+
+function addGroundingSources(reply, data) {
+  const chunks = data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+  const sources = [];
+  for (const chunk of chunks) {
+    const uri = chunk?.web?.uri;
+    const title = chunk?.web?.title || uri;
+    if (uri && /^https?:\/\//i.test(uri) && !sources.some(s => s.uri === uri)) sources.push({ uri, title });
+  }
+  if (!sources.length) return reply;
+  const sourceBlock = '\n\n**Sources**\n' + sources.slice(0, 5).map((s, i) => `${i + 1}. [${String(s.title).replace(/[\[\]]/g, '')}](${s.uri})`).join('\n');
+  return /\*\*Sources\*\*/i.test(reply) ? reply : reply + sourceBlock;
+}
+
+async function requestGemini({ contents, text, model, allowSearch }) {
+  const makeBody = (includeSearch) => {
+    const body = {
+      contents,
+      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+      generationConfig: { temperature: .55, topP: .9, maxOutputTokens: 4096 }
+    };
+    if (includeSearch) body.tools = [{ google_search: {} }];
+    return body;
+  };
+  const call = async (targetModel, includeSearch) => {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(makeBody(includeSearch))
+    });
+    const data = await response.json();
+    if (!response.ok || data.error) throw new Error(data.error?.message || `Gemini request failed (${response.status})`);
+    return { data, model: targetModel, searched: includeSearch };
+  };
+
+  try {
+    return await call(model, allowSearch);
+  } catch (firstError) {
+    // If search grounding is unsupported for the selected model/account, retry without it.
+    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
+      try { return await call(model, false); } catch (_) { /* proceed to model fallback below */ }
+    }
+    // Automatic Pro routing must not strand a user whose API key cannot access Pro.
+    if (model === 'gemini-2.5-pro') {
+      try { return await call('gemini-2.5-flash', allowSearch); }
+      catch (secondError) {
+        if (allowSearch) return await call('gemini-2.5-flash', false);
+        throw secondError;
+      }
+    }
+    throw firstError;
+  }
+}
+
 async function sendChatMessage(text,imageData=null){
   if(state.isSending)return;
   text=(text||'').trim();
@@ -336,7 +423,7 @@ async function sendChatMessage(text,imageData=null){
   const box=document.getElementById('chat-messages-container'); if(box)box.style.display='flex';
 
   if(/^remember(?: that)?\s+/i.test(text)){
-    const fact=text.replace(/^remember(?: that)?\s+/i,'').trim();
+  const fact=text.replace(/^remember(?: that)?\s+/i,'').trim();
     await memoryEngine.storeMemory(fact);
   }
 
@@ -349,14 +436,15 @@ async function sendChatMessage(text,imageData=null){
     if(memories.length)memoryContext=`Relevant user memory (use only when helpful): ${memories.join(' | ')}\n`;
   }
 
-  const complex=state.autonomy!=='ask' || state.proactive || text.length>100;
-  if(complex)renderAgentSteps(['Understand objective','Check memory and context','Select available capabilities','Execute or prepare permitted actions','Report result']);
+  const routing = chooseModelForRequest(text);
+  const complex = state.autonomy !== 'ask' || state.proactive || routing.complex;
+  if(complex)renderAgentSteps(['Understand objective','Check relevant memory','Choose the appropriate AI model','Use web research when current facts are needed','Prepare permitted actions and report verified results']);
 
   setVoiceState('THINKING');
   const thinkingId=appendThinkingIndicator();
   const input=document.getElementById('chat-input');if(input){input.value='';autoExpandTextarea(input);}
   clearSelectedImage();
-  
+
   const contents=session.messages.map((m,i)=>{
     const parts=[{text:(i===session.messages.length-1&&m.role==='user'?memoryContext:'')+m.text}];
     if(i===session.messages.length-1&&imageData){
@@ -369,18 +457,15 @@ async function sendChatMessage(text,imageData=null){
   });
 
   try{
-    const endpoint=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      contents,systemInstruction:{parts:[{text:SYSTEM_INSTRUCTION}]},
-      generationConfig:{temperature:.55,topP:.9,maxOutputTokens:4096}
-    })});
-    const data=await response.json();
+    const result = await requestGemini({ contents, text, model: routing.model, allowSearch: routing.webResearch });
+    const data = result.data;
     removeThinkingIndicator(thinkingId);hideAgentSteps();
 
-    if(!response.ok||data.error){
-      throw new Error(data.error?.message||`Gemini request failed (${response.status})`);
+    let reply=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim()||'I did not receive a usable response.';
+    reply = addGroundingSources(reply, data);
+    if (routing.webResearch && !result.searched) {
+      reply += '\n\n*Live search grounding was unavailable for this request, so this answer may not reflect the latest information.*';
     }
-    const reply=(data.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim()||'I did not receive a usable response.';
     session.messages.push({role:'assistant',text:reply,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
@@ -444,6 +529,7 @@ function formatMarkdown(text){
   s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
   s=s.replace(/^###\s+(.*)$/gm,'<h4>$1</h4>').replace(/^##\s+(.*)$/gm,'<h3>$1</h3>').replace(/^#\s+(.*)$/gm,'<h2>$1</h2>');
   s=s.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/__(.*?)__/g,'<strong>$1</strong>');
+  s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   s=s.replace(/^\s*[-*]\s+(.*)$/gm,'<li>$1</li>');
   s=s.replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>');
   s=s.replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>');
@@ -607,5 +693,5 @@ const DeviceBridge={
   }
 };
 
-window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen};
-       
+window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
+     
