@@ -395,7 +395,7 @@ async function requestGemini({ contents, text, model, allowSearch }) {
   try {
     return await call(model, allowSearch);
   } catch (error) {
- firstError = error;
+    firstError = error;
     // Search grounding may be unavailable for some keys or requests. Retry without search first.
     if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(error.message || '')) {
       try { return await call(model, false); } catch (retryError) { firstError = retryError; }
@@ -416,8 +416,8 @@ async function requestGemini({ contents, text, model, allowSearch }) {
         firstError = fallbackError;
       }
     }
-  }
-  throw firstError || new Error('No available Gemini model could complete the request.');
+       }
+ throw firstError || new Error('No available Gemini model could complete the request.');
 }
 
 async function sendChatMessage(text,imageData=null){
@@ -708,4 +708,4 @@ const DeviceBridge={
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-   
+       
