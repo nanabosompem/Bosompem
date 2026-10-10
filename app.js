@@ -258,7 +258,7 @@ const state = {
   activeScreen:'chat',
   userName:localStorage.getItem(STORAGE.userName)||'',
   apiKey:localStorage.getItem(STORAGE.apiKey)||'',
-  model:localStorage.getItem(STORAGE.model)||'gemini-2.5-flash',
+  model:(['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(localStorage.getItem(STORAGE.model)) ? localStorage.getItem(STORAGE.model) : 'auto'),
   memoryMode:localStorage.getItem(STORAGE.memoryMode)!=='false',
   proactive:localStorage.getItem(STORAGE.proactive)==='true',
   autonomy:localStorage.getItem(STORAGE.autonomy)||'ask',
@@ -346,12 +346,13 @@ function classifyRequest(text) {
 
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
-  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
-  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
-  const selected = state.model || 'gemini-2.5-flash';
-  const model = selected === 'gemini-2.5-pro'
-    ? 'gemini-2.5-pro'
-    : (kind.complex ? 'gemini-2.5-pro' : 'gemini-2.5-flash');
+  const selected = state.model || 'auto';
+  let model;
+  if (selected === 'gemini-3.8-flash' || selected === 'gemini-3.5-flash-lite') {
+    model = selected;
+  } else {
+    model = kind.complex || kind.webResearch ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite';
+  }
   return { ...kind, model };
 }
 
@@ -373,7 +374,7 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     const body = {
       contents,
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { temperature: .55, topP: .9, maxOutputTokens: 4096 }
+      generationConfig: { maxOutputTokens: 4096 }
     };
     if (includeSearch) body.tools = [{ google_search: {} }];
     return body;
@@ -390,23 +391,33 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     return { data, model: targetModel, searched: includeSearch };
   };
 
+  let firstError;
   try {
     return await call(model, allowSearch);
-  } catch (firstError) {
-    // If search grounding is unsupported for the selected model/account, retry without it.
-    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
-      try { return await call(model, false); } catch (_) { /* proceed to model fallback below */ }
+  } catch (error) {
+ firstError = error;
+    // Search grounding may be unavailable for some keys or requests. Retry without search first.
+    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(error.message || '')) {
+      try { return await call(model, false); } catch (retryError) { firstError = retryError; }
     }
-    // Automatic Pro routing must not strand a user whose API key cannot access Pro.
-    if (model === 'gemini-2.5-pro') {
-      try { return await call('gemini-2.5-flash', allowSearch); }
-      catch (secondError) {
-        if (allowSearch) return await call('gemini-2.5-flash', false);
-        throw secondError;
+  }
+
+  // Fall back to a lower-cost supported model if the selected model is unavailable to this API key.
+  const fallbackModels = model === 'gemini-3.5-flash-lite'
+    ? ['gemini-3.8-flash']
+    : ['gemini-3.5-flash-lite'];
+  for (const fallbackModel of fallbackModels) {
+    try { return await call(fallbackModel, allowSearch); }
+    catch (fallbackError) {
+      if (allowSearch) {
+        try { return await call(fallbackModel, false); }
+        catch (noSearchError) { firstError = noSearchError; }
+      } else {
+        firstError = fallbackError;
       }
     }
-    throw firstError;
   }
+  throw firstError || new Error('No available Gemini model could complete the request.');
 }
 
 async function sendChatMessage(text,imageData=null){
@@ -471,7 +482,9 @@ async function sendChatMessage(text,imageData=null){
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
   }catch(err){
     removeThinkingIndicator(thinkingId);hideAgentSteps();
-    session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${err.message||'Connection error.'}`,createdAt:new Date().toISOString()});
+    const rawReason=String(err.message||'Connection error.');
+    const friendlyReason=/model.*(not found|no longer available|not available|permission|access)/i.test(rawReason) ? 'The selected Gemini model is not available to this API key. Check the model access in Google AI Studio or choose Automatic in Bosompem Settings.' : rawReason;
+    session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${friendlyReason}`,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();setVoiceState('IDLE');
   }finally{
     state.isSending=false;
@@ -660,7 +673,7 @@ function continueProject(id){
 function saveUserProfile(){
   const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();localStorage.setItem(STORAGE.userName,state.userName);updateGreeting();alert('Profile saved.');
 }
-function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
+function switchModel(model){state.model=['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(model)?model:'auto';localStorage.setItem(STORAGE.model,state.model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
   state.memoryMode=!!document.getElementById('memory-context-toggle')?.checked;
@@ -694,4 +707,5 @@ const DeviceBridge={
 };
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
-     
+
+   
