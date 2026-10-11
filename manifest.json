@@ -1,11 +1,11 @@
 {
-  "name": "Bosompem AI \u2014 Personal Assistant",
+  "name": "Bosompem AI — Personal Assistant",
   "short_name": "Bosompem",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#04132d",
-  "theme_color": "#087cff",
-  "description": "Bosompem \u2014 a persistent, multimodal and user-controlled AI personal assistant.",
+  "background_color": "#07152f",
+  "theme_color": "#07152f",
+  "description": "Bosompem — a persistent, multimodal and user-controlled AI personal assistant.",
   "icons": []
 }
