@@ -41,8 +41,6 @@ Do not infer sensitive personal traits from unrelated facts.
 const STORAGE = {
   sessions: 'bosompem_sessions',
   userName: 'bosompem_user_name',
-  userRole: 'bosompem_user_role',
-  userBio: 'bosompem_user_bio',
   apiKey: 'bosompem_api_key',
   model: 'bosompem_model',
   memoryMode: 'bosompem_memory_mode',
@@ -260,8 +258,6 @@ class MemoryVault {
 const state = {
   activeScreen:'chat',
   userName:localStorage.getItem(STORAGE.userName)||'',
-  userRole:localStorage.getItem(STORAGE.userRole)||'',
-  userBio:localStorage.getItem(STORAGE.userBio)||'',
   apiKey:localStorage.getItem(STORAGE.apiKey)||'',
   model:(['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(localStorage.getItem(STORAGE.model))?localStorage.getItem(STORAGE.model):'auto'),
   memoryMode:localStorage.getItem(STORAGE.memoryMode)!=='false',
@@ -315,8 +311,7 @@ function openScreen(screenId){
   document.querySelectorAll('.screen-view').forEach(x=>x.classList.toggle('active',x.id===`screen-${screenId}`));
   document.querySelectorAll('.nav-tab,.menu-item').forEach(x=>x.classList.toggle('active',x.dataset.screen===screenId));
   const titles={chat:'Chat Studio','live-voice':'Live Voice',projects:'Projects','media-lab':'Media & Vision','memory-vault':'Memory Vault',tasks:'Tasks & Reminders',profile:'User Profile',settings:'System Settings'};
-  const title=document.getElementById('active-screen-title'); if(title)title.textContent=titles[screenId]||'Bosompem AI';
-  if(screenId==='memory-vault')renderMemoryList();
+  const title=document.getElementById('active-screen-title'); if(title)title.textContent=titles[screenId]||'Bosompem AI';  if(screenId==='memory-vault')renderMemoryList();
   if(screenId==='projects')renderProjects();
   if(screenId==='tasks')renderReminders();
 }
@@ -573,7 +568,6 @@ function appendThinkingIndicator(){
   const id='thinking-'+Date.now();box.insertAdjacentHTML('beforeend',`<div id="${id}" class="chat-bubble assistant"><div class="bubble-content">Thinking…</div></div>`);scrollToBottom();return id;
 }
 function removeThinkingIndicator(id){if(id)document.getElementById(id)?.remove();}
-getElementById(id)?.remove();}
 function scrollToBottom(){const b=document.getElementById('chat-messages-container');if(b)b.scrollTop=b.scrollHeight;}
 
 function formatMarkdown(text){
@@ -622,7 +616,7 @@ function initVoiceEngines(){
   voiceNoteRecognition.onresult=e=>{
     let transcript='';
     for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';
-    const input=document.getElementById('chat-input');if(input){input.value=transcript.trim();autoExpandTextarea(input);}
+       const input=document.getElementById('chat-input');if(input){input.value=transcript.trim();autoExpandTextarea(input);}
   };
   voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording){try{voiceNoteRecognition.start();}catch{}}};
 }
@@ -687,7 +681,7 @@ async function deleteMemoryItem(id){await memoryEngine.deleteMemory(id);renderMe
 function addReminder(){
   const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
   const when=prompt('When? Example: tomorrow 09:00 or 2026-10-10 18:30');if(!when?.trim())return;
-  state.reminders.unshift({id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),createdAt:new Date().toISOString()});saveJSON(STORAGE.reminders,state.reminders);renderReminders();
+  state.reminders.unshift({id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),createdAt:new Date().toISOString()});saveJSON(STORAGE.reminders,state.reminders);renderReminders();if('Notification' in window&&Notification.permission==='granted'&&document.visibilityState==='visible')alert('Reminder saved. For notifications at the scheduled time, Bosompem must remain open; background push requires a push service.');
 }
 function renderReminders(){
   const list=document.getElementById('full-reminders-list');if(!list)return;
@@ -713,34 +707,52 @@ function continueProject(id){
 function updateProfilePreview(){
   const name=(document.getElementById('user-name-input')?.value||'').trim();
   const role=(document.getElementById('user-role-input')?.value||'').trim();
-  const displayName=document.getElementById('profile-display-name');
-  const line=document.getElementById('profile-profile-line');
   const avatar=document.getElementById('profile-avatar');
-  if(displayName)displayName.textContent=name||'Your Profile';
+  const title=document.getElementById('profile-display-name');
+  const line=document.getElementById('profile-profile-line');
+  if(title)title.textContent=name||'Your Profile';
   if(line)line.textContent=role||'Bosompem is personalized for you.';
-  if(avatar)avatar.textContent=(name||'B').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
+  if(avatar)avatar.textContent=(name||'B').split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
   const bio=(document.getElementById('user-bio-input')?.value||'').trim();
-  const completion=(name?35:0)+(role?25:0)+(bio?25:0)+15;
-  const value=document.getElementById('profile-completion-value');
-  const bar=document.getElementById('profile-completion-bar');
-  if(value)value.textContent=Math.min(100,completion)+'%';
-  if(bar)bar.style.width=Math.min(100,completion)+'%';
-  const memory=document.getElementById('profile-memory-status');
-  const proactive=document.getElementById('profile-proactive-status');
-  if(memory)memory.textContent=state.memoryMode?'On':'Off';
-  if(proactive)proactive.textContent=state.proactive?'On':'Off';
+  const completion=40+(name?20:0)+(role?20:0)+(bio?20:0);
+  const value=document.getElementById('profile-completion-value'); const bar=document.getElementById('profile-completion-bar');
+  if(value)value.textContent=completion+'%'; if(bar)bar.style.width=completion+'%';
 }
 function saveUserProfile(){
-  state.userName=(document.getElementById('user-name-input')?.value||'').trim();
-  state.userRole=(document.getElementById('user-role-input')?.value||'').trim();
-  state.userBio=(document.getElementById('user-bio-input')?.value||'').trim();
+  const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();
   localStorage.setItem(STORAGE.userName,state.userName);
-  localStorage.setItem(STORAGE.userRole,state.userRole);
-  localStorage.setItem(STORAGE.userBio,state.userBio);
-  updateGreeting();updateProfilePreview();
-  const button=document.querySelector('#screen-profile .primary-btn');
-  if(button){const original=button.innerHTML;button.innerHTML='<i class="fa-solid fa-check"></i> Profile Saved';setTimeout(()=>button.innerHTML=original,1600);}
+  localStorage.setItem('bosompem_user_role',(document.getElementById('user-role-input')?.value||'').trim());
+  localStorage.setItem('bosompem_user_bio',(document.getElementById('user-bio-input')?.value||'').trim());
+  updateGreeting();updateProfilePreview();notifyUser('Profile updated','Your Bosompem profile was saved.');
 }
+
+async function enableNotifications(){
+  if(!('Notification' in window)){alert('This browser does not support notifications.');return;}
+  if(!window.isSecureContext){alert('Notifications require HTTPS. Open Bosompem using its GitHub Pages HTTPS address.');return;}
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission==='granted'){
+      localStorage.setItem('bosompem_notifications_enabled','true');
+      const btn=document.getElementById('enable-notifications-btn');
+      if(btn)btn.innerHTML='<i class="fa-solid fa-check"></i> Notifications enabled';
+      notifyUser('Notifications enabled','Bosompem can notify you while this site is active.');
+    }else alert('Notification permission was not granted. You can enable it in your browser site settings.');
+  }catch(err){alert('Could not enable notifications: '+(err.message||'browser error'));}
+}
+function notifyUser(title,body){
+  if(!('Notification' in window)||Notification.permission!=='granted'||document.visibilityState==='visible')return;
+  try{
+    if(navigator.serviceWorker?.controller){navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body,icon:'./icon-192.png',badge:'./icon-192.png',tag:'bosompem-'+title.toLowerCase().replace(/[^a-z0-9]+/g,'-')})).catch(()=>{});}
+    else new Notification(title,{body});
+  }catch(_){/* Notification support varies by browser. */}
+}
+function updateSendButton(){
+  const input=document.getElementById('chat-input');const button=document.getElementById('send-btn');
+  if(!input||!button)return;
+  button.setAttribute('aria-label',state.isSending?'Stop generation':'Send');
+  button.title=state.isSending?'Stop generation':'Send';
+}
+
 function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
@@ -756,12 +768,15 @@ function loadSavedSettings(){
   const key=document.getElementById('api-key');if(key)key.value=state.apiKey;
   const model=document.getElementById('model-select');if(model)model.value=state.model;
   const name=document.getElementById('user-name-input');if(name)name.value=state.userName;
-  const role=document.getElementById('user-role-input');if(role)role.value=state.userRole;
-  const bio=document.getElementById('user-bio-input');if(bio)bio.value=state.userBio;
   const mem=document.getElementById('memory-context-toggle');if(mem)mem.checked=state.memoryMode;
   const pro=document.getElementById('proactive-toggle');if(pro)pro.checked=state.proactive;
   const auto=document.getElementById('autonomy-level');if(auto)auto.value=state.autonomy;
-  updateGreeting();updateProfilePreview();
+  updateGreeting();
+  const role=document.getElementById('user-role-input');if(role)role.value=localStorage.getItem('bosompem_user_role')||'';
+  const bio=document.getElementById('user-bio-input');if(bio)bio.value=localStorage.getItem('bosompem_user_bio')||'';
+  updateProfilePreview();
+  const notifyBtn=document.getElementById('enable-notifications-btn');
+  if(notifyBtn&&'Notification' in window&&Notification.permission==='granted')notifyBtn.innerHTML='<i class="fa-solid fa-check"></i> Notifications enabled';
 }
 
 /* Permissioned device bridge.
@@ -779,4 +794,5 @@ const DeviceBridge={
 window.toggleAttachmentMenu=toggleAttachmentMenu;window.triggerChatImage=triggerChatImage;window.triggerScreenshot=triggerScreenshot;window.attachLocation=attachLocation;
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-     
+   
+   
