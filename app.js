@@ -320,8 +320,14 @@ function openScreen(screenId){
   if(screenId==='tasks')renderReminders();
 }
 function toggleNavDrawer(){
-  document.getElementById('nav-drawer')?.classList.toggle('open');
-  document.getElementById('nav-overlay')?.classList.toggle('active');
+  const drawer = document.getElementById('nav-drawer');
+  const overlay = document.getElementById('nav-overlay');
+  if (!drawer || !overlay) return;
+  const shouldOpen = !drawer.classList.contains('open');
+  drawer.classList.toggle('open', shouldOpen);
+  overlay.classList.toggle('active', shouldOpen);
+  drawer.setAttribute('aria-hidden', String(!shouldOpen));
+  overlay.setAttribute('aria-hidden', String(!shouldOpen));
 }
 function switchScreenFromDrawer(id){openScreen(id);toggleNavDrawer();}
 
@@ -331,7 +337,7 @@ function handleTextareaKeyDown(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.
 function createNewChatSession(){
   const s={id:'session-'+Date.now(),title:'New Conversation',messages:[],createdAt:new Date().toISOString()};
   state.sessions.unshift(s);saveJSON(STORAGE.sessions,state.sessions);loadSession(s.id);
-}
+     }
 function getActiveSession(){return state.sessions.find(s=>s.id===state.activeSessionId);}
 function loadSession(id){
   state.activeSessionId=id;
@@ -579,7 +585,6 @@ function setVoiceState(newState){
   const orb=document.getElementById('voice-orb'),icon=document.getElementById('orb-icon'),bar=document.getElementById('speech-state-bar'),status=document.getElementById('voice-status-title');
   if(orb)orb.className=`voice-orb ${newState.toLowerCase()}`;
   if(icon)icon.className=newState==='LISTENING'?'fa-solid fa-microphone':newState==='THINKING'?'fa-solid fa-circle-notch fa-spin':newState==='SPEAKING'?'fa-solid fa-volume-high':'fa-solid fa-microphone';
-   
   if(bar)bar.classList.toggle('hidden',newState!=='SPEAKING');
   if(status)status.textContent={IDLE:'Live Voice Ready',LISTENING:'Listening…',THINKING:'Thinking…',SPEAKING:'Speaking…'}[newState]||'Live Voice';
 }
@@ -595,7 +600,7 @@ function initVoiceEngines(){
       if(e.results[i].isFinal)state.voiceFinalTranscript+=' '+piece;else interim+=' '+piece;
     }
     const full=(state.voiceFinalTranscript+' '+interim).trim();
-    const card=document.getElementById('voice-live-transcript');if(card)card.textContent=full||'Listening…';
+   const card=document.getElementById('voice-live-transcript');if(card)card.textContent=full||'Listening…';
     // Submit only after the browser finalizes speech; onend handles a final pause without duplicate sends.
     if(e.results[e.results.length-1]?.isFinal)queueLiveVoiceSubmit(650);
   };
@@ -807,4 +812,4 @@ const DeviceBridge={
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-     
+       
