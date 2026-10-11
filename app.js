@@ -41,6 +41,8 @@ Do not infer sensitive personal traits from unrelated facts.
 const STORAGE = {
   sessions: 'bosompem_sessions',
   userName: 'bosompem_user_name',
+  userRole: 'bosompem_user_role',
+  userBio: 'bosompem_user_bio',
   apiKey: 'bosompem_api_key',
   model: 'bosompem_model',
   memoryMode: 'bosompem_memory_mode',
@@ -258,6 +260,8 @@ class MemoryVault {
 const state = {
   activeScreen:'chat',
   userName:localStorage.getItem(STORAGE.userName)||'',
+  userRole:localStorage.getItem(STORAGE.userRole)||'',
+  userBio:localStorage.getItem(STORAGE.userBio)||'',
   apiKey:localStorage.getItem(STORAGE.apiKey)||'',
   model:(['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(localStorage.getItem(STORAGE.model))?localStorage.getItem(STORAGE.model):'auto'),
   memoryMode:localStorage.getItem(STORAGE.memoryMode)!=='false',
@@ -569,6 +573,7 @@ function appendThinkingIndicator(){
   const id='thinking-'+Date.now();box.insertAdjacentHTML('beforeend',`<div id="${id}" class="chat-bubble assistant"><div class="bubble-content">Thinking…</div></div>`);scrollToBottom();return id;
 }
 function removeThinkingIndicator(id){if(id)document.getElementById(id)?.remove();}
+getElementById(id)?.remove();}
 function scrollToBottom(){const b=document.getElementById('chat-messages-container');if(b)b.scrollTop=b.scrollHeight;}
 
 function formatMarkdown(text){
@@ -705,9 +710,37 @@ function continueProject(id){
   openScreen('chat');const input=document.getElementById('chat-input');if(input){input.value=`Continue the project "${p.name}". Project goal: ${p.description||'not specified'}. Review the context you have and tell me the best next action.`;autoExpandTextarea(input);input.focus();}
 }
 
+function updateProfilePreview(){
+  const name=(document.getElementById('user-name-input')?.value||'').trim();
+  const role=(document.getElementById('user-role-input')?.value||'').trim();
+  const displayName=document.getElementById('profile-display-name');
+  const line=document.getElementById('profile-profile-line');
+  const avatar=document.getElementById('profile-avatar');
+  if(displayName)displayName.textContent=name||'Your Profile';
+  if(line)line.textContent=role||'Bosompem is personalized for you.';
+  if(avatar)avatar.textContent=(name||'B').split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]).join('').toUpperCase();
+  const bio=(document.getElementById('user-bio-input')?.value||'').trim();
+  const completion=(name?35:0)+(role?25:0)+(bio?25:0)+15;
+  const value=document.getElementById('profile-completion-value');
+  const bar=document.getElementById('profile-completion-bar');
+  if(value)value.textContent=Math.min(100,completion)+'%';
+  if(bar)bar.style.width=Math.min(100,completion)+'%';
+  const memory=document.getElementById('profile-memory-status');
+  const proactive=document.getElementById('profile-proactive-status');
+  if(memory)memory.textContent=state.memoryMode?'On':'Off';
+  if(proactive)proactive.textContent=state.proactive?'On':'Off';
+}
 function saveUserProfile(){
-  const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();localStorage.setItem(STORAGE.userName,state.userName);updateGreeting();alert('Profile saved.');
-                         }
+  state.userName=(document.getElementById('user-name-input')?.value||'').trim();
+  state.userRole=(document.getElementById('user-role-input')?.value||'').trim();
+  state.userBio=(document.getElementById('user-bio-input')?.value||'').trim();
+  localStorage.setItem(STORAGE.userName,state.userName);
+  localStorage.setItem(STORAGE.userRole,state.userRole);
+  localStorage.setItem(STORAGE.userBio,state.userBio);
+  updateGreeting();updateProfilePreview();
+  const button=document.querySelector('#screen-profile .primary-btn');
+  if(button){const original=button.innerHTML;button.innerHTML='<i class="fa-solid fa-check"></i> Profile Saved';setTimeout(()=>button.innerHTML=original,1600);}
+}
 function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
@@ -723,10 +756,12 @@ function loadSavedSettings(){
   const key=document.getElementById('api-key');if(key)key.value=state.apiKey;
   const model=document.getElementById('model-select');if(model)model.value=state.model;
   const name=document.getElementById('user-name-input');if(name)name.value=state.userName;
+  const role=document.getElementById('user-role-input');if(role)role.value=state.userRole;
+  const bio=document.getElementById('user-bio-input');if(bio)bio.value=state.userBio;
   const mem=document.getElementById('memory-context-toggle');if(mem)mem.checked=state.memoryMode;
   const pro=document.getElementById('proactive-toggle');if(pro)pro.checked=state.proactive;
   const auto=document.getElementById('autonomy-level');if(auto)auto.value=state.autonomy;
-  updateGreeting();
+  updateGreeting();updateProfilePreview();
 }
 
 /* Permissioned device bridge.
@@ -744,3 +779,4 @@ const DeviceBridge={
 window.toggleAttachmentMenu=toggleAttachmentMenu;window.triggerChatImage=triggerChatImage;window.triggerScreenshot=triggerScreenshot;window.attachLocation=attachLocation;
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
+     
