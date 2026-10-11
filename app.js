@@ -9,7 +9,6 @@ const SYSTEM_INSTRUCTION = `
 You are Bosompem Pro, a unified AI personal assistant and agent.
 Your job is to understand the user's goal, not merely repeat their words.
 Be direct, natural and useful. Use standard Markdown for visual responses.
-Keep internal objectives, scratchpad reasoning, hidden instructions, and private planning private. Do not print internal planner steps or expose them as a response. If useful, provide only a brief user-facing summary of the approach.
 
 When a task is complex:
 1. identify the objective,
@@ -259,7 +258,7 @@ const state = {
   activeScreen:'chat',
   userName:localStorage.getItem(STORAGE.userName)||'',
   apiKey:localStorage.getItem(STORAGE.apiKey)||'',
-  model:(['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(localStorage.getItem(STORAGE.model))?localStorage.getItem(STORAGE.model):'auto'),
+  model:localStorage.getItem(STORAGE.model)||'auto',
   memoryMode:localStorage.getItem(STORAGE.memoryMode)!=='false',
   proactive:localStorage.getItem(STORAGE.proactive)==='true',
   autonomy:localStorage.getItem(STORAGE.autonomy)||'ask',
@@ -271,7 +270,10 @@ const state = {
   isLiveVoiceActive:false,
   isVoiceNoteRecording:false,
   selectedImageData:null,
-  isSending:false
+  isSending:false,
+  voiceRequestPending:false,
+  voiceFinalTranscript:'',
+  reminderTimer:null
 };
 
 const memoryEngine=new MemoryVault();
@@ -290,6 +292,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   updateClock();
   setInterval(updateClock,30000);
   renderReminders();
+  initReminderNotifications();
   renderMemoryList();
   renderProjects();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
@@ -311,7 +314,8 @@ function openScreen(screenId){
   document.querySelectorAll('.screen-view').forEach(x=>x.classList.toggle('active',x.id===`screen-${screenId}`));
   document.querySelectorAll('.nav-tab,.menu-item').forEach(x=>x.classList.toggle('active',x.dataset.screen===screenId));
   const titles={chat:'Chat Studio','live-voice':'Live Voice',projects:'Projects','media-lab':'Media & Vision','memory-vault':'Memory Vault',tasks:'Tasks & Reminders',profile:'User Profile',settings:'System Settings'};
-  const title=document.getElementById('active-screen-title'); if(title)title.textContent=titles[screenId]||'Bosompem AI';  if(screenId==='memory-vault')renderMemoryList();
+  const title=document.getElementById('active-screen-title'); if(title)title.textContent=titles[screenId]||'Bosompem AI';
+  if(screenId==='memory-vault')renderMemoryList();
   if(screenId==='projects')renderProjects();
   if(screenId==='tasks')renderReminders();
 }
@@ -346,10 +350,12 @@ function classifyRequest(text) {
 
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
-  const selected = state.model || 'auto';
-  const model = selected === 'gemini-3.8-flash' || selected === 'gemini-3.5-flash-lite'
-    ? selected
-    : (kind.complex || kind.webResearch ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite');
+  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
+  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
+  const selected = state.model || 'gemini-2.5-flash';
+  const model = selected === 'gemini-2.5-pro'
+    ? 'gemini-2.5-pro'
+    : (kind.complex ? 'gemini-2.5-pro' : 'gemini-2.5-flash');
   return { ...kind, model };
 }
 
@@ -371,7 +377,7 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     const body = {
       contents,
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { maxOutputTokens: 4096 }
+      generationConfig: { temperature: .55, topP: .9, maxOutputTokens: 4096 }
     };
     if (includeSearch) body.tools = [{ google_search: {} }];
     return body;
@@ -395,15 +401,15 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
       try { return await call(model, false); } catch (_) { /* proceed to model fallback below */ }
     }
-    // Retry with the alternate supported model, then without grounding if necessary.
-    const fallback = model === 'gemini-3.8-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.8-flash';
-    try { return await call(fallback, allowSearch); }
-    catch (secondError) {
-      if (allowSearch) {
-        try { return await call(fallback, false); } catch (_) { /* surface the original useful error below */ }
+    // Automatic Pro routing must not strand a user whose API key cannot access Pro.
+    if (model === 'gemini-2.5-pro') {
+      try { return await call('gemini-2.5-flash', allowSearch); }
+      catch (secondError) {
+        if (allowSearch) return await call('gemini-2.5-flash', false);
+        throw secondError;
       }
-      throw secondError || firstError;
     }
+    throw firstError;
   }
 }
 
@@ -436,8 +442,7 @@ async function sendChatMessage(text,imageData=null){
 
   const routing = chooseModelForRequest(text);
   const complex = state.autonomy !== 'ask' || state.proactive || routing.complex;
-  // Internal planning remains private; never display the planner steps in chat UI.
-  hideAgentSteps();
+  if(complex)renderAgentSteps(['Understand objective','Check relevant memory','Choose the appropriate AI model','Use web research when current facts are needed','Prepare permitted actions and report verified results']);
 
   setVoiceState('THINKING');
   const thinkingId=appendThinkingIndicator();
@@ -489,56 +494,40 @@ function webSearchFallback(){
   window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`,'_blank','noopener');
 }
 
-function toggleAttachmentMenu(force) {
-  const menu=document.getElementById('attachment-menu');
-  const button=document.getElementById('plus-btn');
-  if(!menu||!button)return;
-  const shouldOpen=typeof force==='boolean'?force:!menu.classList.contains('open');
-  menu.classList.toggle('open',shouldOpen);
-  menu.setAttribute('aria-hidden',String(!shouldOpen));
-  button.classList.toggle('open',shouldOpen);
-  button.setAttribute('aria-expanded',String(shouldOpen));
+function toggleAttachmentMenu(){
+  const menu=document.getElementById('attachment-menu'),btn=document.getElementById('plus-btn');
+  if(!menu)return;
+  const opening=menu.classList.contains('hidden');
+  menu.classList.toggle('hidden',!opening);menu.setAttribute('aria-hidden',String(!opening));
+  btn?.setAttribute('aria-expanded',String(opening));
 }
-function triggerChatImage(source='gallery') {
-  const input=document.getElementById('chat-image-input');
-  if(!input)return;
-  input.accept='image/*';
-  if(source==='camera') input.setAttribute('capture','environment'); else input.removeAttribute('capture');
-  toggleAttachmentMenu(false);
+function triggerChatImage(mode='gallery'){
+  const input=document.getElementById('chat-image-input');if(!input)return;
+  input.setAttribute('accept','image/*');
+  if(mode==='camera')input.setAttribute('capture','environment');else input.removeAttribute('capture');
   input.click();
+  const menu=document.getElementById('attachment-menu');menu?.classList.add('hidden');menu?.setAttribute('aria-hidden','true');
+  document.getElementById('plus-btn')?.setAttribute('aria-expanded','false');
 }
-async function triggerScreenshot() {
-  toggleAttachmentMenu(false);
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-    alert('Screen capture is not supported in this browser. Use Gallery or Camera instead.');
-    return;
-  }
-  try {
-    const stream=await navigator.mediaDevices.getDisplayMedia({video:true});
-    const track=stream.getVideoTracks()[0];
-    const video=document.createElement('video'); video.srcObject=stream; video.muted=true;
-    await video.play();
-    const canvas=document.createElement('canvas');
-    canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720;
-    canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
-    state.selectedImageData=canvas.toDataURL('image/jpeg',0.88);
-    stream.getTracks().forEach(t=>t.stop());
-    const img=document.getElementById('attachment-preview-image'); const box=document.getElementById('attachment-preview');
-    if(img)img.src=state.selectedImageData; if(box)box.classList.remove('hidden');
-  } catch(err) { if(err && err.name!=='NotAllowedError') alert('Could not capture the screen in this browser.'); }
+function triggerScreenshot(){
+  alert('Screen capture is not available in this browser build. Use Gallery or Camera to attach an image.');
 }
-function attachLocation() {
-  toggleAttachmentMenu(false);
-  if(!navigator.geolocation) { alert('Location is not available in this browser.'); return; }
+function attachLocation(){
+  if(!navigator.geolocation){alert('Location is not supported by this browser.');return;}
   navigator.geolocation.getCurrentPosition(pos=>{
-    const input=document.getElementById('chat-input'); if(!input)return;
-    input.value=(input.value?input.value+'\n':'')+`My current coordinates are latitude ${pos.coords.latitude.toFixed(5)}, longitude ${pos.coords.longitude.toFixed(5)}. Help me with a location-related request.`;
-    autoExpandTextarea(input); updateSendButton(); input.focus();
-  },()=>alert('Location permission was denied or your location could not be found.'),{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
+    const input=document.getElementById('chat-input');
+    if(input){input.value+=` My location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;autoExpandTextarea(input);}
+    openScreen('chat');
+  },err=>alert(err.code===1?'Location permission was denied.':'Could not get your location.'),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
+}
+function stopGeneration(){
+  // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
+  stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
+  const btn=document.getElementById('send-btn');if(btn)btn.disabled=false;
 }
 
 function handleChatImageUpload(e){
-  const file=e.target.files?.[0];if(!file)return;toggleAttachmentMenu(false);
+  const file=e.target.files?.[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=ev=>{
     state.selectedImageData=ev.target.result;
@@ -590,48 +579,70 @@ function setVoiceState(newState){
   const orb=document.getElementById('voice-orb'),icon=document.getElementById('orb-icon'),bar=document.getElementById('speech-state-bar'),status=document.getElementById('voice-status-title');
   if(orb)orb.className=`voice-orb ${newState.toLowerCase()}`;
   if(icon)icon.className=newState==='LISTENING'?'fa-solid fa-microphone':newState==='THINKING'?'fa-solid fa-circle-notch fa-spin':newState==='SPEAKING'?'fa-solid fa-volume-high':'fa-solid fa-microphone';
+   
   if(bar)bar.classList.toggle('hidden',newState!=='SPEAKING');
   if(status)status.textContent={IDLE:'Live Voice Ready',LISTENING:'Listening…',THINKING:'Thinking…',SPEAKING:'Speaking…'}[newState]||'Live Voice';
 }
 function initVoiceEngines(){
   if(!SpeechRecognition)return;
   liveRecognition=new SpeechRecognition();
-  liveRecognition.continuous=false;liveRecognition.interimResults=true;liveRecognition.lang='en-US';
-  liveRecognition.onstart=()=>setVoiceState('LISTENING');
+  liveRecognition.continuous=true;liveRecognition.interimResults=true;liveRecognition.lang='en-US';
+  liveRecognition.onstart=()=>{if(state.isLiveVoiceActive&&state.voiceState!=='THINKING'&&state.voiceState!=='SPEAKING')setVoiceState('LISTENING');};
   liveRecognition.onresult=e=>{
-    let transcript='';
-    for(let i=e.resultIndex;i<e.results.length;i++)transcript+=e.results[i][0].transcript;
-    const card=document.getElementById('voice-live-transcript');if(card)card.textContent=transcript;
-    if(e.results[e.results.length-1].isFinal&&transcript.trim())sendChatMessage(transcript);
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const piece=e.results[i][0]?.transcript||'';
+      if(e.results[i].isFinal)state.voiceFinalTranscript+=' '+piece;else interim+=' '+piece;
+    }
+    const full=(state.voiceFinalTranscript+' '+interim).trim();
+    const card=document.getElementById('voice-live-transcript');if(card)card.textContent=full||'Listening…';
+    // Submit only after the browser finalizes speech; onend handles a final pause without duplicate sends.
+    if(e.results[e.results.length-1]?.isFinal)queueLiveVoiceSubmit(650);
   };
-  liveRecognition.onerror=()=>{if(state.isLiveVoiceActive)setVoiceState('IDLE');};
+  liveRecognition.onerror=e=>{
+    if(!state.isLiveVoiceActive)return;
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      state.isLiveVoiceActive=false;setVoiceState('IDLE');const b=document.getElementById('live-voice-toggle-btn');if(b)b.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
+      alert('Microphone permission is blocked. Allow microphone access for this site, then try again.');return;
+    }
+    if(e.error!=='no-speech'&&e.error!=='aborted')console.warn('Live speech recognition:',e.error);
+  };
   liveRecognition.onend=()=>{
-    if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING'){
-      setTimeout(()=>{try{liveRecognition.start();}catch{}},350);
-    }else if(!state.isLiveVoiceActive)setVoiceState('IDLE');
+    if(!state.isLiveVoiceActive)return;
+    if(state.voiceState==='THINKING'||state.voiceState==='SPEAKING'||state.voiceRequestPending)return;
+    queueLiveVoiceSubmit(180);
+    setTimeout(()=>{if(state.isLiveVoiceActive&&!state.voiceRequestPending&&state.voiceState!=='THINKING'&&state.voiceState!=='SPEAKING')try{liveRecognition.start();}catch{}},250);
   };
-
   voiceNoteRecognition=new SpeechRecognition();
   voiceNoteRecognition.continuous=true;voiceNoteRecognition.interimResults=true;voiceNoteRecognition.lang='en-US';
-  voiceNoteRecognition.onresult=e=>{
-    let transcript='';
-    for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';
-       const input=document.getElementById('chat-input');if(input){input.value=transcript.trim();autoExpandTextarea(input);}
-  };
-  voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording){try{voiceNoteRecognition.start();}catch{}}};
+  voiceNoteRecognition.onresult=e=>{let transcript='';for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';const input=document.getElementById('chat-input');if(input){input.value=transcript.trim();autoExpandTextarea(input);}};
+  voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording)try{voiceNoteRecognition.start();}catch{}};
+}
+let liveSubmitTimer=null;
+function queueLiveVoiceSubmit(delay=450){
+  clearTimeout(liveSubmitTimer);liveSubmitTimer=setTimeout(async()=>{
+    const text=state.voiceFinalTranscript.trim();
+    if(!text||!state.isLiveVoiceActive||state.voiceRequestPending||state.isSending)return;
+    state.voiceFinalTranscript='';state.voiceRequestPending=true;
+    try{if(liveRecognition)try{liveRecognition.stop();}catch{};setVoiceState('THINKING');await sendChatMessage(text);}
+    finally{state.voiceRequestPending=false;if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING')setTimeout(()=>{try{liveRecognition.start();}catch{}},220);}
+  },delay);
 }
 function toggleLiveVoiceMode(){
-  if(!SpeechRecognition)return alert('Live speech recognition is not supported by this browser.');
+  if(!SpeechRecognition)return alert('Live voice requires a browser with SpeechRecognition support. Try Chrome on Android.');
   state.isLiveVoiceActive=!state.isLiveVoiceActive;
   const btn=document.getElementById('live-voice-toggle-btn');
   if(state.isLiveVoiceActive){
-    if(btn)btn.innerHTML='<i class="fa-solid fa-stop"></i> Stop Live Mode';
-    stopSpeechPlayback();try{liveRecognition.start();}catch{}
+    if(!state.apiKey){state.isLiveVoiceActive=false;alert('Add your Gemini API key in System Settings before starting Live Voice.');openScreen('settings');return;}
+    if(btn)btn.innerHTML='<i class="fa-solid fa-stop"></i><span>Stop Live Mode</span>';
+    state.voiceFinalTranscript='';stopSpeechPlayback();setVoiceState('LISTENING');
+    try{liveRecognition.start();}catch(e){state.isLiveVoiceActive=false;setVoiceState('IDLE');if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';alert('Could not start the microphone. Check browser microphone permission and try again.');}
   }else{
-    if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i> Start Live Mode';
-    try{liveRecognition.stop();}catch{};stopSpeechPlayback();setVoiceState('IDLE');
+    if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
+    clearTimeout(liveSubmitTimer);state.voiceFinalTranscript='';try{liveRecognition.stop();}catch{};stopSpeechPlayback();setVoiceState('IDLE');
   }
 }
+
 function toggleVoiceNoteRecording(){
   if(!SpeechRecognition)return alert('Speech recognition is unavailable in this browser.');
   state.isVoiceNoteRecording=!state.isVoiceNoteRecording;
@@ -643,8 +654,8 @@ function speakText(rawText){
   const clean=SpeechSanitizer.cleanTextForSpeech(rawText);if(!clean)return;
   speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(clean);u.rate=1;u.pitch=1;
   u.onstart=()=>setVoiceState('SPEAKING');
-  u.onend=()=>{setVoiceState('IDLE');if(state.isLiveVoiceActive)setTimeout(()=>{try{liveRecognition.start();}catch{}},350);};
-  u.onerror=()=>setVoiceState('IDLE');speechSynthesis.speak(u);
+  u.rate=1.08;u.onend=()=>{if(state.isLiveVoiceActive){setVoiceState('LISTENING');setTimeout(()=>{try{liveRecognition.start();}catch{}},180);}else setVoiceState('IDLE');};
+  u.onerror=()=>{if(state.isLiveVoiceActive)setVoiceState('LISTENING');else setVoiceState('IDLE');};speechSynthesis.speak(u);
 }
 function stopSpeechPlayback(){if('speechSynthesis'in window)speechSynthesis.cancel();setVoiceState('IDLE');}
 
@@ -656,7 +667,7 @@ function renderAgentSteps(steps){
 function hideAgentSteps(){document.getElementById('agent-planner-card')?.classList.add('hidden');}
 
 function handleImageUpload(e){
-  const file=e.target.files?.[0];if(!file)return;toggleAttachmentMenu(false);const reader=new FileReader();
+  const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();
   reader.onload=ev=>{state.selectedImageData=ev.target.result;const img=document.getElementById('lab-image-preview'),box=document.getElementById('image-preview-box');if(img)img.src=state.selectedImageData;if(box)box.classList.remove('hidden');};
   reader.readAsDataURL(file);e.target.value='';
 }
@@ -678,10 +689,55 @@ async function renderMemoryList(){
 }
 async function deleteMemoryItem(id){await memoryEngine.deleteMemory(id);renderMemoryList();}
 
+async function enableNotifications(){
+  if(!('Notification' in window)){alert('This browser does not support notifications.');return false;}
+  if(!window.isSecureContext){alert('Notifications require HTTPS. Open Bosompem on its secure GitHub Pages address.');return false;}
+  const permission=await Notification.requestPermission();
+  if(permission!=='granted'){alert('Notifications are blocked. You can enable them in the browser site settings.');return false;}
+  showBrowserNotification('Bosompem notifications enabled','Reminders can notify you while this page is active.');return true;
+}
+function showBrowserNotification(title,body){
+  if(!('Notification' in window)||Notification.permission!=='granted')return false;
+  try{if('serviceWorker'in navigator&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body,icon:'./icon-192.png',badge:'./icon-192.png',tag:'bosompem-'+Date.now()})).catch(()=>new Notification(title,{body}));}
+    else new Notification(title,{body});return true;}catch(err){console.warn('Notification failed',err);return false;}
+}
+function initReminderNotifications(){
+  if(state.reminderTimer)clearInterval(state.reminderTimer);
+  state.reminderTimer=setInterval(()=>{
+    const now=Date.now();let changed=false;
+    for(const r of state.reminders){const due=r.dueAt?Date.parse(r.dueAt):Date.parse(r.when||'');if(Number.isFinite(due)&&due<=now&&!r.notified){r.notified=true;changed=true;showBrowserNotification('Bosompem reminder',r.title);}}
+    if(changed){saveJSON(STORAGE.reminders,state.reminders);renderReminders();}
+  },15000);
+}
+async function generateImage(){
+  const prompt=document.getElementById('image-generation-prompt')?.value.trim();
+  const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
+  if(!prompt){alert('Describe the image you want to create first.');return;}
+  if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
+  if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
+  // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
+  const candidates=['gemini-2.5-flash-image','gemini-2.0-flash-preview-image-generation'];let lastError='No supported image model was available.';
+  for(const model of candidates){try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Generate an image based on this prompt. Return an image, not just a description: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+    const data=await res.json();if(!res.ok)throw new Error(data.error?.message||`Image API error ${res.status}`);
+    const parts=data.candidates?.[0]?.content?.parts||[];const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
+    const d=imagePart?.inlineData||imagePart?.inline_data;if(!d?.data)throw new Error('The selected model returned no image. Check whether image generation is enabled for your API key.');
+    const mime=d.mimeType||d.mime_type||'image/png';if(result)result.innerHTML=`<img class="generated-image" alt="AI-generated image" src="data:${mime};base64,${d.data}"><a class="primary-btn" download="bosompem-generated-image.png" href="data:${mime};base64,${d.data}">Save image</a>`;
+    if(status)status.textContent='Image generated successfully.';return;
+  }catch(err){lastError=err.message||String(err);if(/quota|billing|permission|not found|not supported|not available|model/i.test(lastError))continue;break;}}
+  if(status)status.textContent='Image generation failed.';alert(`Bosompem could not generate an image. ${lastError}`);
+}
+
+function parseReminderDate(value){
+  const now=new Date();const normalized=value.toLowerCase().trim();
+  let m=normalized.match(/^(today|tomorrow)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if(m){let hour=Number(m[2]),minute=Number(m[3]||0);if(m[4]==='pm'&&hour<12)hour+=12;if(m[4]==='am'&&hour===12)hour=0;if(hour>23||minute>59)return null;const d=new Date(now);if(m[1]==='tomorrow')d.setDate(d.getDate()+1);d.setHours(hour,minute,0,0);return d;}
+  const parsed=Date.parse(value);return Number.isFinite(parsed)?new Date(parsed):null;
+}
 function addReminder(){
   const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
   const when=prompt('When? Example: tomorrow 09:00 or 2026-10-10 18:30');if(!when?.trim())return;
-  state.reminders.unshift({id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),createdAt:new Date().toISOString()});saveJSON(STORAGE.reminders,state.reminders);renderReminders();if('Notification' in window&&Notification.permission==='granted'&&document.visibilityState==='visible')alert('Reminder saved. For notifications at the scheduled time, Bosompem must remain open; background push requires a push service.');
+  const dueAt=parseReminderDate(when.trim());state.reminders.unshift({id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),dueAt:dueAt?dueAt.toISOString():null,notified:false,createdAt:new Date().toISOString()});saveJSON(STORAGE.reminders,state.reminders);renderReminders();
 }
 function renderReminders(){
   const list=document.getElementById('full-reminders-list');if(!list)return;
@@ -705,54 +761,17 @@ function continueProject(id){
 }
 
 function updateProfilePreview(){
-  const name=(document.getElementById('user-name-input')?.value||'').trim();
-  const role=(document.getElementById('user-role-input')?.value||'').trim();
-  const avatar=document.getElementById('profile-avatar');
-  const title=document.getElementById('profile-display-name');
-  const line=document.getElementById('profile-profile-line');
-  if(title)title.textContent=name||'Your Profile';
-  if(line)line.textContent=role||'Bosompem is personalized for you.';
-  if(avatar)avatar.textContent=(name||'B').split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
-  const bio=(document.getElementById('user-bio-input')?.value||'').trim();
-  const completion=40+(name?20:0)+(role?20:0)+(bio?20:0);
-  const value=document.getElementById('profile-completion-value'); const bar=document.getElementById('profile-completion-bar');
-  if(value)value.textContent=completion+'%'; if(bar)bar.style.width=completion+'%';
+  const name=(document.getElementById('user-name-input')?.value||state.userName||'Your Profile').trim();
+  const role=(document.getElementById('user-role-input')?.value||localStorage.getItem('bosompem_user_role')||'').trim();
+  const bio=(document.getElementById('user-bio-input')?.value||localStorage.getItem('bosompem_user_bio')||'').trim();
+  const title=document.getElementById('profile-display-name');if(title)title.textContent=name||'Your Profile';
+  const avatar=document.getElementById('profile-avatar');if(avatar)avatar.textContent=(name||'B').charAt(0).toUpperCase();
+  const line=document.getElementById('profile-profile-line');if(line)line.textContent=role||bio||'Bosompem is personalized for you.';
+  const completion=document.getElementById('profile-completion-value'),bar=document.getElementById('profile-completion-bar');const pct=40+(name&&name!=='Your Profile'?20:0)+(role?20:0)+(bio?20:0);if(completion)completion.textContent=pct+'%';if(bar)bar.style.width=pct+'%';
 }
 function saveUserProfile(){
-  const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();
-  localStorage.setItem(STORAGE.userName,state.userName);
-  localStorage.setItem('bosompem_user_role',(document.getElementById('user-role-input')?.value||'').trim());
-  localStorage.setItem('bosompem_user_bio',(document.getElementById('user-bio-input')?.value||'').trim());
-  updateGreeting();updateProfilePreview();notifyUser('Profile updated','Your Bosompem profile was saved.');
+  const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();localStorage.setItem(STORAGE.userName,state.userName);updateGreeting();alert('Profile saved.');
 }
-
-async function enableNotifications(){
-  if(!('Notification' in window)){alert('This browser does not support notifications.');return;}
-  if(!window.isSecureContext){alert('Notifications require HTTPS. Open Bosompem using its GitHub Pages HTTPS address.');return;}
-  try{
-    const permission=await Notification.requestPermission();
-    if(permission==='granted'){
-      localStorage.setItem('bosompem_notifications_enabled','true');
-      const btn=document.getElementById('enable-notifications-btn');
-      if(btn)btn.innerHTML='<i class="fa-solid fa-check"></i> Notifications enabled';
-      notifyUser('Notifications enabled','Bosompem can notify you while this site is active.');
-    }else alert('Notification permission was not granted. You can enable it in your browser site settings.');
-  }catch(err){alert('Could not enable notifications: '+(err.message||'browser error'));}
-}
-function notifyUser(title,body){
-  if(!('Notification' in window)||Notification.permission!=='granted'||document.visibilityState==='visible')return;
-  try{
-    if(navigator.serviceWorker?.controller){navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body,icon:'./icon-192.png',badge:'./icon-192.png',tag:'bosompem-'+title.toLowerCase().replace(/[^a-z0-9]+/g,'-')})).catch(()=>{});}
-    else new Notification(title,{body});
-  }catch(_){/* Notification support varies by browser. */}
-}
-function updateSendButton(){
-  const input=document.getElementById('chat-input');const button=document.getElementById('send-btn');
-  if(!input||!button)return;
-  button.setAttribute('aria-label',state.isSending?'Stop generation':'Send');
-  button.title=state.isSending?'Stop generation':'Send';
-}
-
 function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
@@ -767,16 +786,11 @@ function saveSettings(){
 function loadSavedSettings(){
   const key=document.getElementById('api-key');if(key)key.value=state.apiKey;
   const model=document.getElementById('model-select');if(model)model.value=state.model;
-  const name=document.getElementById('user-name-input');if(name)name.value=state.userName;
+  const name=document.getElementById('user-name-input');if(name)name.value=state.userName;const role=document.getElementById('user-role-input');if(role)role.value=localStorage.getItem('bosompem_user_role')||'';const bio=document.getElementById('user-bio-input');if(bio)bio.value=localStorage.getItem('bosompem_user_bio')||'';
   const mem=document.getElementById('memory-context-toggle');if(mem)mem.checked=state.memoryMode;
   const pro=document.getElementById('proactive-toggle');if(pro)pro.checked=state.proactive;
   const auto=document.getElementById('autonomy-level');if(auto)auto.value=state.autonomy;
   updateGreeting();
-  const role=document.getElementById('user-role-input');if(role)role.value=localStorage.getItem('bosompem_user_role')||'';
-  const bio=document.getElementById('user-bio-input');if(bio)bio.value=localStorage.getItem('bosompem_user_bio')||'';
-  updateProfilePreview();
-  const notifyBtn=document.getElementById('enable-notifications-btn');
-  if(notifyBtn&&'Notification' in window&&Notification.permission==='granted')notifyBtn.innerHTML='<i class="fa-solid fa-check"></i> Notifications enabled';
 }
 
 /* Permissioned device bridge.
@@ -791,8 +805,6 @@ const DeviceBridge={
   }
 };
 
-window.toggleAttachmentMenu=toggleAttachmentMenu;window.triggerChatImage=triggerChatImage;window.triggerScreenshot=triggerScreenshot;window.attachLocation=attachLocation;
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-   
-   
+     
