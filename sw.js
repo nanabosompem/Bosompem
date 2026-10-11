@@ -26,3 +26,11 @@ self.addEventListener('fetch', event => {
 });
 
 self.addEventListener('message', event => { if (event.data?.type === 'SKIP_WAITING') self.skipWaiting(); });
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list => {
+    for (const client of list) if ('focus' in client) return client.focus();
+    if (self.clients.openWindow) return self.clients.openWindow('./');
+  }));
+});
