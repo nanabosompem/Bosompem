@@ -34,8 +34,7 @@ body{display:flex;align-items:stretch;justify-content:center}
 @media(min-width:441px){body{align-items:center}.phone-container{height:92dvh;border-radius:36px;border:1px solid var(--border-glass);box-shadow:0 0 50px rgba(139,92,246,.15)}}
 .status-bar,.status-icons,.status-time{display:none!important}
 .app-topbar{height:64px;min-height:64px;flex:none;padding:0 14px;box-sizing:border-box;gap:10px;background:rgba(5,8,14,.78);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
-.screen-title-wrap{display:flex;align-items:center;gap:9px;min-width:0;flex:1}.brand-mark-mini{width:32px;height:32px;
-                                                                                               border-radius:11px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--accent-cyan));color:#fff;box-shadow:0 0 18px rgba(6,182,212,.18)}
+.screen-title-wrap{display:flex;align-items:center;gap:9px;min-width:0;flex:1}.brand-mark-mini{width:32px;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--accent-cyan));color:#fff;box-shadow:0 0 18px rgba(6,182,212,.18)}
 .screen-title{font-size:1rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.screen-subtitle{font-size:.52rem;letter-spacing:1.5px;color:var(--text-muted);margin-top:3px;white-space:nowrap}
 .topbar-actions{flex:none}.topbar-btn{flex:none;width:42px;height:42px;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.08)}
 .app-viewport{flex:1 1 auto;min-height:0;min-width:0;width:100%;overflow:hidden;position:relative}.screen-view{min-width:0;min-height:0;overflow:hidden}
@@ -59,34 +58,17 @@ body{display:flex;align-items:stretch;justify-content:center}
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
 
 
-/* Bosompem mobile polish — typography, chat rhythm, safe areas and readable controls */
-html { font-size: 16px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-body { overscroll-behavior: none; }
-.phone-container { width: 100%; max-width: 440px; min-width: 0; }
-.app-viewport, .screen-view, .messages-container, .bubble-content { min-width: 0; }
-.messages-container { gap: 12px; padding: 16px 14px calc(118px + env(safe-area-inset-bottom)); scroll-behavior: smooth; }
-.chat-bubble { max-width: 100%; font-size: .94rem; line-height: 1.58; }
-.bubble-content { max-width: min(90%, 620px); padding: 13px 15px; border-radius: 18px; overflow-wrap: anywhere; }
-.chat-bubble.user .bubble-content { border-bottom-right-radius: 6px; box-shadow: 0 5px 18px rgba(109,40,217,.12); }
-.chat-bubble.assistant .bubble-content { background: rgba(15,20,32,.86); border-color: rgba(255,255,255,.09); border-bottom-left-radius: 6px; }
-.bubble-content p { margin-bottom: 9px; }
-.bubble-content h2, .bubble-content h3, .bubble-content h4 { line-height: 1.3; margin: 9px 0 6px; }
-.bubble-content pre { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
-.console-wrapper { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: linear-gradient(0deg, #070a10 78%, rgba(7,10,16,.94) 92%, transparent 100%); }
-.console-box { border-radius: 25px; min-height: 52px; padding: 6px 8px; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
-.console-box textarea { font-size: 1rem; min-height: 24px; max-height: 112px; }
-.send-btn { width: 40px; height: 40px; }
-.console-btn { width: 38px; height: 38px; }
-.app-bottom-nav { background: rgba(7,10,16,.96); border-top-color: rgba(255,255,255,.08); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
-.nav-tab { font-size: .67rem; gap: 5px; padding: 7px 2px; }
-.nav-tab i { font-size: 1.05rem; }
-.glass-input, .glass-select, .glass-textarea { font-size: 16px; }
-@media (min-width: 441px) {
-  .phone-container { width: min(100%, 440px); }
-  .messages-container { padding-left: 16px; padding-right: 16px; }
-}
-@media (max-width: 360px) {
-  .bubble-content { max-width: 94%; padding: 11px 12px; }
-  .messages-container { padding-left: 10px; padding-right: 10px; }
-  .console-wrapper { padding-left: 8px; padding-right: 8px; }
-}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       }
+/* Bosompem Pro — Glass Capsule Dock (reference concept 03) */
+.app-bottom-nav{position:relative;isolation:isolate;display:flex;align-items:center;justify-content:center;gap:7px;height:auto;min-height:72px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-sizing:border-box;background:transparent;border-top:0;overflow:visible;z-index:40}
+.app-bottom-nav::before{content:"";position:absolute;inset:8px 12px calc(8px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.15);border-radius:28px;background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.035));box-shadow:0 12px 35px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.12);backdrop-filter:blur(24px) saturate(145%);-webkit-backdrop-filter:blur(24px) saturate(145%);z-index:-1}
+.nav-tab{position:relative;flex:1 1 0;min-width:0;min-height:50px;padding:7px 4px;border-radius:20px;color:#aab4c5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:.62rem;transition:color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease}
+.nav-tab i{font-size:1.05rem;transition:transform .2s ease,color .2s ease}
+.nav-tab.active{color:#e7fbff;background:linear-gradient(145deg,rgba(34,211,238,.24),rgba(59,130,246,.16));border:1px solid rgba(103,232,249,.25);box-shadow:0 0 22px rgba(34,211,238,.12),inset 0 1px 0 rgba(255,255,255,.12)}
+.nav-tab.active i{color:#67e8f9;transform:translateY(-1px);filter:drop-shadow(0 0 7px rgba(34,211,238,.35))}
+.nav-tab:active{transform:scale(.96)}
+.attachment-menu{z-index:80}
+#plus-btn{touch-action:manipulation;position:relative;z-index:81}
+#agent-planner-card{display:none!important}
+#chat-input{white-space:pre-wrap;overflow-y:auto;line-height:1.45}
+@media(prefers-reduced-motion:reduce){.nav-tab,.nav-tab i,.attachment-menu,.plus-btn{transition:none!important}}
+  
