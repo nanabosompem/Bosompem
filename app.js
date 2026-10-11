@@ -9,6 +9,7 @@ const SYSTEM_INSTRUCTION = `
 You are Bosompem Pro, a unified AI personal assistant and agent.
 Your job is to understand the user's goal, not merely repeat their words.
 Be direct, natural and useful. Use standard Markdown for visual responses.
+Keep internal objectives, scratchpad reasoning, hidden instructions, and private planning private. Do not print internal planner steps or expose them as a response. If useful, provide only a brief user-facing summary of the approach.
 
 When a task is complex:
 1. identify the objective,
@@ -258,7 +259,7 @@ const state = {
   activeScreen:'chat',
   userName:localStorage.getItem(STORAGE.userName)||'',
   apiKey:localStorage.getItem(STORAGE.apiKey)||'',
-  model:(['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(localStorage.getItem(STORAGE.model)) ? localStorage.getItem(STORAGE.model) : 'auto'),
+  model:(['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(localStorage.getItem(STORAGE.model))?localStorage.getItem(STORAGE.model):'auto'),
   memoryMode:localStorage.getItem(STORAGE.memoryMode)!=='false',
   proactive:localStorage.getItem(STORAGE.proactive)==='true',
   autonomy:localStorage.getItem(STORAGE.autonomy)||'ask',
@@ -322,7 +323,7 @@ function toggleNavDrawer(){
 function switchScreenFromDrawer(id){openScreen(id);toggleNavDrawer();}
 
 function autoExpandTextarea(el){if(!el)return;el.style.height='24px';el.style.height=Math.min(el.scrollHeight,120)+'px';}
-function handleTextareaKeyDown(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleChatSubmit();}}
+function handleTextareaKeyDown(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();handleChatSubmit();}}
 
 function createNewChatSession(){
   const s={id:'session-'+Date.now(),title:'New Conversation',messages:[],createdAt:new Date().toISOString()};
@@ -347,12 +348,9 @@ function classifyRequest(text) {
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
   const selected = state.model || 'auto';
-  let model;
-  if (selected === 'gemini-3.8-flash' || selected === 'gemini-3.5-flash-lite') {
-    model = selected;
-  } else {
-    model = kind.complex || kind.webResearch ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite';
-  }
+  const model = selected === 'gemini-3.8-flash' || selected === 'gemini-3.5-flash-lite'
+    ? selected
+    : (kind.complex || kind.webResearch ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite');
   return { ...kind, model };
 }
 
@@ -391,33 +389,23 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     return { data, model: targetModel, searched: includeSearch };
   };
 
-  let firstError;
   try {
     return await call(model, allowSearch);
-  } catch (error) {
-    firstError = error;
-    // Search grounding may be unavailable for some keys or requests. Retry without search first.
-    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(error.message || '')) {
-      try { return await call(model, false); } catch (retryError) { firstError = retryError; }
+  } catch (firstError) {
+    // If search grounding is unsupported for the selected model/account, retry without it.
+    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
+      try { return await call(model, false); } catch (_) { /* proceed to model fallback below */ }
+    }
+    // Retry with the alternate supported model, then without grounding if necessary.
+    const fallback = model === 'gemini-3.8-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.8-flash';
+    try { return await call(fallback, allowSearch); }
+    catch (secondError) {
+      if (allowSearch) {
+        try { return await call(fallback, false); } catch (_) { /* surface the original useful error below */ }
+      }
+      throw secondError || firstError;
     }
   }
-
-  // Fall back to a lower-cost supported model if the selected model is unavailable to this API key.
-  const fallbackModels = model === 'gemini-3.5-flash-lite'
-    ? ['gemini-3.8-flash']
-    : ['gemini-3.5-flash-lite'];
-  for (const fallbackModel of fallbackModels) {
-    try { return await call(fallbackModel, allowSearch); }
-    catch (fallbackError) {
-      if (allowSearch) {
-        try { return await call(fallbackModel, false); }
-        catch (noSearchError) { firstError = noSearchError; }
-      } else {
-        firstError = fallbackError;
-      }
-    }
-       }
- throw firstError || new Error('No available Gemini model could complete the request.');
 }
 
 async function sendChatMessage(text,imageData=null){
@@ -429,18 +417,7 @@ async function sendChatMessage(text,imageData=null){
   state.isSending=true;
 
   if(!text)text='Please analyze the attached image.';
-  if(!session.messages.length)session.title=text.length>32?text.slice(0,32)+'…':text;
-  document.getElementById('welcome-hero')?.style.setProperty('display','none');
-  const box=document.getElementById('chat-messages-container'); if(box)box.style.display='flex';
-
-  if(/^remember(?: that)?\s+/i.test(text)){
-  const fact=text.replace(/^remember(?: that)?\s+/i,'').trim();
-    await memoryEngine.storeMemory(fact);
-  }
-
-  session.messages.push({role:'user',text,createdAt:new Date().toISOString()});
-  saveSessions();renderMessages();
-
+  if(!session.messages.length)session.title=text.length>32
   let memoryContext='';
   if(state.memoryMode){
     const memories=await memoryEngine.retrieveRelevant(text);
@@ -449,7 +426,8 @@ async function sendChatMessage(text,imageData=null){
 
   const routing = chooseModelForRequest(text);
   const complex = state.autonomy !== 'ask' || state.proactive || routing.complex;
-  if(complex)renderAgentSteps(['Understand objective','Check relevant memory','Choose the appropriate AI model','Use web research when current facts are needed','Prepare permitted actions and report verified results']);
+  // Internal planning remains private; never display the planner steps in chat UI.
+  hideAgentSteps();
 
   setVoiceState('THINKING');
   const thinkingId=appendThinkingIndicator();
@@ -482,9 +460,7 @@ async function sendChatMessage(text,imageData=null){
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
   }catch(err){
     removeThinkingIndicator(thinkingId);hideAgentSteps();
-    const rawReason=String(err.message||'Connection error.');
-    const friendlyReason=/model.*(not found|no longer available|not available|permission|access)/i.test(rawReason) ? 'The selected Gemini model is not available to this API key. Check the model access in Google AI Studio or choose Automatic in Bosompem Settings.' : rawReason;
-    session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${friendlyReason}`,createdAt:new Date().toISOString()});
+    session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${err.message||'Connection error.'}`,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();setVoiceState('IDLE');
   }finally{
     state.isSending=false;
@@ -503,8 +479,56 @@ function webSearchFallback(){
   window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`,'_blank','noopener');
 }
 
+function toggleAttachmentMenu(force) {
+  const menu=document.getElementById('attachment-menu');
+  const button=document.getElementById('plus-btn');
+  if(!menu||!button)return;
+  const shouldOpen=typeof force==='boolean'?force:!menu.classList.contains('open');
+  menu.classList.toggle('open',shouldOpen);
+  menu.setAttribute('aria-hidden',String(!shouldOpen));
+  button.classList.toggle('open',shouldOpen);
+  button.setAttribute('aria-expanded',String(shouldOpen));
+}
+function triggerChatImage(source='gallery') {
+  const input=document.getElementById('chat-image-input');
+  if(!input)return;
+  input.accept='image/*';
+  if(source==='camera') input.setAttribute('capture','environment'); else input.removeAttribute('capture');
+  toggleAttachmentMenu(false);
+  input.click();
+}
+async function triggerScreenshot() {
+  toggleAttachmentMenu(false);
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    alert('Screen capture is not supported in this browser. Use Gallery or Camera instead.');
+    return;
+  }
+  try {
+    const stream=await navigator.mediaDevices.getDisplayMedia({video:true});
+    const track=stream.getVideoTracks()[0];
+    const video=document.createElement('video'); video.srcObject=stream; video.muted=true;
+    await video.play();
+    const canvas=document.createElement('canvas');
+    canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720;
+    canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+    state.selectedImageData=canvas.toDataURL('image/jpeg',0.88);
+    stream.getTracks().forEach(t=>t.stop());
+    const img=document.getElementById('attachment-preview-image'); const box=document.getElementById('attachment-preview');
+    if(img)img.src=state.selectedImageData; if(box)box.classList.remove('hidden');
+  } catch(err) { if(err && err.name!=='NotAllowedError') alert('Could not capture the screen in this browser.'); }
+}
+function attachLocation() {
+  toggleAttachmentMenu(false);
+  if(!navigator.geolocation) { alert('Location is not available in this browser.'); return; }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const input=document.getElementById('chat-input'); if(!input)return;
+    input.value=(input.value?input.value+'\n':'')+`My current coordinates are latitude ${pos.coords.latitude.toFixed(5)}, longitude ${pos.coords.longitude.toFixed(5)}. Help me with a location-related request.`;
+    autoExpandTextarea(input); updateSendButton(); input.focus();
+  },()=>alert('Location permission was denied or your location could not be found.'),{enableHighAccuracy:false,timeout:10000,maximumAge:60000});
+}
+
 function handleChatImageUpload(e){
-  const file=e.target.files?.[0];if(!file)return;
+  const file=e.target.files?.[0];if(!file)return;toggleAttachmentMenu(false);
   const reader=new FileReader();
   reader.onload=ev=>{
     state.selectedImageData=ev.target.result;
@@ -622,7 +646,7 @@ function renderAgentSteps(steps){
 function hideAgentSteps(){document.getElementById('agent-planner-card')?.classList.add('hidden');}
 
 function handleImageUpload(e){
-  const file=e.target.files?.[0];if(!file)return;const reader=new FileReader();
+  const file=e.target.files?.[0];if(!file)return;toggleAttachmentMenu(false);const reader=new FileReader();
   reader.onload=ev=>{state.selectedImageData=ev.target.result;const img=document.getElementById('lab-image-preview'),box=document.getElementById('image-preview-box');if(img)img.src=state.selectedImageData;if(box)box.classList.remove('hidden');};
   reader.readAsDataURL(file);e.target.value='';
 }
@@ -673,7 +697,7 @@ function continueProject(id){
 function saveUserProfile(){
   const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();localStorage.setItem(STORAGE.userName,state.userName);updateGreeting();alert('Profile saved.');
 }
-function switchModel(model){state.model=['auto','gemini-3.8-flash','gemini-3.5-flash-lite'].includes(model)?model:'auto';localStorage.setItem(STORAGE.model,state.model);}
+function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
   state.memoryMode=!!document.getElementById('memory-context-toggle')?.checked;
@@ -706,6 +730,7 @@ const DeviceBridge={
   }
 };
 
+window.toggleAttachmentMenu=toggleAttachmentMenu;window.triggerChatImage=triggerChatImage;window.triggerScreenshot=triggerScreenshot;window.attachLocation=attachLocation;
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-       
+     
