@@ -417,7 +417,18 @@ async function sendChatMessage(text,imageData=null){
   state.isSending=true;
 
   if(!text)text='Please analyze the attached image.';
-  if(!session.messages.length)session.title=text.length>32
+  if(!session.messages.length)session.title=text.length>32?text.slice(0,32)+'…':text;
+  document.getElementById('welcome-hero')?.style.setProperty('display','none');
+  const box=document.getElementById('chat-messages-container'); if(box)box.style.display='flex';
+
+  if(/^remember(?: that)?\s+/i.test(text)){
+  const fact=text.replace(/^remember(?: that)?\s+/i,'').trim();
+    await memoryEngine.storeMemory(fact);
+  }
+
+  session.messages.push({role:'user',text,createdAt:new Date().toISOString()});
+  saveSessions();renderMessages();
+
   let memoryContext='';
   if(state.memoryMode){
     const memories=await memoryEngine.retrieveRelevant(text);
@@ -696,7 +707,7 @@ function continueProject(id){
 
 function saveUserProfile(){
   const input=document.getElementById('user-name-input');state.userName=(input?.value||'').trim();localStorage.setItem(STORAGE.userName,state.userName);updateGreeting();alert('Profile saved.');
-}
+                         }
 function switchModel(model){state.model=model;localStorage.setItem(STORAGE.model,model);}
 function saveSettings(){
   const key=document.getElementById('api-key')?.value.trim();if(key){state.apiKey=key;localStorage.setItem(STORAGE.apiKey,key);}
@@ -733,4 +744,3 @@ const DeviceBridge={
 window.toggleAttachmentMenu=toggleAttachmentMenu;window.triggerChatImage=triggerChatImage;window.triggerScreenshot=triggerScreenshot;window.attachLocation=attachLocation;
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-     
