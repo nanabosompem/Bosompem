@@ -37,8 +37,7 @@ body{display:flex;align-items:stretch;justify-content:center}
 .screen-title-wrap{display:flex;align-items:center;gap:9px;min-width:0;flex:1}.brand-mark-mini{width:32px;height:32px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--primary),var(--accent-cyan));color:#fff;box-shadow:0 0 18px rgba(6,182,212,.18)}
 .screen-title{font-size:1rem;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.screen-subtitle{font-size:.52rem;letter-spacing:1.5px;color:var(--text-muted);margin-top:3px;white-space:nowrap}
 .topbar-actions{flex:none}.topbar-btn{flex:none;width:42px;height:42px;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.08)}
-.app-viewport{flex:1 1 auto;min-height:0;min-width:0;width:100%;overflow:hidden;position:relative}.screen-view{min-width:0;min-height:0;overflow:hidden}
-.screen-scroll-container{min-height:0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;overflow-x:hidden}
+.app-viewport{flex:1 1 auto;min-height:0;min-width:0;width:100%;overflow:hidden;position:relative}.screen-view{min-width:0;min-height:0;overflow:hidden}.screen-scroll-container{min-height:0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));overflow-y:auto;overflow-x:hidden}
 .welcome-hero{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:24px 16px 145px;justify-content:center}.welcome-hero h1{font-size:2rem}
 .messages-container{flex:1 1 auto;min-height:0;min-width:0;width:100%;overflow-y:auto;overflow-x:hidden;padding:18px 16px 150px}.bubble-content{min-width:0;overflow-wrap:anywhere}.bubble-content pre{max-width:100%}
 .console-wrapper{position:absolute;left:0;right:0;bottom:0;width:100%;max-width:100%;min-width:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-sizing:border-box;background:linear-gradient(0deg,#070a10 62%,rgba(7,10,16,.94) 80%,transparent 100%);z-index:20}
@@ -81,4 +80,5 @@ button{touch-action:manipulation}.quick-action-card,.prompt-card{gap:12px}.quick
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
-}
+         }
+
