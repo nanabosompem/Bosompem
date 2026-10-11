@@ -275,7 +275,6 @@ const state = {
   voiceFinalTranscript:'',
   reminderTimer:null
 };
-
 const memoryEngine=new MemoryVault();
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 let liveRecognition=null;
@@ -337,7 +336,7 @@ function handleTextareaKeyDown(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.
 function createNewChatSession(){
   const s={id:'session-'+Date.now(),title:'New Conversation',messages:[],createdAt:new Date().toISOString()};
   state.sessions.unshift(s);saveJSON(STORAGE.sessions,state.sessions);loadSession(s.id);
-     }
+}
 function getActiveSession(){return state.sessions.find(s=>s.id===state.activeSessionId);}
 function loadSession(id){
   state.activeSessionId=id;
@@ -358,10 +357,9 @@ function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
   // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
   // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
-  const selected = state.model || 'gemini-2.5-flash';
-  const model = selected === 'gemini-2.5-pro'
-    ? 'gemini-2.5-pro'
-    : (kind.complex ? 'gemini-2.5-pro' : 'gemini-2.5-flash');
+  // Gemini 2.5 model IDs are retired for this project; use the current stable Flash model.
+  const selected = state.model || 'gemini-3.8-flash';
+  const model = 'gemini-3.8-flash';
   return { ...kind, model };
 }
 
@@ -408,12 +406,8 @@ async function requestGemini({ contents, text, model, allowSearch }) {
       try { return await call(model, false); } catch (_) { /* proceed to model fallback below */ }
     }
     // Automatic Pro routing must not strand a user whose API key cannot access Pro.
-    if (model === 'gemini-2.5-pro') {
-      try { return await call('gemini-2.5-flash', allowSearch); }
-      catch (secondError) {
-        if (allowSearch) return await call('gemini-2.5-flash', false);
-        throw secondError;
-      }
+    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
+      return await call(model, false);
     }
     throw firstError;
   }
@@ -555,7 +549,7 @@ function renderMessages(){
     return `<div class="chat-bubble ${m.role}"><div class="bubble-content">${body}${actions}</div></div>`;
   }).join('');
   scrollToBottom();
-}
+     }
 function speakMessage(i){const s=getActiveSession();if(s?.messages[i])speakText(s.messages[i].text);}
 async function copyMessage(i){const s=getActiveSession();if(!s?.messages[i])return;try{await navigator.clipboard.writeText(s.messages[i].text);alert('Copied.');}catch{alert('Copy is not available here.');}}
 function appendThinkingIndicator(){
@@ -600,7 +594,7 @@ function initVoiceEngines(){
       if(e.results[i].isFinal)state.voiceFinalTranscript+=' '+piece;else interim+=' '+piece;
     }
     const full=(state.voiceFinalTranscript+' '+interim).trim();
-   const card=document.getElementById('voice-live-transcript');if(card)card.textContent=full||'Listening…';
+    const card=document.getElementById('voice-live-transcript');if(card)card.textContent=full||'Listening…';
     // Submit only after the browser finalizes speech; onend handles a final pause without duplicate sends.
     if(e.results[e.results.length-1]?.isFinal)queueLiveVoiceSubmit(650);
   };
@@ -812,4 +806,3 @@ const DeviceBridge={
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-       
