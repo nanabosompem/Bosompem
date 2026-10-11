@@ -275,6 +275,7 @@ const state = {
   voiceFinalTranscript:'',
   reminderTimer:null
 };
+
 const memoryEngine=new MemoryVault();
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 let liveRecognition=null;
@@ -314,7 +315,7 @@ function openScreen(screenId){
   document.querySelectorAll('.nav-tab,.menu-item').forEach(x=>x.classList.toggle('active',x.dataset.screen===screenId));
   const titles={chat:'Chat Studio','live-voice':'Live Voice',projects:'Projects','media-lab':'Media & Vision','memory-vault':'Memory Vault',tasks:'Tasks & Reminders',profile:'User Profile',settings:'System Settings'};
   const title=document.getElementById('active-screen-title'); if(title)title.textContent=titles[screenId]||'Bosompem AI';
-  if(screenId==='memory-vault')renderMemoryList();
+        if(screenId==='memory-vault')renderMemoryList();
   if(screenId==='projects')renderProjects();
   if(screenId==='tasks')renderReminders();
 }
@@ -381,7 +382,7 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     const body = {
       contents,
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { temperature: .55, topP: .9, maxOutputTokens: 4096 }
+      generationConfig: { temperature: .45, topP: .9, maxOutputTokens: 1024 }
     };
     if (includeSearch) body.tools = [{ google_search: {} }];
     return body;
@@ -449,9 +450,12 @@ async function sendChatMessage(text,imageData=null){
   const input=document.getElementById('chat-input');if(input){input.value='';autoExpandTextarea(input);}
   clearSelectedImage();
 
-  const contents=session.messages.map((m,i)=>{
-    const parts=[{text:(i===session.messages.length-1&&m.role==='user'?memoryContext:'')+m.text}];
-    if(i===session.messages.length-1&&imageData){
+  // Send only recent conversational context to reduce payload size and latency.
+  // Full history remains saved locally; this limits only what is sent per request.
+  const recentMessages = session.messages.slice(-12);
+  const contents=recentMessages.map((m,i)=>{
+    const parts=[{text:(i===recentMessages.length-1&&m.role==='user'?memoryContext:'')+m.text}];
+    if(i===recentMessages.length-1&&imageData){
       const comma=imageData.indexOf(',');
       const meta=imageData.slice(0,comma),data=imageData.slice(comma+1);
       const mime=(meta.match(/data:([^;]+)/)||[])[1]||'image/jpeg';
@@ -549,7 +553,7 @@ function renderMessages(){
     return `<div class="chat-bubble ${m.role}"><div class="bubble-content">${body}${actions}</div></div>`;
   }).join('');
   scrollToBottom();
-     }
+}
 function speakMessage(i){const s=getActiveSession();if(s?.messages[i])speakText(s.messages[i].text);}
 async function copyMessage(i){const s=getActiveSession();if(!s?.messages[i])return;try{await navigator.clipboard.writeText(s.messages[i].text);alert('Copied.');}catch{alert('Copy is not available here.');}}
 function appendThinkingIndicator(){
@@ -580,7 +584,7 @@ function setVoiceState(newState){
   if(orb)orb.className=`voice-orb ${newState.toLowerCase()}`;
   if(icon)icon.className=newState==='LISTENING'?'fa-solid fa-microphone':newState==='THINKING'?'fa-solid fa-circle-notch fa-spin':newState==='SPEAKING'?'fa-solid fa-volume-high':'fa-solid fa-microphone';
   if(bar)bar.classList.toggle('hidden',newState!=='SPEAKING');
-  if(status)status.textContent={IDLE:'Live Voice Ready',LISTENING:'Listening…',THINKING:'Thinking…',SPEAKING:'Speaking…'}[newState]||'Live Voice';
+ if(status)status.textContent={IDLE:'Live Voice Ready',LISTENING:'Listening…',THINKING:'Thinking…',SPEAKING:'Speaking…'}[newState]||'Live Voice';
 }
 function initVoiceEngines(){
   if(!SpeechRecognition)return;
@@ -806,3 +810,4 @@ const DeviceBridge={
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
+                                  
