@@ -378,14 +378,14 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     const body = {
       contents,
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { temperature: 0.45, topP: 0.9, maxOutputTokens: 2048 }
+      generationConfig: { temperature: 0.45, topP: 0.9, maxOutputTokens: 1200 }
     };
-    if (includeSearch) body.tools = [{ google_search: {} }];
+   if (includeSearch) body.tools = [{ google_search: {} }];
     return body;
   };
   const call = async (targetModel, includeSearch) => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90000);
+    const timeout = setTimeout(() => controller.abort(), 35000);
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
       const response = await fetch(endpoint, {
@@ -393,7 +393,7 @@ async function requestGemini({ contents, text, model, allowSearch }) {
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.apiKey },
         body: JSON.stringify(makeBody(includeSearch)),
         signal: controller.signal
-         });
+      });
       let data;
       try { data = await response.json(); }
       catch { throw new Error(`Google returned an unreadable response (HTTP ${response.status}). Check the connection and try again.`); }
@@ -408,7 +408,7 @@ async function requestGemini({ contents, text, model, allowSearch }) {
       }
       return { data, model: targetModel, searched: includeSearch };
     } catch (err) {
-      if (err.name === 'AbortError') throw new Error('Gemini took longer than 90 seconds and the request timed out. Check your connection and try again.');
+      if (err.name === 'AbortError') throw new Error('Gemini took longer than 35 seconds and timed out. Try again; if this keeps happening, check the API quota and connection.');
       if (err instanceof TypeError) throw new Error('Could not reach Google Gemini. Check your internet connection, API access, and browser network restrictions.');
       throw err;
     } finally { clearTimeout(timeout); }
@@ -429,8 +429,17 @@ async function sendChatMessage(text,imageData=null){
   if(state.isSending)return;
   text=(text||'').trim();
   if(!text && !imageData)return;
-  if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   const session=getActiveSession(); if(!session)return;
+
+  // Answer this simple capability question locally instead of making the user wait on an AI request.
+  if(!imageData && /\b(can you|could you|do you)\b.{0,45}\b(generate|create|make)\b.{0,25}\b(images?|pictures?|artwork)\b/i.test(text)){
+    session.messages.push({role:'user',text,createdAt:new Date().toISOString()});
+    session.messages.push({role:'assistant',text:'Yes. Open the menu (☰), choose **Vision Studio**, then use **Image Generation Studio**. Describe the image and tap **Generate image**. Image creation depends on your Gemini API key having access to a supported image-generation model.',createdAt:new Date().toISOString()});
+    saveSessions();renderMessages();
+    const input=document.getElementById('chat-input');if(input){input.value='';autoExpandTextarea(input);}
+    return;
+  }
+  if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   state.isSending=true;
 
   if(!text)text='Please analyze the attached image.';
@@ -512,9 +521,17 @@ function webSearchFallback(){
 function toggleAttachmentMenu(){
   const menu=document.getElementById('attachment-menu'),btn=document.getElementById('plus-btn');
   if(!menu)return;
-  const opening=menu.classList.contains('hidden');
-  menu.classList.toggle('hidden',!opening);menu.setAttribute('aria-hidden',String(!opening));
+  const opening=!menu.classList.contains('open');
+  menu.classList.toggle('open',opening);
+  menu.classList.toggle('hidden',!opening);
+  menu.setAttribute('aria-hidden',String(!opening));
+  btn?.classList.toggle('open',opening);
   btn?.setAttribute('aria-expanded',String(opening));
+}
+function openImageGenerationFromComposer(){
+  closeAttachmentMenu();
+  openScreen('media-lab');
+  setTimeout(()=>document.getElementById('image-generation-prompt')?.focus(),120);
 }
 function triggerChatImage(mode='gallery'){
   const input=document.getElementById('chat-image-input');if(!input)return;
@@ -618,7 +635,8 @@ function initVoiceEngines(){
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
       state.isLiveVoiceActive=false;setVoiceState('IDLE');const b=document.getElementById('live-voice-toggle-btn');if(b)b.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
       alert('Microphone permission is blocked. Allow microphone access for this site, then try again.');return;
-    }
+           }
+
     if(e.error!=='no-speech'&&e.error!=='aborted')console.warn('Live speech recognition:',e.error);
   };
   liveRecognition.onend=()=>{
@@ -641,7 +659,7 @@ function queueLiveVoiceSubmit(delay=450){
     try{if(liveRecognition)try{liveRecognition.stop();}catch{};setVoiceState('THINKING');await sendChatMessage(text);}
     finally{state.voiceRequestPending=false;if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING')setTimeout(()=>{try{liveRecognition.start();}catch{}},220);}
   },delay);
-    }
+}
 function toggleLiveVoiceMode(){
   if(!SpeechRecognition)return alert('Live voice requires a browser with SpeechRecognition support. Try Chrome on Android.');
   state.isLiveVoiceActive=!state.isLiveVoiceActive;
@@ -850,4 +868,4 @@ const DeviceBridge={
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
 
-   
+     
