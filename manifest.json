@@ -1,10 +1,11 @@
 {
-  "name":"Bosompem Pro Personal AI",
-  "short_name":"Bosompem",
-  "start_url":"./",
-  "display":"standalone",
-  "background_color":"#050b25",
-  "theme_color":"#087bff",
-  "description":"Personal AI assistant with voice, memory and reminders.",
-  "icons":[]
+  "name": "Bosompem Pro Personal AI",
+  "short_name": "Bosompem",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#050b25",
+  "theme_color": "#087bff",
+  "description": "Personal AI assistant with voice, memory, reminders and image generation.",
+  "icons": []
 }
