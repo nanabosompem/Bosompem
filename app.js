@@ -356,12 +356,8 @@ function classifyRequest(text) {
 
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
-  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
-  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
-  // Gemini 2.5 model IDs are retired for this project; use the current stable Flash model.
-  const selected = state.model || 'gemini-3.8-flash';
-  const model = 'gemini-3.8-flash';
-  return { ...kind, model };
+  // Keep the requested latest model for every request; do not silently downgrade.
+  return { ...kind, model: 'gemini-3.8-flash' };
 }
 
 function addGroundingSources(reply, data) {
@@ -382,35 +378,50 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     const body = {
       contents,
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { temperature: .45, topP: .9, maxOutputTokens: 1024 }
+      generationConfig: { temperature: 0.45, topP: 0.9, maxOutputTokens: 2048 }
     };
     if (includeSearch) body.tools = [{ google_search: {} }];
     return body;
   };
   const call = async (targetModel, includeSearch) => {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(makeBody(includeSearch))
-    });
-    const data = await response.json();
-    if (!response.ok || data.error) throw new Error(data.error?.message || `Gemini request failed (${response.status})`);
-    return { data, model: targetModel, searched: includeSearch };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90000);
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.apiKey },
+        body: JSON.stringify(makeBody(includeSearch)),
+        signal: controller.signal
+         });
+      let data;
+      try { data = await response.json(); }
+      catch { throw new Error(`Google returned an unreadable response (HTTP ${response.status}). Check the connection and try again.`); }
+      if (!response.ok || data.error) {
+        const msg = data.error?.message || `Gemini request failed (HTTP ${response.status})`;
+        const status = data.error?.status || '';
+        if (response.status === 400 && /API key|key not valid/i.test(msg)) throw new Error('Your Gemini API key was rejected. Re-enter the key in Settings.');
+        if (response.status === 401 || response.status === 403) throw new Error('Gemini denied access. Check that the API key is valid and the Gemini API is enabled for its Google project.');
+        if (response.status === 404 || /model.*not found|not supported for generateContent/i.test(msg)) throw new Error(`Google could not find or use model “${targetModel}” for this API key. Confirm the model is available in Google AI Studio. Details: ${msg}`);
+        if (response.status === 429) throw new Error('Gemini rate limit or quota reached. Wait briefly or check your Google AI Studio quota.');
+        throw new Error(`${msg}${status ? ` (${status})` : ''}`);
+      }
+      return { data, model: targetModel, searched: includeSearch };
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('Gemini took longer than 90 seconds and the request timed out. Check your connection and try again.');
+      if (err instanceof TypeError) throw new Error('Could not reach Google Gemini. Check your internet connection, API access, and browser network restrictions.');
+      throw err;
+    } finally { clearTimeout(timeout); }
   };
-
   try {
-    return await call(model, allowSearch);
-  } catch (firstError) {
-    // If search grounding is unsupported for the selected model/account, retry without it.
-    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
-      try { return await call(model, false); } catch (_) { /* proceed to model fallback below */ }
+    return await call(model || 'gemini-3.8-flash', !!allowSearch);
+  } catch (err) {
+    const msg = String(err.message || '');
+    // Search grounding is optional; retry the same latest model without search when grounding is rejected.
+    if (allowSearch && /google_search|grounding|search tool|tool.*not supported|invalid argument/i.test(msg)) {
+      return await call(model || 'gemini-3.8-flash', false);
     }
-    // Automatic Pro routing must not strand a user whose API key cannot access Pro.
-    if (allowSearch && /tool|google_search|grounding|not supported|invalid argument/i.test(firstError.message || '')) {
-      return await call(model, false);
-    }
-    throw firstError;
+    throw err;
   }
 }
 
@@ -479,7 +490,7 @@ async function sendChatMessage(text,imageData=null){
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
   }catch(err){
     removeThinkingIndicator(thinkingId);hideAgentSteps();
-    session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${err.message||'Connection error.'}`,createdAt:new Date().toISOString()});
+    session.messages.push({role:'assistant',text:`I couldn’t complete that request.\n\n**What went wrong:** ${err.message||'An unexpected connection error occurred.'}\n\nYour chat history is still saved. You can retry without losing your message.`,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();setVoiceState('IDLE');
   }finally{
     state.isSending=false;
@@ -630,7 +641,7 @@ function queueLiveVoiceSubmit(delay=450){
     try{if(liveRecognition)try{liveRecognition.stop();}catch{};setVoiceState('THINKING');await sendChatMessage(text);}
     finally{state.voiceRequestPending=false;if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING')setTimeout(()=>{try{liveRecognition.start();}catch{}},220);}
   },delay);
-}
+    }
 function toggleLiveVoiceMode(){
   if(!SpeechRecognition)return alert('Live voice requires a browser with SpeechRecognition support. Try Chrome on Android.');
   state.isLiveVoiceActive=!state.isLiveVoiceActive;
@@ -714,21 +725,49 @@ function initReminderNotifications(){
 }
 async function generateImage(){
   const prompt=document.getElementById('image-generation-prompt')?.value.trim();
-  const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
-  if(!prompt){alert('Describe the image you want to create first.');return;}
-  if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
-  if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
-  // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
-  const candidates=['gemini-2.5-flash-image','gemini-2.0-flash-preview-image-generation'];let lastError='No supported image model was available.';
-  for(const model of candidates){try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Generate an image based on this prompt. Return an image, not just a description: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
-    const data=await res.json();if(!res.ok)throw new Error(data.error?.message||`Image API error ${res.status}`);
-    const parts=data.candidates?.[0]?.content?.parts||[];const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
-    const d=imagePart?.inlineData||imagePart?.inline_data;if(!d?.data)throw new Error('The selected model returned no image. Check whether image generation is enabled for your API key.');
-    const mime=d.mimeType||d.mime_type||'image/png';if(result)result.innerHTML=`<img class="generated-image" alt="AI-generated image" src="data:${mime};base64,${d.data}"><a class="primary-btn" download="bosompem-generated-image.png" href="data:${mime};base64,${d.data}">Save image</a>`;
-    if(status)status.textContent='Image generated successfully.';return;
-  }catch(err){lastError=err.message||String(err);if(/quota|billing|permission|not found|not supported|not available|model/i.test(lastError))continue;break;}}
-  if(status)status.textContent='Image generation failed.';alert(`Bosompem could not generate an image. ${lastError}`);
+  const status=document.getElementById('image-generation-status');
+  const result=document.getElementById('generated-image-result');
+  const button=document.getElementById('generate-image-btn');
+  if(!prompt){if(status)status.textContent='Describe the image you want to create first.';return;}
+  if(!state.apiKey){if(status)status.textContent='Add your Gemini API key in Settings first.';openScreen('settings');return;}
+  if(button){button.disabled=true;button.classList.add('is-loading');}
+  if(status)status.textContent='Creating your image with Google’s image-generation model…';
+  if(result)result.innerHTML='';
+  // Current Google image-generation model first; professional model is a capability fallback.
+  const candidates=['gemini-3.1-flash-image','gemini-3-pro-image','gemini-2.5-flash-image'];
+  let lastError='No image model was available for this API key.';
+  try {
+    for(const model of candidates){
+      try{
+        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
+          method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':state.apiKey},
+          body:JSON.stringify({contents:[{role:'user',parts:[{text:`Create a polished, high-quality image matching this prompt. Respect the subject, composition, materials, lighting, color palette, and aspect ratio described. Prompt: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})
+        });
+        let data;try{data=await res.json();}catch{throw new Error(`Image service returned an unreadable response (HTTP ${res.status}).`);}
+        if(!res.ok||data.error)throw new Error(data.error?.message||`Image API error ${res.status}`);
+        const parts=data.candidates?.[0]?.content?.parts||[];
+        const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
+        const d=imagePart?.inlineData||imagePart?.inline_data;
+        if(!d?.data)throw new Error('The model returned text but no image. This model or API key may not have image generation enabled.');
+        const mime=d.mimeType||d.mime_type||'image/png';
+        const safeMime=/^image\/(png|jpeg|webp)$/i.test(mime)?mime:'image/png';
+        if(result){
+          const img=document.createElement('img');img.className='generated-image';img.alt='Image generated by Bosompem';img.src=`data:${safeMime};base64,${d.data}`;
+          const save=document.createElement('a');save.className='primary-btn';save.textContent='Save generated image';save.download=`bosompem-image-${Date.now()}.${safeMime==='image/jpeg'?'jpg':safeMime==='image/webp'?'webp':'png'}`;save.href=img.src;
+          result.append(img,save);
+        }
+        if(status)status.textContent=`Image created successfully using ${model}.`;
+        return;
+      }catch(err){
+        lastError=err.message||String(err);
+        // Continue only when this model is unavailable; quota/key/network errors need user action.
+        if(/not found|not supported|not available|model.*unavailable|does not exist/i.test(lastError))continue;
+        if(/returned text but no image|no image-generation|image generation.*not enabled/i.test(lastError))continue;
+        break;
+      }
+    }
+    if(status)status.textContent=`Image generation failed: ${lastError}`;
+  } finally { if(button){button.disabled=false;button.classList.remove('is-loading');} }
 }
 
 function parseReminderDate(value){
@@ -810,4 +849,5 @@ const DeviceBridge={
 
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
-                                  
+
+   
