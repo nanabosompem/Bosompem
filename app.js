@@ -356,12 +356,13 @@ function classifyRequest(text) {
 
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
-  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
-  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
-  // Gemini 2.5 model IDs are retired for this project; use the current stable Flash model.
-  const selected = state.model || 'gemini-3.8-flash';
-  const model = 'gemini-3.8-flash';
-  return { ...kind, model };
+  const selected = state.model || 'auto';
+
+  const model = selected === 'auto'
+    ? 'gemini-3.1-flash-lite'
+    : selected;
+
+  return { ...kind, model };  
 }
 
 function addGroundingSources(reply, data) {
