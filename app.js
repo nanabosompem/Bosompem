@@ -356,8 +356,12 @@ function classifyRequest(text) {
 
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
-  // Keep the requested latest model for every request; do not silently downgrade.
-  return { ...kind, model: 'gemini-3.8-flash' };
+  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
+  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
+  // Gemini 2.5 model IDs are retired for this project; use the current stable Flash model.
+  const selected = state.model || 'gemini-3.8-flash';
+  const model = 'gemini-3.8-flash';
+  return { ...kind, model };
 }
 
 function addGroundingSources(reply, data) {
@@ -378,68 +382,96 @@ async function requestGemini({ contents, text, model, allowSearch }) {
     const body = {
       contents,
       systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-      generationConfig: { temperature: 0.45, topP: 0.9, maxOutputTokens: 1200 }
+      generationConfig: { temperature: .45, topP: .9, maxOutputTokens: 1024 }
     };
-   if (includeSearch) body.tools = [{ google_search: {} }];
+    if (includeSearch) body.tools = [{ google_search: {} }];
     return body;
   };
+
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const call = async (targetModel, includeSearch) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35000);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    let response;
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
-      const response = await fetch(endpoint, {
+      response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.apiKey },
-        body: JSON.stringify(makeBody(includeSearch)),
-        signal: controller.signal
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(makeBody(includeSearch))
       });
-      let data;
-      try { data = await response.json(); }
-      catch { throw new Error(`Google returned an unreadable response (HTTP ${response.status}). Check the connection and try again.`); }
-      if (!response.ok || data.error) {
-        const msg = data.error?.message || `Gemini request failed (HTTP ${response.status})`;
-        const status = data.error?.status || '';
-        if (response.status === 400 && /API key|key not valid/i.test(msg)) throw new Error('Your Gemini API key was rejected. Re-enter the key in Settings.');
-        if (response.status === 401 || response.status === 403) throw new Error('Gemini denied access. Check that the API key is valid and the Gemini API is enabled for its Google project.');
-        if (response.status === 404 || /model.*not found|not supported for generateContent/i.test(msg)) throw new Error(`Google could not find or use model “${targetModel}” for this API key. Confirm the model is available in Google AI Studio. Details: ${msg}`);
-        if (response.status === 429) throw new Error('Gemini rate limit or quota reached. Wait briefly or check your Google AI Studio quota.');
-        throw new Error(`${msg}${status ? ` (${status})` : ''}`);
-      }
-      return { data, model: targetModel, searched: includeSearch };
-    } catch (err) {
-      if (err.name === 'AbortError') throw new Error('Gemini took longer than 35 seconds and timed out. Try again; if this keeps happening, check the API quota and connection.');
-      if (err instanceof TypeError) throw new Error('Could not reach Google Gemini. Check your internet connection, API access, and browser network restrictions.');
-      throw err;
-    } finally { clearTimeout(timeout); }
-  };
-  try {
-    return await call(model || 'gemini-3.8-flash', !!allowSearch);
-  } catch (err) {
-    const msg = String(err.message || '');
-    // Search grounding is optional; retry the same latest model without search when grounding is rejected.
-    if (allowSearch && /google_search|grounding|search tool|tool.*not supported|invalid argument/i.test(msg)) {
-      return await call(model || 'gemini-3.8-flash', false);
+    } catch (networkError) {
+      const error = new Error('Network connection failed before Gemini responded. Check your connection and retry.');
+      error.status = 0;
+      error.transient = true;
+      throw error;
     }
-    throw err;
+
+    let data = {};
+    try { data = await response.json(); }
+    catch { data = {}; }
+    if (!response.ok || data.error) {
+      const error = new Error(data.error?.message || `Gemini request failed (${response.status})`);
+      error.status = Number(data.error?.code || response.status);
+      error.apiStatus = String(data.error?.status || '');
+      error.model = targetModel;
+      throw error;
+    }
+    return { data, model: targetModel, searched: includeSearch };
+  };
+
+  const isTransient = error => {
+    const status = Number(error?.status || 0);
+    const message = String(error?.message || '');
+    return error?.transient === true || [408, 429, 500, 502, 503, 504].includes(status) ||
+      /UNAVAILABLE|RESOURCE_EXHAUSTED|INTERNAL|DEADLINE_EXCEEDED|temporarily unavailable|high demand|overloaded/i.test(message);
+  };
+  const isSearchConfigError = error => /google_search|grounding|tool.*not supported|unsupported.*tool|invalid argument/i.test(String(error?.message || ''));
+
+  // First retry transient failures on the selected model with bounded exponential backoff.
+  // Only switch models after retrying a transient server/capacity failure; do not mask key or request errors.
+  let firstError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await call(model, allowSearch);
+    } catch (error) {
+      firstError = error;
+      if (allowSearch && isSearchConfigError(error)) {
+        try { return await call(model, false); }
+        catch (noSearchError) { firstError = noSearchError; }
+      }
+      if (!isTransient(firstError) || attempt === 1) break;
+      await wait((attempt === 0 ? 900 : 1800) + Math.floor(Math.random() * 350));
+    }
   }
+
+  // A supported stable fallback may recover when the primary model is temporarily overloaded.
+  // The fallback is deliberately limited to transient errors and is not a promise of free-tier access.
+  if (isTransient(firstError)) {
+    const fallbackModel = model === 'gemini-3.6-flash' ? 'gemini-3.5-flash-lite' : 'gemini-3.6-flash';
+    try {
+      return await call(fallbackModel, allowSearch);
+    } catch (fallbackError) {
+      if (allowSearch && isSearchConfigError(fallbackError)) {
+        try { return await call(fallbackModel, false); }
+        catch (noSearchError) { fallbackError = noSearchError; }
+      }
+      if (isTransient(fallbackError)) {
+        await wait(1600 + Math.floor(Math.random() * 400));
+        try { return await call(fallbackModel, false); }
+        catch (lastError) { throw lastError; }
+      }
+      throw fallbackError;
+    }
+  }
+
+  throw firstError;
 }
 
 async function sendChatMessage(text,imageData=null){
   if(state.isSending)return;
   text=(text||'').trim();
   if(!text && !imageData)return;
-  const session=getActiveSession(); if(!session)return;
-
-  // Answer this simple capability question locally instead of making the user wait on an AI request.
-  if(!imageData && /\b(can you|could you|do you)\b.{0,45}\b(generate|create|make)\b.{0,25}\b(images?|pictures?|artwork)\b/i.test(text)){
-    session.messages.push({role:'user',text,createdAt:new Date().toISOString()});
-    session.messages.push({role:'assistant',text:'Yes. Open the menu (☰), choose **Vision Studio**, then use **Image Generation Studio**. Describe the image and tap **Generate image**. Image creation depends on your Gemini API key having access to a supported image-generation model.',createdAt:new Date().toISOString()});
-    saveSessions();renderMessages();
-    const input=document.getElementById('chat-input');if(input){input.value='';autoExpandTextarea(input);}
-    return;
-  }
   if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
+  const session=getActiveSession(); if(!session)return;
   state.isSending=true;
 
   if(!text)text='Please analyze the attached image.';
@@ -499,7 +531,7 @@ async function sendChatMessage(text,imageData=null){
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
   }catch(err){
     removeThinkingIndicator(thinkingId);hideAgentSteps();
-    session.messages.push({role:'assistant',text:`I couldn’t complete that request.\n\n**What went wrong:** ${err.message||'An unexpected connection error occurred.'}\n\nYour chat history is still saved. You can retry without losing your message.`,createdAt:new Date().toISOString()});
+    session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${err.message||'Connection error.'}`,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();setVoiceState('IDLE');
   }finally{
     state.isSending=false;
@@ -521,17 +553,9 @@ function webSearchFallback(){
 function toggleAttachmentMenu(){
   const menu=document.getElementById('attachment-menu'),btn=document.getElementById('plus-btn');
   if(!menu)return;
-  const opening=!menu.classList.contains('open');
-  menu.classList.toggle('open',opening);
-  menu.classList.toggle('hidden',!opening);
-  menu.setAttribute('aria-hidden',String(!opening));
-  btn?.classList.toggle('open',opening);
+  const opening=menu.classList.contains('hidden');
+  menu.classList.toggle('hidden',!opening);menu.setAttribute('aria-hidden',String(!opening));
   btn?.setAttribute('aria-expanded',String(opening));
-}
-function openImageGenerationFromComposer(){
-  closeAttachmentMenu();
-  openScreen('media-lab');
-  setTimeout(()=>document.getElementById('image-generation-prompt')?.focus(),120);
 }
 function triggerChatImage(mode='gallery'){
   const input=document.getElementById('chat-image-input');if(!input)return;
@@ -581,7 +605,7 @@ function renderMessages(){
     return `<div class="chat-bubble ${m.role}"><div class="bubble-content">${body}${actions}</div></div>`;
   }).join('');
   scrollToBottom();
-}
+     }             
 function speakMessage(i){const s=getActiveSession();if(s?.messages[i])speakText(s.messages[i].text);}
 async function copyMessage(i){const s=getActiveSession();if(!s?.messages[i])return;try{await navigator.clipboard.writeText(s.messages[i].text);alert('Copied.');}catch{alert('Copy is not available here.');}}
 function appendThinkingIndicator(){
@@ -635,8 +659,7 @@ function initVoiceEngines(){
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
       state.isLiveVoiceActive=false;setVoiceState('IDLE');const b=document.getElementById('live-voice-toggle-btn');if(b)b.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
       alert('Microphone permission is blocked. Allow microphone access for this site, then try again.');return;
-           }
-
+    }
     if(e.error!=='no-speech'&&e.error!=='aborted')console.warn('Live speech recognition:',e.error);
   };
   liveRecognition.onend=()=>{
@@ -743,49 +766,21 @@ function initReminderNotifications(){
 }
 async function generateImage(){
   const prompt=document.getElementById('image-generation-prompt')?.value.trim();
-  const status=document.getElementById('image-generation-status');
-  const result=document.getElementById('generated-image-result');
-  const button=document.getElementById('generate-image-btn');
-  if(!prompt){if(status)status.textContent='Describe the image you want to create first.';return;}
-  if(!state.apiKey){if(status)status.textContent='Add your Gemini API key in Settings first.';openScreen('settings');return;}
-  if(button){button.disabled=true;button.classList.add('is-loading');}
-  if(status)status.textContent='Creating your image with Google’s image-generation model…';
-  if(result)result.innerHTML='';
-  // Current Google image-generation model first; professional model is a capability fallback.
-  const candidates=['gemini-3.1-flash-image','gemini-3-pro-image','gemini-2.5-flash-image'];
-  let lastError='No image model was available for this API key.';
-  try {
-    for(const model of candidates){
-      try{
-        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
-          method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':state.apiKey},
-          body:JSON.stringify({contents:[{role:'user',parts:[{text:`Create a polished, high-quality image matching this prompt. Respect the subject, composition, materials, lighting, color palette, and aspect ratio described. Prompt: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})
-        });
-        let data;try{data=await res.json();}catch{throw new Error(`Image service returned an unreadable response (HTTP ${res.status}).`);}
-        if(!res.ok||data.error)throw new Error(data.error?.message||`Image API error ${res.status}`);
-        const parts=data.candidates?.[0]?.content?.parts||[];
-        const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
-        const d=imagePart?.inlineData||imagePart?.inline_data;
-        if(!d?.data)throw new Error('The model returned text but no image. This model or API key may not have image generation enabled.');
-        const mime=d.mimeType||d.mime_type||'image/png';
-        const safeMime=/^image\/(png|jpeg|webp)$/i.test(mime)?mime:'image/png';
-        if(result){
-          const img=document.createElement('img');img.className='generated-image';img.alt='Image generated by Bosompem';img.src=`data:${safeMime};base64,${d.data}`;
-          const save=document.createElement('a');save.className='primary-btn';save.textContent='Save generated image';save.download=`bosompem-image-${Date.now()}.${safeMime==='image/jpeg'?'jpg':safeMime==='image/webp'?'webp':'png'}`;save.href=img.src;
-          result.append(img,save);
-        }
-        if(status)status.textContent=`Image created successfully using ${model}.`;
-        return;
-      }catch(err){
-        lastError=err.message||String(err);
-        // Continue only when this model is unavailable; quota/key/network errors need user action.
-        if(/not found|not supported|not available|model.*unavailable|does not exist/i.test(lastError))continue;
-        if(/returned text but no image|no image-generation|image generation.*not enabled/i.test(lastError))continue;
-        break;
-      }
-    }
-    if(status)status.textContent=`Image generation failed: ${lastError}`;
-  } finally { if(button){button.disabled=false;button.classList.remove('is-loading');} }
+  const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
+  if(!prompt){alert('Describe the image you want to create first.');return;}
+  if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
+  if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
+  // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
+  const candidates=['gemini-2.5-flash-image','gemini-2.0-flash-preview-image-generation'];let lastError='No supported image model was available.';
+  for(const model of candidates){try{
+    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Generate an image based on this prompt. Return an image, not just a description: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+    const data=await res.json();if(!res.ok)throw new Error(data.error?.message||`Image API error ${res.status}`);
+    const parts=data.candidates?.[0]?.content?.parts||[];const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
+    const d=imagePart?.inlineData||imagePart?.inline_data;if(!d?.data)throw new Error('The selected model returned no image. Check whether image generation is enabled for your API key.');
+    const mime=d.mimeType||d.mime_type||'image/png';if(result)result.innerHTML=`<img class="generated-image" alt="AI-generated image" src="data:${mime};base64,${d.data}"><a class="primary-btn" download="bosompem-generated-image.png" href="data:${mime};base64,${d.data}">Save image</a>`;
+    if(status)status.textContent='Image generated successfully.';return;
+  }catch(err){lastError=err.message||String(err);if(/quota|billing|permission|not found|not supported|not available|model/i.test(lastError))continue;break;}}
+  if(status)status.textContent='Image generation failed.';alert(`Bosompem could not generate an image. ${lastError}`);
 }
 
 function parseReminderDate(value){
@@ -868,4 +863,3 @@ const DeviceBridge={
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
 
-     
