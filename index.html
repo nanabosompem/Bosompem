@@ -51,6 +51,7 @@
       <button class="menu-item" data-screen="media-lab" onclick="switchScreenFromDrawer('media-lab')"><i class="fa-solid fa-eye"></i><span>Vision Studio</span></button>
       <button class="menu-item" data-screen="memory-vault" onclick="switchScreenFromDrawer('memory-vault')"><i class="fa-solid fa-brain"></i><span>Memory</span></button>
       <button class="menu-item" data-screen="tasks" onclick="switchScreenFromDrawer('tasks')"><i class="fa-solid fa-bolt"></i><span>Tasks & Automations</span></button>
+      <button class="menu-item" data-screen="games" onclick="switchScreenFromDrawer('games')"><i class="fa-solid fa-dice"></i><span>Games Predictions</span></button>
       <button class="menu-item" data-screen="profile" onclick="switchScreenFromDrawer('profile')"><i class="fa-regular fa-user"></i><span>Profile</span></button>
       <button class="menu-item" data-screen="settings" onclick="switchScreenFromDrawer('settings')"><i class="fa-solid fa-sliders"></i><span>Settings</span></button>
     </nav>
@@ -107,6 +108,31 @@
     <section id="screen-media-lab" class="screen-view"><div class="screen-scroll-container"><div class="page-hero"><div class="eyebrow">MULTIMODAL</div><h2>Vision Studio</h2><p>Show Bosompem what you're seeing and ask what to do next.</p></div><div class="lab-card"><h3><i class="fa-solid fa-eye"></i> Image workspace</h3><p>Choose an image from your device.</p><div class="drop-zone" onclick="document.getElementById('lab-file-input').click()"><i class="fa-solid fa-arrow-up-from-bracket"></i><strong>Select image</strong><small>PNG, JPG and other supported images</small><input type="file" id="lab-file-input" accept="image/*" hidden onchange="handleImageUpload(event)"></div><div id="image-preview-box" class="image-preview-box hidden"><img id="lab-image-preview" alt="Vision preview"></div></div><div class="lab-card"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Ask about it</h3><textarea id="media-prompt-input" class="glass-textarea" placeholder="What's happening here? What should I change?"></textarea><button class="primary-btn" onclick="processMediaLabTask()"><i class="fa-solid fa-bolt"></i> Ask Bosompem</button></div><div class="lab-card image-generation-card"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Image Generation Studio</h3><p>Create original images from detailed prompts. Availability depends on your Gemini API key and model access.</p><textarea id="image-generation-prompt" class="glass-textarea" rows="4" placeholder="Describe the image: subject, setting, art style, lighting, colors, camera angle and details…"></textarea><div class="image-generation-options"><span><i class="fa-solid fa-sparkles"></i> High-detail generation</span><span><i class="fa-solid fa-image"></i> Save generated image</span></div><button id="generate-image-btn" class="primary-btn" onclick="generateImage()"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate image</button><p id="image-generation-status" role="status" aria-live="polite">Ready to create.</p><div id="generated-image-result" class="generated-image-result"></div></div></div></section>
     <section id="screen-memory-vault" class="screen-view"><div class="screen-scroll-container"><div class="page-hero"><div class="eyebrow">PERSONAL CONTEXT</div><h2>Memory</h2><p>See and control the useful context Bosompem keeps locally.</p></div><div class="lab-card"><div class="memory-input-row"><input type="text" id="memory-add-input" class="glass-input" placeholder="Add something useful to remember"><button class="primary-btn-sm" onclick="addCustomMemory()"><i class="fa-solid fa-plus"></i></button></div></div><div id="memory-items-list" class="tasks-list"></div></div></section>
     <section id="screen-tasks" class="screen-view"><div class="screen-scroll-container"><div class="section-heading"><div><div class="eyebrow">AUTOMATION</div><h2>Tasks</h2><p>Reminders and future automation hooks.</p></div><button class="icon-action-btn" onclick="addReminder()"><i class="fa-solid fa-plus"></i></button></div><div class="tasks-header-card"><div class="task-stat"><span id="task-count">0</span><small>scheduled locally</small></div><div class="status-pill">READY</div></div><div id="full-reminders-list" class="tasks-list"></div></div></section>
+    <section id="screen-games" class="screen-view">
+      <div class="screen-scroll-container games-scroll">
+        <div class="page-hero"><div class="eyebrow">GAMES LAB</div><h2>Games Predictions</h2><p>Explore game history and probability without false promises. Random outcomes cannot be reliably predicted from past rounds.</p></div>
+        <div class="games-tabs" role="tablist" aria-label="Game tools">
+          <button class="games-tab active" type="button" data-game-tab="aviator" onclick="switchGamesTab('aviator')"><i class="fa-solid fa-chart-line"></i> Aviator Analyzer</button>
+          <button class="games-tab" type="button" data-game-tab="bottle" onclick="switchGamesTab('bottle')"><i class="fa-solid fa-bottle-water"></i> Spin the Bottle</button>
+        </div>
+        <div id="game-panel-aviator" class="game-panel active"><div class="lab-card game-card">
+          <div class="game-card-heading"><div><span class="eyebrow">HISTORICAL DATA</span><h3>Aviator round analyzer</h3></div><span class="game-icon"><i class="fa-solid fa-chart-simple"></i></span></div>
+          <p class="game-help">Enter multipliers you have already observed, such as <strong>1.12, 2.40, 1.01, 5.60</strong>. This summarizes history only; it does not predict the next round or identify a guaranteed win.</p>
+          <label class="game-label" for="aviator-multipliers">Past multipliers</label><textarea id="aviator-multipliers" class="glass-input game-textarea" rows="3" placeholder="1.12, 2.40, 1.01, 5.60, 1.85"></textarea>
+          <div class="game-actions"><button class="primary-btn" type="button" onclick="analyzeAviatorHistory()"><i class="fa-solid fa-chart-column"></i> Analyze history</button><button class="secondary-btn" type="button" onclick="clearAviatorHistory()">Clear</button></div>
+          <div id="aviator-analysis-result" class="game-results" aria-live="polite"><p class="game-empty">Your historical summary will appear here.</p></div>
+          <p class="game-disclaimer"><i class="fa-solid fa-shield-halved"></i> Gamble responsibly. Never stake money you cannot afford to lose.</p>
+        </div></div>
+        <div id="game-panel-bottle" class="game-panel"><div class="lab-card game-card">
+          <div class="game-card-heading"><div><span class="eyebrow">RANDOM PICKER</span><h3>Spin the Bottle</h3></div><span class="game-icon"><i class="fa-solid fa-bottle-water"></i></span></div>
+          <p class="game-help">Add at least two names or options, separated by commas or new lines. Bosompem will randomly select one.</p>
+          <label class="game-label" for="bottle-participants">Participants or options</label><textarea id="bottle-participants" class="glass-input game-textarea" rows="4" placeholder="Ama, Kojo, Esi, Kwame"></textarea>
+          <div class="game-actions"><button class="primary-btn" type="button" onclick="spinBottle()"><i class="fa-solid fa-rotate"></i> Spin</button><button class="secondary-btn" type="button" onclick="clearBottleHistory()">Clear history</button></div>
+          <div id="bottle-result" class="bottle-result" aria-live="polite"><span class="bottle-result-label">READY WHEN YOU ARE</span><strong id="bottle-picked-name">Who will it be?</strong></div>
+          <div class="game-history-heading"><h4>Recent spins</h4><button class="text-btn" type="button" onclick="clearBottleHistory()">Clear</button></div><ol id="bottle-history" class="bottle-history"><li class="game-empty">No spins yet.</li></ol>
+        </div></div>
+      </div>
+    </section>
     <section id="screen-profile" class="screen-view">
       <div class="screen-scroll-container profile-scroll">
         <div class="profile-hero-card">
@@ -158,3 +184,4 @@
                                                                                                                                                                                   
 
 
+  
