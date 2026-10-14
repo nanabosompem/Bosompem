@@ -297,8 +297,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderProjects();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
 });
-
-function updateClock(){
+   function updateClock(){
   const el=document.getElementById('status-time');
   if(el)el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
 }
@@ -354,18 +353,15 @@ function classifyRequest(text) {
   return { webResearch, complex };
 }
 
-
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
-  const selected = state.model || 'auto';
-
-  const model = selected === 'auto'
-    ? 'gemini-3.5-flash-lite'
-    : selected;
-
+  // Preserve the user's explicit Pro selection. Otherwise route simple requests to Flash
+  // and more demanding work to Pro, with a Flash retry if Pro is unavailable.
+  // Gemini 2.5 model IDs are retired for this project; use the current stable Flash model.
+  const selected = state.model || 'gemini-3.8-flash';
+  const model = 'gemini-3.8-flash';
   return { ...kind, model };
 }
-
 
 function addGroundingSources(reply, data) {
   const chunks = data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -601,14 +597,14 @@ function renderMessages(){
   const box=document.getElementById('chat-messages-container'),session=getActiveSession();if(!box||!session)return;
   box.innerHTML=session.messages.map((m,i)=>{
     const body=m.role==='assistant'?formatMarkdown(m.text):escapeHtml(m.text).replace(/\n/g,'<br>');
-    const actions=m.role==='assistant'?`<div class="bubble-actions">
+      const actions=m.role==='assistant'?`<div class="bubble-actions">
       <button class="btn-bubble-action" onclick="speakMessage(${i})"><i class="fa-solid fa-volume-high"></i> Speak</button>
       <button class="btn-bubble-action" onclick="copyMessage(${i})"><i class="fa-solid fa-copy"></i> Copy</button>
     </div>`:'';
     return `<div class="chat-bubble ${m.role}"><div class="bubble-content">${body}${actions}</div></div>`;
   }).join('');
   scrollToBottom();
-     }             
+}
 function speakMessage(i){const s=getActiveSession();if(s?.messages[i])speakText(s.messages[i].text);}
 async function copyMessage(i){const s=getActiveSession();if(!s?.messages[i])return;try{await navigator.clipboard.writeText(s.messages[i].text);alert('Copied.');}catch{alert('Copy is not available here.');}}
 function appendThinkingIndicator(){
@@ -641,51 +637,128 @@ function setVoiceState(newState){
   if(bar)bar.classList.toggle('hidden',newState!=='SPEAKING');
  if(status)status.textContent={IDLE:'Live Voice Ready',LISTENING:'Listening…',THINKING:'Thinking…',SPEAKING:'Speaking…'}[newState]||'Live Voice';
 }
+let liveSubmitTimer = null;
+let liveLastSubmittedText = '';
+let liveLastSubmittedAt = 0;
+let liveRestartTimer = null;
+
 function initVoiceEngines(){
   if(!SpeechRecognition)return;
+
   liveRecognition=new SpeechRecognition();
-  liveRecognition.continuous=true;liveRecognition.interimResults=true;liveRecognition.lang='en-US';
-  liveRecognition.onstart=()=>{if(state.isLiveVoiceActive&&state.voiceState!=='THINKING'&&state.voiceState!=='SPEAKING')setVoiceState('LISTENING');};
+  liveRecognition.continuous=true;
+  liveRecognition.interimResults=true;
+  liveRecognition.lang='en-US';
+
+  liveRecognition.onstart=()=>{
+    if(state.isLiveVoiceActive && state.voiceState!=='THINKING' && state.voiceState!=='SPEAKING'){
+      setVoiceState('LISTENING');
+    }
+  };
+
   liveRecognition.onresult=e=>{
     let interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
-      const piece=e.results[i][0]?.transcript||'';
-      if(e.results[i].isFinal)state.voiceFinalTranscript+=' '+piece;else interim+=' '+piece;
+      const result=e.results[i];
+      const piece=(result[0]?.transcript||'').trim();
+      if(!piece)continue;
+      if(result.isFinal){
+        // Only consume each finalized result once. The browser may resend result events.
+        const marker=`${i}:${piece}`;
+        if(!state._liveFinalResultMarkers)state._liveFinalResultMarkers=new Set();
+        if(!state._liveFinalResultMarkers.has(marker)){
+          state._liveFinalResultMarkers.add(marker);
+          state.voiceFinalTranscript=(state.voiceFinalTranscript+' '+piece).trim();
+        }
+      }else{
+        interim+=' '+piece;
+      }
     }
     const full=(state.voiceFinalTranscript+' '+interim).trim();
-    const card=document.getElementById('voice-live-transcript');if(card)card.textContent=full||'Listening…';
-    // Submit only after the browser finalizes speech; onend handles a final pause without duplicate sends.
-    if(e.results[e.results.length-1]?.isFinal)queueLiveVoiceSubmit(650);
+    const card=document.getElementById('voice-live-transcript');
+    if(card)card.textContent=full||'Listening…';
+    if(state.voiceFinalTranscript.trim())queueLiveVoiceSubmit(900);
   };
+
   liveRecognition.onerror=e=>{
     if(!state.isLiveVoiceActive)return;
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-      state.isLiveVoiceActive=false;setVoiceState('IDLE');const b=document.getElementById('live-voice-toggle-btn');if(b)b.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
-      alert('Microphone permission is blocked. Allow microphone access for this site, then try again.');return;
+      state.isLiveVoiceActive=false;
+      clearTimeout(liveSubmitTimer);
+      clearTimeout(liveRestartTimer);
+      setVoiceState('IDLE');
+      const b=document.getElementById('live-voice-toggle-btn');
+      if(b)b.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
+      alert('Microphone permission is blocked. Allow microphone access for this site, then try again.');
+      return;
     }
     if(e.error!=='no-speech'&&e.error!=='aborted')console.warn('Live speech recognition:',e.error);
   };
+
   liveRecognition.onend=()=>{
     if(!state.isLiveVoiceActive)return;
-    if(state.voiceState==='THINKING'||state.voiceState==='SPEAKING'||state.voiceRequestPending)return;
-    queueLiveVoiceSubmit(180);
-    setTimeout(()=>{if(state.isLiveVoiceActive&&!state.voiceRequestPending&&state.voiceState!=='THINKING'&&state.voiceState!=='SPEAKING')try{liveRecognition.start();}catch{}},250);
+    if(state.voiceState==='THINKING'||state.voiceState==='SPEAKING'||state.voiceRequestPending||state.isSending)return;
+    // Do not submit here: onresult is the single submission trigger.
+    clearTimeout(liveRestartTimer);
+    liveRestartTimer=setTimeout(()=>{
+      if(state.isLiveVoiceActive&&!state.voiceRequestPending&&!state.isSending&&state.voiceState!=='THINKING'&&state.voiceState!=='SPEAKING'){
+        try{liveRecognition.start();}catch{}
+      }
+    },350);
   };
+
   voiceNoteRecognition=new SpeechRecognition();
-  voiceNoteRecognition.continuous=true;voiceNoteRecognition.interimResults=true;voiceNoteRecognition.lang='en-US';
-  voiceNoteRecognition.onresult=e=>{let transcript='';for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';const input=document.getElementById('chat-input');if(input){input.value=transcript.trim();autoExpandTextarea(input);}};
+  voiceNoteRecognition.continuous=true;
+  voiceNoteRecognition.interimResults=true;
+  voiceNoteRecognition.lang='en-US';
+  voiceNoteRecognition.onresult=e=>{
+    let transcript='';
+    for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';
+    const input=document.getElementById('chat-input');
+    if(input){input.value=transcript.trim();autoExpandTextarea(input);}
+  };
   voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording)try{voiceNoteRecognition.start();}catch{}};
 }
-let liveSubmitTimer=null;
-function queueLiveVoiceSubmit(delay=450){
-  clearTimeout(liveSubmitTimer);liveSubmitTimer=setTimeout(async()=>{
-    const text=state.voiceFinalTranscript.trim();
+
+function queueLiveVoiceSubmit(delay=900){
+  clearTimeout(liveSubmitTimer);
+  liveSubmitTimer=setTimeout(async()=>{
+    const text=(state.voiceFinalTranscript||'').trim();
     if(!text||!state.isLiveVoiceActive||state.voiceRequestPending||state.isSending)return;
-    state.voiceFinalTranscript='';state.voiceRequestPending=true;
-    try{if(liveRecognition)try{liveRecognition.stop();}catch{};setVoiceState('THINKING');await sendChatMessage(text);}
-    finally{state.voiceRequestPending=false;if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING')setTimeout(()=>{try{liveRecognition.start();}catch{}},220);}
+
+    const now=Date.now();
+    if(text===liveLastSubmittedText&&now-liveLastSubmittedAt<7000){
+      state.voiceFinalTranscript='';
+      state._liveFinalResultMarkers=new Set();
+      return;
+    }
+
+    liveLastSubmittedText=text;
+    liveLastSubmittedAt=now;
+    state.voiceFinalTranscript='';
+    state._liveFinalResultMarkers=new Set();
+    state.voiceRequestPending=true;
+    clearTimeout(liveRestartTimer);
+
+    try{
+      if(liveRecognition)try{liveRecognition.stop();}catch{}
+      setVoiceState('THINKING');
+      await sendChatMessage(text);
+    }finally{
+      state.voiceRequestPending=false;
+      // Recognition restarts from speech playback's onend, or here if playback did not start.
+      if(state.isLiveVoiceActive&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING'){
+        clearTimeout(liveRestartTimer);
+        liveRestartTimer=setTimeout(()=>{
+          if(state.isLiveVoiceActive&&!state.voiceRequestPending&&!state.isSending&&state.voiceState!=='SPEAKING'&&state.voiceState!=='THINKING'){
+            try{liveRecognition.start();}catch{}
+          }
+        },350);
+      }
+    }
   },delay);
 }
+
 function toggleLiveVoiceMode(){
   if(!SpeechRecognition)return alert('Live voice requires a browser with SpeechRecognition support. Try Chrome on Android.');
   state.isLiveVoiceActive=!state.isLiveVoiceActive;
@@ -693,11 +766,27 @@ function toggleLiveVoiceMode(){
   if(state.isLiveVoiceActive){
     if(!state.apiKey){state.isLiveVoiceActive=false;alert('Add your Gemini API key in System Settings before starting Live Voice.');openScreen('settings');return;}
     if(btn)btn.innerHTML='<i class="fa-solid fa-stop"></i><span>Stop Live Mode</span>';
-    state.voiceFinalTranscript='';stopSpeechPlayback();setVoiceState('LISTENING');
-    try{liveRecognition.start();}catch(e){state.isLiveVoiceActive=false;setVoiceState('IDLE');if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';alert('Could not start the microphone. Check browser microphone permission and try again.');}
+    clearTimeout(liveSubmitTimer);
+    clearTimeout(liveRestartTimer);
+    state.voiceFinalTranscript='';
+    state._liveFinalResultMarkers=new Set();
+    stopSpeechPlayback();
+    setVoiceState('LISTENING');
+    try{liveRecognition.start();}catch(e){
+      state.isLiveVoiceActive=false;
+      setVoiceState('IDLE');
+      if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
+      alert('Could not start the microphone. Check browser microphone permission and try again.');
+    }
   }else{
     if(btn)btn.innerHTML='<i class="fa-solid fa-microphone"></i><span>Start Live Mode</span>';
-    clearTimeout(liveSubmitTimer);state.voiceFinalTranscript='';try{liveRecognition.stop();}catch{};stopSpeechPlayback();setVoiceState('IDLE');
+    clearTimeout(liveSubmitTimer);
+    clearTimeout(liveRestartTimer);
+    state.voiceFinalTranscript='';
+    state._liveFinalResultMarkers=new Set();
+    try{liveRecognition.stop();}catch{}
+    stopSpeechPlayback();
+    setVoiceState('IDLE');
   }
 }
 
@@ -773,7 +862,7 @@ async function generateImage(){
   if(!prompt){alert('Describe the image you want to create first.');return;}
   if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
-  // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
+   // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
   const candidates=['gemini-2.5-flash-image','gemini-2.0-flash-preview-image-generation'];let lastError='No supported image model was available.';
   for(const model of candidates){try{
     const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Generate an image based on this prompt. Return an image, not just a description: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
@@ -866,3 +955,4 @@ const DeviceBridge={
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
 
+   
