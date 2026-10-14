@@ -312,7 +312,7 @@ function openScreen(screenId){
   state.activeScreen=screenId;
   document.querySelectorAll('.screen-view').forEach(x=>x.classList.toggle('active',x.id===`screen-${screenId}`));
   document.querySelectorAll('.nav-tab,.menu-item').forEach(x=>x.classList.toggle('active',x.dataset.screen===screenId));
-  const titles={chat:'Chat Studio','live-voice':'Live Voice',projects:'Projects','media-lab':'Media & Vision','memory-vault':'Memory Vault',tasks:'Tasks & Reminders',profile:'User Profile',settings:'System Settings'};
+  const titles={chat:'Chat Studio','live-voice':'Live Voice',projects:'Projects','media-lab':'Media & Vision','memory-vault':'Memory Vault',tasks:'Tasks & Reminders',games:'Games Predictions',profile:'User Profile',settings:'System Settings'};
   const title=document.getElementById('active-screen-title'); if(title)title.textContent=titles[screenId]||'Bosompem AI';
         if(screenId==='memory-vault')renderMemoryList();
   if(screenId==='projects')renderProjects();
@@ -598,7 +598,6 @@ function stopGeneration(){
   stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
   const btn=document.getElementById('send-btn');if(btn)btn.disabled=false;
 }
-
 function handleChatImageUpload(e){
   const file=e.target.files?.[0];if(!file)return;
   const reader=new FileReader();
@@ -892,7 +891,6 @@ async function generateImage(){
   }catch(err){lastError=err.message||String(err);if(/quota|billing|permission|not found|not supported|not available|model/i.test(lastError))continue;break;}}
   if(status)status.textContent='Image generation failed.';alert(`Bosompem could not generate an image. ${lastError}`);
 }
-
 function parseReminderDate(value){
   const now=new Date();const normalized=value.toLowerCase().trim();
   let m=normalized.match(/^(today|tomorrow)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
@@ -974,3 +972,63 @@ window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,clas
 
 
    
+
+// Games Predictions tools: local-only history and honest statistical summaries.
+const GAMES_STORAGE = { aviator:'bosompem_games_aviator_history_v1', bottle:'bosompem_games_bottle_history_v1' };
+function switchGamesTab(tab) {
+  document.querySelectorAll('[data-game-tab]').forEach(button => {
+    const active = button.dataset.gameTab === tab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('.game-panel').forEach(panel => panel.classList.toggle('active', panel.id === `game-panel-${tab}`));
+}
+function readLocalGameHistory(key) {
+  try { const value=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(value)?value:[]; }
+  catch (_) { return []; }
+}
+function saveLocalGameHistory(key, history) {
+  try { localStorage.setItem(key,JSON.stringify(history)); }
+  catch (error) { console.warn('Bosompem could not save game history locally.',error); }
+}
+function escapeGameText(value) {
+  return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+function analyzeAviatorHistory() {
+  const input=document.getElementById('aviator-multipliers'), result=document.getElementById('aviator-analysis-result');
+  if(!input||!result)return;
+  const raw=input.value.trim(), values=raw.split(/[\s,;]+/).filter(Boolean).map(v=>Number(v.replace(/x$/i,'')));
+  if(!raw||!values.length||values.some(v=>!Number.isFinite(v)||v<1)) { result.innerHTML='<p class="game-error">Enter valid multipliers of 1.00 or higher, separated by commas or spaces.</p>'; return; }
+  if(values.length>500) { result.innerHTML='<p class="game-error">Please analyze up to 500 multipliers at a time.</p>'; return; }
+  const sorted=[...values].sort((a,b)=>a-b), mean=values.reduce((s,v)=>s+v,0)/values.length;
+  const median=sorted.length%2?sorted[(sorted.length-1)/2]:(sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+  const pct=t=>100*values.filter(v=>v>=t).length/values.length;
+  const record={at:new Date().toISOString(),count:values.length,values:values.slice(-100)};
+  const history=readLocalGameHistory(GAMES_STORAGE.aviator); history.unshift(record); saveLocalGameHistory(GAMES_STORAGE.aviator,history.slice(0,20));
+  result.innerHTML=`<div class="game-stat-grid"><div class="game-stat"><span>Rounds entered</span><strong>${values.length}</strong></div><div class="game-stat"><span>Median</span><strong>${median.toFixed(2)}x</strong></div><div class="game-stat"><span>Average</span><strong>${mean.toFixed(2)}x</strong></div><div class="game-stat"><span>Below 1.50x</span><strong>${pct(1.5).toFixed(1)}%</strong></div><div class="game-stat"><span>2.00x or higher</span><strong>${pct(2).toFixed(1)}%</strong></div><div class="game-stat"><span>5.00x or higher</span><strong>${pct(5).toFixed(1)}%</strong></div></div><p class="game-note">These figures describe only the ${values.length} rounds entered. They do not reveal the next result; a recent pattern is not a dependable prediction.</p>`;
+}
+function clearAviatorHistory() {
+  const input=document.getElementById('aviator-multipliers'),result=document.getElementById('aviator-analysis-result');
+  if(input)input.value=''; if(result)result.innerHTML='<p class="game-empty">Input cleared. Saved analysis summaries remain in local storage.</p>';
+}
+function spinBottle() {
+  const input=document.getElementById('bottle-participants'),picked=document.getElementById('bottle-picked-name'),result=document.getElementById('bottle-result');
+  if(!input||!picked||!result)return;
+  const options=input.value.split(/[ ,;\n]+/).map(n=>n.trim()).filter(Boolean);
+  if(options.length<2){picked.textContent='Add at least two names';result.classList.add('error');return;}
+  const choice=options[Math.floor(Math.random()*options.length)]; picked.textContent=choice; result.classList.remove('error');
+  const history=readLocalGameHistory(GAMES_STORAGE.bottle);history.unshift({name:choice,at:new Date().toISOString()});saveLocalGameHistory(GAMES_STORAGE.bottle,history.slice(0,30));renderBottleHistory();
+}
+function renderBottleHistory() {
+  const list=document.getElementById('bottle-history');if(!list)return;
+  const history=readLocalGameHistory(GAMES_STORAGE.bottle);
+  if(!history.length){list.innerHTML='<li class="game-empty">No spins yet.</li>';return;}
+  list.innerHTML=history.slice(0,10).map(item=>{const d=new Date(item.at),when=Number.isNaN(d.getTime())?'':d.toLocaleString();return `<li><span>${escapeGameText(item.name)}</span><small>${escapeGameText(when)}</small></li>`;}).join('');
+}
+function clearBottleHistory() {
+  saveLocalGameHistory(GAMES_STORAGE.bottle,[]);renderBottleHistory();
+  const result=document.getElementById('bottle-result'),picked=document.getElementById('bottle-picked-name');
+  if(picked)picked.textContent='Who will it be?';if(result)result.classList.remove('error');
+}
+document.addEventListener('DOMContentLoaded',renderBottleHistory);
+     
