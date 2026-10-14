@@ -549,12 +549,25 @@ function webSearchFallback(){
   window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`,'_blank','noopener');
 }
 
-function toggleAttachmentMenu(){
-  const menu=document.getElementById('attachment-menu'),btn=document.getElementById('plus-btn');
-  if(!menu)return;
-  const opening=menu.classList.contains('hidden');
-  menu.classList.toggle('hidden',!opening);menu.setAttribute('aria-hidden',String(!opening));
-  btn?.setAttribute('aria-expanded',String(opening));
+
+function toggleAttachmentMenu() {
+  const menu = document.getElementById('attachment-menu');
+  const btn = document.getElementById('plus-btn');
+
+  if (!menu) {
+    console.error('Bosompem: attachment-menu was not found.');
+    return;
+  }
+
+  const opening = !menu.classList.contains('open');
+
+  menu.classList.toggle('open', opening);
+  menu.classList.toggle('hidden', !opening);
+  menu.setAttribute('aria-hidden', String(!opening));
+
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(opening));
+  }
 }
 function triggerChatImage(mode='gallery'){
   const input=document.getElementById('chat-image-input');if(!input)return;
