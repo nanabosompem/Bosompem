@@ -354,16 +354,18 @@ function classifyRequest(text) {
   return { webResearch, complex };
 }
 
+
 function chooseModelForRequest(text) {
   const kind = classifyRequest(text);
   const selected = state.model || 'auto';
 
   const model = selected === 'auto'
-    ? 'gemini-3.1-flash-lite'
+    ? 'gemini-3.5-flash-lite'
     : selected;
 
-  return { ...kind, model };  
+  return { ...kind, model };
 }
+
 
 function addGroundingSources(reply, data) {
   const chunks = data?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
