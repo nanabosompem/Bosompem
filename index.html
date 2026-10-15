@@ -114,6 +114,7 @@
         <div class="games-tabs" role="tablist" aria-label="Game tools">
           <button class="games-tab active" type="button" data-game-tab="aviator" onclick="switchGamesTab('aviator')"><i class="fa-solid fa-chart-line"></i> Aviator Analyzer</button>
           <button class="games-tab" type="button" data-game-tab="bottle" onclick="switchGamesTab('bottle')"><i class="fa-solid fa-bottle-water"></i> Spin the Bottle</button>
+          <button class="games-tab" type="button" data-game-tab="sportybet" onclick="switchGamesTab('sportybet')"><i class="fa-solid fa-bullseye"></i> SportyBet UP/DOWN</button>
         </div>
         <div id="game-panel-aviator" class="game-panel active"><div class="lab-card game-card">
           <div class="game-card-heading"><div><span class="eyebrow">HISTORICAL DATA</span><h3>Aviator round analyzer</h3></div><span class="game-icon"><i class="fa-solid fa-chart-simple"></i></span></div>
@@ -122,6 +123,22 @@
           <div class="game-actions"><button class="primary-btn" type="button" onclick="analyzeAviatorHistory()"><i class="fa-solid fa-chart-column"></i> Analyze history</button><button class="secondary-btn" type="button" onclick="clearAviatorHistory()">Clear</button></div>
           <div id="aviator-analysis-result" class="game-results" aria-live="polite"><p class="game-empty">Your historical summary will appear here.</p></div>
           <p class="game-disclaimer"><i class="fa-solid fa-shield-halved"></i> Gamble responsibly. Never stake money you cannot afford to lose.</p>
+        </div></div>
+             <div id="game-panel-sportybet" class="game-panel"><div class="lab-card game-card">
+          <div class="game-card-heading"><div><span class="eyebrow">SPORTYBET • RESULT TRACKER</span><h3>Spin da’ Bottle: UP / DOWN</h3></div><span class="game-icon"><i class="fa-solid fa-bullseye"></i></span></div>
+          <p class="game-help">Record results from the actual SportyBet game. Make and save a prediction before entering its result. This tracker tests whether a strategy works on new rounds; it cannot know future random outcomes.</p>
+          <div class="game-stat-grid" id="sportybet-stats"><div class="game-stat"><span>Settled predictions</span><strong>0</strong></div><div class="game-stat"><span>Hit rate</span><strong>—</strong></div><div class="game-stat"><span>Net units</span><strong>0.00</strong></div></div>
+          <h4 class="game-subheading">Step 1 · Save a prediction</h4>
+          <label class="game-label" for="sportybet-prediction">Your prediction</label><select id="sportybet-prediction" class="glass-select game-select"><option value="UP">UP</option><option value="DOWN">DOWN</option></select>
+          <label class="game-label" for="sportybet-stake">Test stake (units)</label><input id="sportybet-stake" class="glass-input game-input" type="number" min="0.01" step="0.01" value="1" inputmode="decimal">
+          <button class="primary-btn" type="button" onclick="createSportyBetPrediction()"><i class="fa-solid fa-floppy-disk"></i> Save prediction before result</button>
+          <div id="sportybet-pending-box" class="sportybet-pending" aria-live="polite"><p class="game-empty">No prediction waiting for a result.</p></div>
+          <h4 class="game-subheading">Step 2 · Record the actual outcome</h4>
+          <label class="game-label" for="sportybet-outcome">Actual result</label><select id="sportybet-outcome" class="glass-select game-select"><option value="UP">UP</option><option value="DOWN">DOWN</option><option value="MIDDLE">MIDDLE (losing result)</option></select>
+          <div class="game-actions"><button class="primary-btn" type="button" onclick="settleSportyBetPrediction()"><i class="fa-solid fa-check"></i> Settle saved prediction</button><button class="secondary-btn" type="button" onclick="recordSportyBetResultOnly()">Record result only</button></div>
+          <div id="sportybet-message" class="game-results" aria-live="polite"><p class="game-empty">Your tracked results will appear here.</p></div>
+          <div class="game-history-heading"><h4>Recent rounds</h4><button class="text-btn" type="button" onclick="clearSportyBetHistory()">Clear history</button></div><ol id="sportybet-history" class="bottle-history"><li class="game-empty">No rounds recorded yet.</li></ol>
+          <p class="game-disclaimer"><i class="fa-solid fa-shield-halved"></i> The hit rate excludes middle results from prediction accuracy but includes them as losses in net units. For this tracker, a winning UP/DOWN result returns 2× the stake (net +1 unit per unit staked); a wrong side or MIDDLE is recorded as a loss. Confirm the current game's payout rules before relying on this calculation. Past results do not guarantee future outcomes.</p>
         </div></div>
         <div id="game-panel-bottle" class="game-panel"><div class="lab-card game-card">
           <div class="game-card-heading"><div><span class="eyebrow">RANDOM PICKER</span><h3>Spin the Bottle</h3></div><span class="game-icon"><i class="fa-solid fa-bottle-water"></i></span></div>
