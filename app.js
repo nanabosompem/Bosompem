@@ -597,7 +597,8 @@ function stopGeneration(){
   // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
   stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
   const btn=document.getElementById('send-btn');if(btn)btn.disabled=false;
-   }
+       }
+
 function handleChatImageUpload(e){
   const file=e.target.files?.[0];if(!file)return;
   const reader=new FileReader();
@@ -896,8 +897,8 @@ function parseReminderDate(value){
   const now=new Date();const normalized=value.toLowerCase().trim();
   let m=normalized.match(/^(today|tomorrow)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
   if(m){let hour=Number(m[2]),minute=Number(m[3]||0);if(m[4]==='pm'&&hour<12)hour+=12;if(m[4]==='am'&&hour===12)hour=0;if(hour>23||minute>59)return null;const d=new Date(now);if(m[1]==='tomorrow')d.setDate(d.getDate()+1);d.setHours(hour,minute,0,0);return d;}
- const parsed=Date.parse(value);return Number.isFinite(parsed)?new Date(parsed):null;
-}
+  const parsed=Date.parse(value);return Number.isFinite(parsed)?new Date(parsed):null;
+  }
 function addReminder(){
   const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
   const when=prompt('When? Example: tomorrow 09:00 or 2026-10-10 18:30');if(!when?.trim())return;
@@ -975,7 +976,7 @@ window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,clas
    
 
 // Games Predictions tools: local-only history and honest statistical summaries.
-const GAMES_STORAGE = { aviator:'bosompem_games_aviator_history_v1', bottle:'bosompem_games_bottle_history_v1', sportybet:'bosompem_sportybet_updown_v1' };
+const GAMES_STORAGE = { aviator:'bosompem_games_aviator_history_v1', bottle:'bosompem_games_bottle_history_v1' };
 function switchGamesTab(tab) {
   document.querySelectorAll('[data-game-tab]').forEach(button => {
     const active = button.dataset.gameTab === tab;
@@ -983,7 +984,6 @@ function switchGamesTab(tab) {
     button.setAttribute('aria-selected', String(active));
   });
   document.querySelectorAll('.game-panel').forEach(panel => panel.classList.toggle('active', panel.id === `game-panel-${tab}`));
-  if(tab==='sportybet')renderSportyBetTracker();
 }
 function readLocalGameHistory(key) {
   try { const value=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(value)?value:[]; }
@@ -1032,63 +1032,90 @@ function clearBottleHistory() {
   const result=document.getElementById('bottle-result'),picked=document.getElementById('bottle-picked-name');
   if(picked)picked.textContent='Who will it be?';if(result)result.classList.remove('error');
 }
-function getSportyBetData() {
-  const data=readLocalGameHistory(GAMES_STORAGE.sportybet);
-  return data.filter(x=>x&&typeof x==='object'&&['UP','DOWN','MIDDLE','PENDING'].includes(x.outcome||'PENDING'));
+document.addEventListener('DOMContentLoaded',renderBottleHistory);
+
+
+/* SportyBet Spin Da' Bottle: local prediction-only evaluation engine.
+   Seed entries are the 30 outcomes previously supplied by the user.
+   No SportyBet API connection and no betting/stake recommendations. */
+const SPORTYBET_KEY='bosompem_sportybet_prediction_lab_v1';
+const SPORTYBET_SEED=[{"roundId":"596513","timestamp":"2026-10-14T23:40:08","outcome":"UP"},{"roundId":"321736","timestamp":"2026-10-15T22:45:55","outcome":"DOWN"},{"roundId":"761990","timestamp":"2026-10-15T22:46:07","outcome":"UP"},{"roundId":"640614","timestamp":"2026-10-15T22:46:15","outcome":"UP"},{"roundId":"458891","timestamp":"2026-10-15T22:46:23","outcome":"UP"},{"roundId":"388453","timestamp":"2026-10-15T22:46:49","outcome":"UP"},{"roundId":"545146","timestamp":"2026-10-15T22:47:00","outcome":"UP"},{"roundId":"296802","timestamp":"2026-10-15T23:05:06","outcome":"UP","tradeNo":"261015230506trd91762488"},{"roundId":"940249","timestamp":"2026-10-15T23:05:11","outcome":"UP","tradeNo":"261015230511trd91769378"},{"roundId":"344906","timestamp":"2026-10-15T23:05:23","outcome":"UP","tradeNo":"261015230523trd91790014"},{"roundId":"722554","timestamp":"2026-10-15T23:05:32","outcome":"UP","tradeNo":"261015230532trd91807066"},{"roundId":"684148","timestamp":"2026-10-15T23:05:38","outcome":"UP","tradeNo":"261015230538trd91814846"},{"roundId":"670784","timestamp":"2026-10-15T23:06:01","outcome":"DOWN","tradeNo":"261015230601trd91851779"},{"roundId":"814077","timestamp":"2026-10-15T23:06:13","outcome":"DOWN","tradeNo":"261015230613trd91869278"},{"roundId":"879566","timestamp":"2026-10-15T23:06:24","outcome":"UP","tradeNo":"261015230624trd91886080"},{"roundId":"677528","timestamp":"2026-10-15T23:07:46","outcome":"DOWN","tradeNo":"261015230746trd92005973"},{"roundId":"589341","timestamp":"2026-10-15T23:08:00","outcome":"DOWN","tradeNo":"261015230800trd92028568"},{"roundId":"994964","timestamp":"2026-10-15T23:08:09","outcome":"DOWN","tradeNo":"261015230809trd92040530"},{"roundId":"968876","timestamp":"2026-10-15T23:08:39","outcome":"UP","tradeNo":"261015230839trd92087887"},{"roundId":"161150","timestamp":"2026-10-15T23:08:46","outcome":"DOWN","tradeNo":"261015230846trd92102290"},{"roundId":"ID656438","timestamp":"2026-10-15T23:09:00","outcome":"UP","tradeNo":"261015230900trd92122666"},{"roundId":"446139","timestamp":"2026-10-15T23:09:16","outcome":"DOWN","tradeNo":"261015230916trd92146722"},{"roundId":"672439","timestamp":"2026-10-15T23:09:26","outcome":"UP","tradeNo":"261015230926trd92160619"},{"roundId":"331761","timestamp":"2026-10-15T23:09:49","outcome":"MIDDLE","tradeNo":"261015230949trd92195927"},{"roundId":"611875","timestamp":"2026-10-15T23:10:01","outcome":"MIDDLE","tradeNo":"261015231001trd92212961"},{"roundId":"558860","timestamp":"2026-10-15T23:11:25","outcome":"DOWN","tradeNo":"261015231125trd92321833"},{"roundId":"670914","timestamp":"2026-10-15T23:11:33","outcome":"UP","tradeNo":"261015231133trd92337768"},{"roundId":"158571","timestamp":"2026-10-15T23:11:44","outcome":"DOWN","tradeNo":"261015231144trd92355959"},{"roundId":"118495","timestamp":"2026-10-15T23:11:57","outcome":"DOWN","tradeNo":"261015231157trd92374301"},{"roundId":"234844","timestamp":"2026-10-15T23:12:03","outcome":"UP","tradeNo":"261015231203trd92382305"}];
+function readSportyBetData(){
+  try{
+    const d=JSON.parse(localStorage.getItem(SPORTYBET_KEY)||'null');
+    if(d&&Array.isArray(d.records)&&Array.isArray(d.predictions))return d;
+  }catch(_){}
+  return {records:SPORTYBET_SEED.map(x=>({...x,source:'provided-history'})),predictions:[],pendingPredictionId:null};
 }
-function saveSportyBetData(data) { saveLocalGameHistory(GAMES_STORAGE.sportybet,data.slice(0,500)); }
-function formatSportyBetTimestamp(value) {
-  if (!value) return 'Not recorded';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Invalid timestamp';
-  // Show device-local time plus the exact ISO-8601 timestamp for auditability.
-  return `${date.toLocaleString()} (ISO: ${date.toISOString()})`;
+let sportyBetData=readSportyBetData();
+function saveSportyBetData(){try{localStorage.setItem(SPORTYBET_KEY,JSON.stringify(sportyBetData));}catch(e){console.warn('Could not save SportyBet data',e);}}
+function sportyBetCounts(records=sportyBetData.records){
+  const counts={UP:0,DOWN:0,MIDDLE:0};records.forEach(r=>{if(counts[r.outcome]!==undefined)counts[r.outcome]++;});return counts;
 }
-function createSportyBetPrediction() {
-  const side=document.getElementById('sportybet-prediction')?.value;
-  const stake=Number(document.getElementById('sportybet-stake')?.value);
-  const message=document.getElementById('sportybet-message');
-  if(!['UP','DOWN'].includes(side)||!Number.isFinite(stake)||stake<=0){if(message)message.innerHTML='<p class="game-error">Choose UP or DOWN and enter a stake greater than zero.</p>';return;}
-  const data=getSportyBetData();
-  if(data.some(x=>x.outcome==='PENDING')){if(message)message.innerHTML='<p class="game-error">Settle the pending prediction before creating another one.</p>';renderSportyBetTracker();return;}
-  const recordedAt = new Date().toISOString();
-  data.unshift({id:'sb_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),prediction:side,stake:Number(stake.toFixed(2)),outcome:'PENDING',predictedAt:recordedAt,settledAt:null,netUnits:null});
-  saveSportyBetData(data);renderSportyBetTracker();if(message)message.innerHTML='<p class="game-note">Prediction saved with a timestamp. Now enter the actual result; do not change the prediction after seeing it.</p>';
+function sportyBetModel(records){
+  const c=sportyBetCounts(records),n=records.length;
+  // Laplace smoothing across three outcomes; descriptive only, not calibrated odds.
+  const probs={UP:(c.UP+1)/(n+3),DOWN:(c.DOWN+1)/(n+3),MIDDLE:(c.MIDDLE+1)/(n+3)};
+  const choice=probs.UP>=probs.DOWN?'UP':'DOWN';
+  const gap=Math.abs(probs.UP-probs.DOWN);
+  return {counts:c,probs,choice,confidenceLabel:n<30?'Very limited data':gap<0.12?'Low confidence':'Exploratory only'};
 }
-function settleSportyBetPrediction() {
-  const outcome=document.getElementById('sportybet-outcome')?.value;
-  const data=getSportyBetData(),pending=data.find(x=>x.outcome==='PENDING');
-  const message=document.getElementById('sportybet-message');
-  if(!pending){if(message)message.innerHTML='<p class="game-error">There is no saved prediction waiting to be settled.</p>';return;}
+function renderSportyBetLab(){
+  const summary=document.getElementById('sportybet-summary'),history=document.getElementById('sportybet-history'),pending=document.getElementById('sportybet-pending'),evaluation=document.getElementById('sportybet-evaluation');
+  if(!summary||!history)return;
+  const m=sportyBetModel(sportyBetData.records),n=sportyBetData.records.length,c=m.counts;
+  summary.innerHTML=`<div class="game-stat-grid"><div class="game-stat"><span>Recorded rounds</span><strong>${n}</strong></div><div class="game-stat"><span>UP</span><strong>${c.UP} (${n?(100*c.UP/n).toFixed(1):'0.0'}%)</strong></div><div class="game-stat"><span>DOWN</span><strong>${c.DOWN} (${n?(100*c.DOWN/n).toFixed(1):'0.0'}%)</strong></div><div class="game-stat"><span>MIDDLE</span><strong>${c.MIDDLE} (${n?(100*c.MIDDLE/n).toFixed(1):'0.0'}%)</strong></div></div><p class="game-note">Smoothed historical preference: <strong>${m.choice}</strong>. ${m.confidenceLabel}. These are sample frequencies, not reliable probabilities for the next round.</p>`;
+  const pendingPrediction=sportyBetData.predictions.find(p=>p.id===sportyBetData.pendingPredictionId&&!p.actualOutcome);
+  pending.innerHTML=pendingPrediction?`<p class="game-note">Open prediction saved at ${escapeGameText(new Date(pendingPrediction.createdAt).toLocaleString())}: <strong>${pendingPrediction.predicted}</strong>. After you can view a new result for free, select its actual outcome above and save it to evaluate this prediction.</p>`:'<p class="game-empty">No open prediction. Creating one only records a test; it does not place a bet.</p>';
+  const recent=sportyBetData.records.slice(-10).reverse();
+  history.innerHTML=recent.length?recent.map(r=>`<li class="sportybet-history-item"><span>${escapeGameText(r.roundId||'Round ID not supplied')}<small>${escapeGameText(r.timestamp||'Timestamp not supplied')}</small></span><strong class="sportybet-outcome-${r.outcome.toLowerCase()}">${r.outcome}</strong></li>`).join(''):'<li class="game-empty">No history.</li>';
+  const settled=sportyBetData.predictions.filter(p=>p.actualOutcome);
+  const correct=settled.filter(p=>p.predicted===p.actualOutcome).length;
+  const wrong=settled.length-correct; // Includes MIDDLE as failed UP/DOWN call.
+  const baselineCorrect=settled.filter(p=>p.actualOutcome==='UP').length;
+  evaluation.innerHTML=`<div class="game-stat-grid"><div class="game-stat"><span>Evaluated predictions</span><strong>${settled.length}</strong></div><div class="game-stat"><span>Correct</span><strong>${correct}</strong></div><div class="game-stat"><span>Incorrect (incl. MIDDLE)</span><strong>${wrong}</strong></div><div class="game-stat"><span>Prediction accuracy</span><strong>${settled.length?(100*correct/settled.length).toFixed(1)+'%':'—'}</strong></div><div class="game-stat"><span>Always-UP baseline</span><strong>${settled.length?(100*baselineCorrect/settled.length).toFixed(1)+'%':'—'}</strong></div></div><p class="game-note">A meaningful comparison requires predictions saved before outcomes and enough unseen rounds. These metrics are descriptive only.</p>`;
+}
+function makeSportyBetPrediction(){
+  if(sportyBetData.pendingPredictionId && sportyBetData.predictions.some(p=>p.id===sportyBetData.pendingPredictionId&&!p.actualOutcome)){alert('You already have an open prediction. Record its observed outcome first, or keep it open until a result is available.');return;}
+  const m=sportyBetModel(sportyBetData.records);
+  const p={id:'sbpred_'+Date.now(),createdAt:new Date().toISOString(),predicted:m.choice,model:'smoothed-frequency-v1',actualOutcome:null,source:'prediction-only'};
+  sportyBetData.predictions.push(p);sportyBetData.pendingPredictionId=p.id;saveSportyBetData();renderSportyBetLab();
+  alert(`Prediction-only entry saved: ${p.predicted}. This is not a dependable forecast or a recommendation to bet.`);
+}
+function recordSportyBetResult(){
+  const outcome=document.getElementById('sportybet-result')?.value;
+  const roundId=(document.getElementById('sportybet-round-id')?.value||'').trim();
   if(!['UP','DOWN','MIDDLE'].includes(outcome))return;
-  pending.outcome=outcome;pending.settledAt=new Date().toISOString();
-  pending.correct=(outcome!=='MIDDLE'&&pending.prediction===outcome);
-  pending.netUnits=outcome==='MIDDLE'||pending.prediction!==outcome?-pending.stake:pending.stake;
-  saveSportyBetData(data);renderSportyBetTracker();
-  if(message)message.innerHTML=`<p class="game-note">Round recorded. ${pending.correct?'Prediction matched the outcome.':outcome==='MIDDLE'?'Middle result recorded as a loss.':'Prediction did not match the outcome.'} Net result: ${pending.netUnits>=0?'+':''}${pending.netUnits.toFixed(2)} units.</p>`;
+  const pending=sportyBetData.predictions.find(p=>p.id===sportyBetData.pendingPredictionId&&!p.actualOutcome);
+  const rec={roundId,timestamp:new Date().toISOString(),outcome,source:'manually-observed'};
+  sportyBetData.records.push(rec);
+  if(pending){pending.actualOutcome=outcome;pending.resultAt=new Date().toISOString();pending.roundId=roundId;sportyBetData.pendingPredictionId=null;}
+  const idInput=document.getElementById('sportybet-round-id');if(idInput)idInput.value='';
+  saveSportyBetData();renderSportyBetLab();
+  if(outcome==='MIDDLE')alert('MIDDLE recorded. It counts as an incorrect UP/DOWN prediction.');
 }
-function recordSportyBetResultOnly() {
-  const outcome=document.getElementById('sportybet-outcome')?.value;
-  if(!['UP','DOWN','MIDDLE'].includes(outcome))return;
-  const data=getSportyBetData();
-  if(data.some(x=>x.outcome==='PENDING')){const message=document.getElementById('sportybet-message');if(message)message.innerHTML='<p class="game-error">Settle the saved prediction first, or clear it only if it was created by mistake.</p>';return;}
-  const recordedAt = new Date().toISOString();
-  data.unshift({id:'sb_'+Date.now(),prediction:null,outcome,predictedAt:null,settledAt:recordedAt,correct:null,stake:0,netUnits:0,resultOnly:true});
-  saveSportyBetData(data);renderSportyBetTracker();
-  const message=document.getElementById('sportybet-message');if(message)message.innerHTML='<p class="game-note">Historical outcome recorded without a prediction. It is included in outcome counts but excluded from prediction accuracy and profit.</p>';
+function runSportyBetBacktest(){
+  const records=sportyBetData.records;
+if(records.length<10){alert('At least 10 records are needed for a very limited exploratory check.');return;}
+  // Walk-forward evaluation: predict each round using only earlier records.
+  let correct=0,baseline=0,checked=0;
+  for(let i=10;i<records.length;i++){
+    const train=records.slice(0,i),actual=records[i].outcome,model=sportyBetModel(train);
+    if(actual===model.choice)correct++;
+    if(actual==='UP')baseline++;
+    checked++;
+  }
+  const el=document.getElementById('sportybet-evaluation');if(!el)return;
+  const pct=checked?100*correct/checked:0,basePct=checked?100*baseline/checked:0;
+  el.innerHTML=`<div class="game-stat-grid"><div class="game-stat"><span>Walk-forward test rounds</span><strong>${checked}</strong></div><div class="game-stat"><span>Smoothed model accuracy</span><strong>${pct.toFixed(1)}%</strong></div><div class="game-stat"><span>Always-UP baseline</span><strong>${basePct.toFixed(1)}%</strong></div></div><p class="game-note">This exploratory backtest uses the old records, including gaps; it is not a future-performance estimate. MIDDLE is scored as incorrect for either UP or DOWN. Do not infer an edge from this small sample.</p>`;
 }
-function renderSportyBetTracker() {
-  const data=getSportyBetData(),settled=data.filter(x=>x.outcome!=='PENDING'&&!x.resultOnly&&x.prediction),pending=data.find(x=>x.outcome==='PENDING');
-  const decisive=settled.filter(x=>x.outcome!=='MIDDLE'),wins=decisive.filter(x=>x.correct).length,net=settled.reduce((sum,x)=>sum+(Number(x.netUnits)||0),0);
-  const counts={UP:data.filter(x=>x.outcome==='UP').length,DOWN:data.filter(x=>x.outcome==='DOWN').length,MIDDLE:data.filter(x=>x.outcome==='MIDDLE').length};
-  const stats=document.getElementById('sportybet-stats');if(stats)stats.innerHTML=`<div class="game-stat"><span>Settled predictions</span><strong>${settled.length}</strong></div><div class="game-stat"><span>Hit rate (not middle)</span><strong>${decisive.length?(100*wins/decisive.length).toFixed(1)+'%':'—'}</strong></div><div class="game-stat"><span>Net units (estimated)</span><strong>${net>=0?'+':''}${net.toFixed(2)}</strong></div>`;
-  const box=document.getElementById('sportybet-pending-box');if(box)box.innerHTML=pending?`<div class="pending-row"><span>Pending prediction</span><strong>${escapeGameText(pending.prediction)} · ${Number(pending.stake).toFixed(2)} units</strong><small>Saved: ${escapeGameText(formatSportyBetTimestamp(pending.predictedAt))}</small></div>`:'<p class="game-empty">No prediction waiting for a result.</p>';
-  const msg=document.getElementById('sportybet-message');if(msg&&msg.querySelector('.game-empty'))msg.innerHTML=`<div class="game-stat-grid"><div class="game-stat"><span>UP outcomes</span><strong>${counts.UP}</strong></div><div class="game-stat"><span>DOWN outcomes</span><strong>${counts.DOWN}</strong></div><div class="game-stat"><span>MIDDLE outcomes</span><strong>${counts.MIDDLE}</strong></div></div><p class="game-note">Accuracy uses only settled predictions with UP or DOWN outcomes. Middle results are excluded from hit rate but count as losses when a stake was recorded. Outcome counts alone do not predict the next round.</p>`;
-  const list=document.getElementById('sportybet-history');if(list){if(!data.length)list.innerHTML='<li class="game-empty">No rounds recorded yet.</li>';else list.innerHTML=data.slice(0,20).map(x=>{const label=x.outcome==='PENDING'?'PENDING':x.outcome;const pred=x.prediction?`Prediction: ${x.prediction}`:'No prediction';const predStamp=x.predictedAt?formatSportyBetTimestamp(x.predictedAt):null;const resultStamp=x.settledAt?formatSportyBetTimestamp(x.settledAt):null;return `<li><span>${escapeGameText(label)} <small>· ${escapeGameText(pred)}</small><small class="sportybet-timestamp">${predStamp?`Prediction saved: ${escapeGameText(predStamp)} · `:''}${resultStamp?`${x.resultOnly?'Result recorded':'Result entered'}: ${escapeGameText(resultStamp)}`:''}</small></span></li>`;}).join('');}
+function exportSportyBetData(){
+  const blob=new Blob([JSON.stringify(sportyBetData,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='bosompem-sportybet-lab.json';a.click();URL.revokeObjectURL(url);
 }
-function clearSportyBetHistory() {
-  if(!confirm('Delete all SportyBet tracker history stored on this device?'))return;
-  saveSportyBetData([]);renderSportyBetTracker();const msg=document.getElementById('sportybet-message');if(msg)msg.innerHTML='<p class="game-empty">History cleared on this device.</p>';
+function resetSportyBetToSeed(){
+  if(!confirm('Restore the original 30 supplied records and clear added records and predictions? Export first if you want to keep your data.'))return;
+  sportyBetData={records:SPORTYBET_SEED.map(x=>({...x,source:'provided-history'})),predictions:[],pendingPredictionId:null};saveSportyBetData();renderSportyBetLab();
 }
-document.addEventListener('DOMContentLoaded',()=>{renderBottleHistory();renderSportyBetTracker();});
-             
+document.addEventListener('DOMContentLoaded',renderSportyBetLab);
+
