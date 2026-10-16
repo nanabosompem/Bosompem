@@ -124,7 +124,7 @@ body{background:radial-gradient(ellipse at 20% 8%,rgba(84,139,255,.13),transpare
 .app-bottom-nav:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(105deg,rgba(255,190,225,.07),transparent 30%,rgba(128,223,255,.08) 68%,rgba(198,163,255,.08));}
 .nav-tab{position:relative;isolation:isolate;min-height:54px;padding:6px 0;border-radius:17px;color:rgba(229,237,250,.78);transition:transform .18s ease,color .18s ease,background .18s ease;}
 .nav-tab i{width:34px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:1.08rem;color:var(--lg-pearl)!important;background:linear-gradient(145deg,rgba(255,255,255,.23),rgba(172,204,255,.07) 55%,rgba(196,163,255,.13));border:1px solid rgba(255,255,255,.2);box-shadow:inset 0 1px rgba(255,255,255,.45),0 3px 12px rgba(81,152,255,.12);text-shadow:0 0 10px rgba(130,226,255,.25);}
-.nav-tab.active{color:#9beeff;background:linear-gradient(145deg,rgba(125,225,255,.12),rgba(183,151,25
+.nav-tab.active{color:#9beeff;background:linear-gradient(145deg,rgba(125,225,255,.12),rgba(183,151,255,.1));}
 .nav-tab.active i{color:#fff!important;border-color:rgba(159,237,255,.48);background:linear-gradient(140deg,rgba(137,228,255,.35),rgba(190,157,255,.3) 56%,rgba(255,194,224,.23));box-shadow:inset 0 1px rgba(255,255,255,.72),0 0 18px rgba(91,209,255,.19);}
 .nav-tab:active{transform:scale(.95)}
 .menu-item{border:1px solid transparent;transition:background .18s,border-color .18s;}
@@ -145,6 +145,7 @@ body{background:radial-gradient(ellipse at 20% 8%,rgba(84,139,255,.13),transpare
 .topbar-btn,.console-btn,.send-btn,.icon-action-btn,.drawer-close-btn,.stop-speech-btn{transition:transform .16s ease,box-shadow .16s ease;}
 .topbar-btn:active,.console-btn:active,.send-btn:active,.icon-action-btn:active{transform:scale(.94);}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;}}
+                                                         
 
 /* Games Predictions */
 .games-scroll{padding-bottom:32px}.games-tabs{display:flex;gap:10px;margin:8px 0 18px;flex-wrap:wrap}
@@ -167,19 +168,9 @@ body{background:radial-gradient(ellipse at 20% 8%,rgba(84,139,255,.13),transpare
 .bottle-history li span{font-weight:600;overflow-wrap:anywhere}.bottle-history li small{font-size:.75rem;color:var(--text-secondary,#aab2c5);text-align:right}
 @media(min-width:620px){.game-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
-/* SportyBet outcome recorder */
-.game-select,.game-input{width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1px solid rgba(226,241,255,.2);color:inherit;font:inherit;background:rgba(255,255,255,.045)}
-.game-select option{background:#171c2a;color:#fff}.game-subheading{margin:22px 0 6px;font-size:1rem}.sportybet-pending{margin-top:12px}.pending-row{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:14px;border:1px solid rgba(151,119,255,.28);background:rgba(143,109,255,.08)}.pending-row span,.pending-row small{color:var(--text-secondary,#aab2c5);font-size:.82rem}.pending-row strong{font-size:1.05rem}
-
-/* SportyBet audit timestamps: show the exact ISO time as well as local display time. */
-.sportybet-timestamp {
-  display: block;
-  margin-top: 5px;
-  overflow-wrap: anywhere;
-  line-height: 1.45;
-  opacity: 0.8;
-  font-size: 0.72rem;
-}
-
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+/* SportyBet prediction-only evaluation */
+#game-panel-sportybet .glass-input,#game-panel-sportybet .glass-select{margin-top:4px}
+.sportybet-history-item{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.sportybet-history-item span{font-weight:650}.sportybet-history-item small{display:block;color:var(--text-muted);font-size:.72rem;margin-top:4px}
+.sportybet-outcome-up{color:#38bdf8}.sportybet-outcome-down{color:#fb7185}.sportybet-outcome-middle{color:#fbbf24}
+                                                         
