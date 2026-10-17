@@ -317,6 +317,7 @@ function openScreen(screenId){
         if(screenId==='memory-vault')renderMemoryList();
   if(screenId==='projects')renderProjects();
   if(screenId==='tasks')renderReminders();
+  if(screenId==='device-control')refreshDeviceBridgeStatus();
 }
 function toggleNavDrawer(){
   const drawer = document.getElementById('nav-drawer');
@@ -597,7 +598,7 @@ function stopGeneration(){
   // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
   stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
   const btn=document.getElementById('send-btn');if(btn)btn.disabled=false;
-}
+     }
 function handleChatImageUpload(e){
   const file=e.target.files?.[0];if(!file)return;
   const reader=new FileReader();
@@ -897,7 +898,7 @@ function parseReminderDate(value){
   let m=normalized.match(/^(today|tomorrow)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
   if(m){let hour=Number(m[2]),minute=Number(m[3]||0);if(m[4]==='pm'&&hour<12)hour+=12;if(m[4]==='am'&&hour===12)hour=0;if(hour>23||minute>59)return null;const d=new Date(now);if(m[1]==='tomorrow')d.setDate(d.getDate()+1);d.setHours(hour,minute,0,0);return d;}
   const parsed=Date.parse(value);return Number.isFinite(parsed)?new Date(parsed):null;
-                               }
+   }
 function addReminder(){
   const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
   const when=prompt('When? Example: tomorrow 09:00 or 2026-10-10 18:30');if(!when?.trim())return;
@@ -969,6 +970,59 @@ const DeviceBridge={
   }
 };
 
+
+let bosompemWakeLock = null;
+function setDeviceActionStatus(message, ok=false){
+  const el=document.getElementById('device-action-status');
+  if(el){el.textContent=message;el.dataset.state=ok?'success':'info';}
+}
+function refreshDeviceBridgeStatus(){
+  const native=DeviceBridge.available();
+  const title=document.getElementById('device-bridge-title');
+  const description=document.getElementById('device-bridge-description');
+  const pill=document.getElementById('device-bridge-pill');
+  if(title)title.textContent=native?'Android bridge detected':'Browser controls ready';
+  if(description)description.textContent=native?'An Android bridge is available. Only actions explicitly implemented by the companion will run.':'This web version can use supported browser actions. System-level controls such as Wi-Fi, Bluetooth and flashlight need an Android integration.';
+  if(pill)pill.textContent=native?'NATIVE BRIDGE':'WEB MODE';
+}
+async function runDeviceAction(action){
+  const labels={vibrate:'Vibration',fullscreen:'Full screen', 'keep-awake':'Keep screen awake',share:'Share'};
+  if(DeviceBridge.available()){
+    const result=await DeviceBridge.execute(action);
+    if(result&&result.ok){setDeviceActionStatus(`${labels[action]||action} completed by the Android bridge.`,true);return;}
+    if(result&&result.reason&&result.reason!=='Native Android bridge not connected.'){
+      setDeviceActionStatus(`${labels[action]||action} was not completed: ${result.reason}`);return;
+    }
+  }
+  try{
+    if(action==='vibrate'){
+      if(!('vibrate' in navigator)){setDeviceActionStatus('Vibration is not supported by this browser.');return;}
+      const worked=navigator.vibrate([180,80,180]);
+      setDeviceActionStatus(worked===false?'The browser refused the vibration request.':'Vibration request sent. If the phone did not vibrate, check silent mode and browser support.',worked!==false);return;
+    }
+    if(action==='fullscreen'){
+      if(document.fullscreenElement){await document.exitFullscreen();setDeviceActionStatus('Exited full-screen mode.',true);}
+      else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();setDeviceActionStatus('Full-screen mode enabled.',true);}
+      else setDeviceActionStatus('Full-screen mode is not supported here.');
+      return;
+    }
+    if(action==='keep-awake'){
+      if(!('wakeLock' in navigator)){setDeviceActionStatus('Screen Wake Lock is not supported in this browser. Keep the page open and change screen timeout in Android settings if needed.');return;}
+      if(bosompemWakeLock){await bosompemWakeLock.release();bosompemWakeLock=null;setDeviceActionStatus('Keep-awake mode turned off.',true);}
+      else{bosompemWakeLock=await navigator.wakeLock.request('screen');bosompemWakeLock.addEventListener('release',()=>{bosompemWakeLock=null;});setDeviceActionStatus('Screen will stay awake while the browser permits it. Android may still release the lock when the page is hidden.',true);}
+      return;
+    }
+    if(action==='share'){
+      const data={title:'Bosompem AI',text:'My personal AI assistant — Bosompem.',url:location.href};
+      if(navigator.share){await navigator.share(data);setDeviceActionStatus('Share sheet opened.',true);}
+      else if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(location.href);setDeviceActionStatus('Share is unavailable; the Bosompem link was copied instead.',true);}
+      else setDeviceActionStatus('Sharing is not supported by this browser.');
+      return;
+    }
+    setDeviceActionStatus('That action is not available in browser mode.');
+  }catch(error){setDeviceActionStatus(`Action not completed: ${error.message||'browser permission was denied'}`);}
+}
+
 window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
 
 
@@ -1017,32 +1071,51 @@ function spinBottle() {
   if(!input||!picked||!result)return;
   const raw=input.value.toUpperCase().match(/\b(?:UP|DOWN|MIDDLE)\b/g)||[];
   const values=raw.filter(v=>v==='UP'||v==='DOWN'||v==='MIDDLE');
-  if(values.length<8){picked.textContent='Add at least 8 observed outcomes';result.classList.add('error');return;}
+  if(values.length<18){picked.textContent='Add at least 18 outcomes for a meaningful test';result.classList.add('error');return;}
   const classes=['UP','DOWN','MIDDLE'];
-  const counts={UP:0,DOWN:0,MIDDLE:0}; values.forEach(v=>counts[v]++);
-  const recent=values.slice(-10), recentCounts={UP:0,DOWN:0,MIDDLE:0};
-  recent.forEach((v,i)=>recentCounts[v]+=(i+1));
-  const last=values[values.length-1], transitions={UP:{UP:0,DOWN:0,MIDDLE:0},DOWN:{UP:0,DOWN:0,MIDDLE:0},MIDDLE:{UP:0,DOWN:0,MIDDLE:0}};
-  for(let i=1;i<values.length;i++) transitions[values[i-1]][values[i]]++;
-  const total=values.length, recentTotal=recent.reduce((s,_,i)=>s+i+1,0);
-  const scores={};
-  classes.forEach(v=>{
-    const overall=(counts[v]+1)/(total+3);
-    const recentScore=(recentCounts[v]+1)/(recentTotal+3);
-    const row=transitions[last], rowTotal=row.UP+row.DOWN+row.MIDDLE;
-    const transition=(row[v]+1)/(rowTotal+3);
-    scores[v]=0.30*overall+0.45*recentScore+0.25*transition;
-  });
-  const ranked=classes.slice().sort((a,b)=>scores[b]-scores[a]);
-  const winner=ranked[0], margin=scores[winner]-scores[ranked[1]];
-  const confidence=margin>=0.10?'Weak signal':margin>=0.045?'Very low confidence':'No clear edge';
-  const pct=n=>(scores[n]*100).toFixed(1)+'%';
-  picked.textContent=winner+' · '+confidence;
+  const predict=(train,method)=>{
+    const counts={UP:0,DOWN:0,MIDDLE:0}; train.forEach(v=>counts[v]++);
+    if(method==='frequency')return classes.slice().sort((a,b)=>counts[b]-counts[a])[0];
+    if(method==='recent'){
+      const recent=train.slice(-10), w={UP:0,DOWN:0,MIDDLE:0};
+      recent.forEach((v,i)=>w[v]+=i+1);
+      return classes.slice().sort((a,b)=>w[b]-w[a])[0];
+    }
+    if(method==='transition'){
+      const last=train[train.length-1], row={UP:0,DOWN:0,MIDDLE:0};
+      for(let i=1;i<train.length;i++)if(train[i-1]===last)row[train[i]]++;
+      return classes.slice().sort((a,b)=>row[b]-row[a])[0];
+    }
+    if(method==='inverse'){
+      const counts2={UP:0,DOWN:0,MIDDLE:0}; train.forEach(v=>counts2[v]++);
+      const base=classes.slice().sort((a,b)=>counts2[b]-counts2[a])[0];
+      return base==='UP'?'DOWN':base==='DOWN'?'UP':'UP';
+    }
+    return 'UP';
+  };
+  const methods=[['frequency','Overall frequency'],['recent','Recent 10 weighted'],['transition','Previous-outcome transition'],['inverse','Opposite-frequency test']];
+  const scores={}; methods.forEach(([id])=>scores[id]={hits:0,tests:0});
+  // Walk-forward: each test prediction uses only outcomes before that test round.
+  for(let i=12;i<values.length;i++){
+    const train=values.slice(0,i), actual=values[i];
+    methods.forEach(([id])=>{const guess=predict(train,id);scores[id].tests++;if(guess===actual)scores[id].hits++;});
+  }
+  const ranked=methods.map(([id,label])=>({id,label,hits:scores[id].hits,tests:scores[id].tests,rate:scores[id].hits/Math.max(1,scores[id].tests)})).sort((a,b)=>b.rate-a.rate);
+  const winner=ranked[0];
+  const nextGuess=predict(values,winner.id);
+  const baseline=ranked.find(m=>m.id==='frequency');
+  const enough=winner.tests>=20;
+  const margin=winner.rate-baseline.rate;
+  const edge=enough&&winner.id!=='frequency'&&margin>=0.05;
+  picked.textContent=edge?`${nextGuess} · TEST CANDIDATE: ${winner.label}`:`No reliable edge · candidate ${nextGuess}`;
   result.classList.remove('error');
+  const pct=x=>(x*100).toFixed(1)+'%';
+  const count={UP:0,DOWN:0,MIDDLE:0};values.forEach(v=>count[v]++);
   const extra=document.getElementById('bottle-analysis-detail');
-  const detail=`<div class="game-stat-grid"><div class="game-stat"><span>Outcomes analysed</span><strong>${total}</strong></div><div class="game-stat"><span>UP frequency</span><strong>${(counts.UP/total*100).toFixed(1)}%</strong></div><div class="game-stat"><span>DOWN frequency</span><strong>${(counts.DOWN/total*100).toFixed(1)}%</strong></div><div class="game-stat"><span>MIDDLE frequency</span><strong>${(counts.MIDDLE/total*100).toFixed(1)}%</strong></div><div class="game-stat"><span>UP model score</span><strong>${pct('UP')}</strong></div><div class="game-stat"><span>DOWN model score</span><strong>${pct('DOWN')}</strong></div></div><p class="game-note">This is a lightweight frequency/recency/transition baseline, not a verified edge. Scores are not calibrated win probabilities. MIDDLE remains possible. Use free visible history and test predictions before trusting the method.</p>`;
+  const rows=ranked.map(m=>`<div class="game-stat"><span>${escapeGameText(m.label)} (${m.hits}/${m.tests})</span><strong>${pct(m.rate)}</strong></div>`).join('');
+  const detail=`<div class="game-stat-grid">${rows}<div class="game-stat"><span>Outcomes supplied</span><strong>${values.length}</strong></div><div class="game-stat"><span>UP / DOWN / MIDDLE</span><strong>${count.UP} / ${count.DOWN} / ${count.MIDDLE}</strong></div><div class="game-stat"><span>Top vs frequency baseline</span><strong>${margin>=0?'+':''}${(margin*100).toFixed(1)} pp</strong></div></div><p class="game-note">Walk-forward test: each historical prediction used only earlier entries. This compares simple methods; it does not prove future results are predictable. ${!enough?'Too few test rounds to choose a method reliably. ':''}${!edge?'No method has shown a strong enough advantage over the frequency baseline, so treat the displayed outcome as an experimental candidate—not a confident prediction.':'The best method beat the frequency baseline in this small historical test; continue testing on new unseen results before trusting it.'} Ensure entries are ordered oldest to newest and are correctly matched to rounds. Include MIDDLE in the sequence; it counts as an outcome, not an automatic UP/DOWN loss.</p>`;
   if(extra)extra.innerHTML=detail; else {const div=document.createElement('div');div.id='bottle-analysis-detail';div.className='game-results';div.innerHTML=detail;result.insertAdjacentElement('afterend',div);}
-  const history=readLocalGameHistory(GAMES_STORAGE.bottle);history.unshift({name:winner,at:new Date().toISOString(),n:total,confidence});saveLocalGameHistory(GAMES_STORAGE.bottle,history.slice(0,30));renderBottleHistory();
+  const history=readLocalGameHistory(GAMES_STORAGE.bottle);history.unshift({name:nextGuess,at:new Date().toISOString(),n:values.length,confidence:edge?'experimental walk-forward edge':'no reliable edge',method:winner.label});saveLocalGameHistory(GAMES_STORAGE.bottle,history.slice(0,30));renderBottleHistory();
 }
 function renderBottleHistory() {
   const list=document.getElementById('bottle-history');if(!list)return;
@@ -1056,4 +1129,4 @@ function clearBottleHistory() {
   if(picked)picked.textContent='Ready to analyze';if(result)result.classList.remove('error');const detail=document.getElementById('bottle-analysis-detail');if(detail)detail.remove();
 }
 document.addEventListener('DOMContentLoaded',renderBottleHistory);
-                          
+     
