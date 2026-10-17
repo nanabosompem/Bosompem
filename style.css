@@ -173,8 +173,6 @@ body{background:#111827}
 .sportybet-history-item{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .sportybet-history-item span{font-weight:650}.sportybet-history-item small{display:block;color:var(--text-muted);font-size:.72rem;margin-top:4px}
 .sportybet-outcome-up{color:#38bdf8}.sportybet-outcome-down{color:#fb7185}.sportybet-outcome-middle{color:#fbbf24}
-
-
 /* Bosompem solid-colour theme: disable CSS gradients across the entire platform. */
 *, *::before, *::after { background-image: none !important; }
 body { background-color: #070910 !important; }
@@ -204,4 +202,47 @@ body { background-color: #070910 !important; }
 .device-action-status{padding:13px 15px;border-radius:12px;background:#111827;border:1px solid rgba(230,244,255,.17);font-size:.78rem;line-height:1.5;color:var(--text-sub)}
 .device-action-status[data-state="success"]{border-color:rgba(56,189,248,.4);color:#d6f4ff}
 @media(min-width:560px){.device-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
+
+/* BOSOMPEM UNIVERSAL GLASS SYSTEM — no pure-black surfaces, text or icons. */
+:root{
+ --bg-deep:#111827;--bg-surface:rgba(38,52,76,.72);--bg-glass:rgba(222,235,255,.10);
+ --bg-input:rgba(29,42,64,.78);--border-glass:rgba(220,235,255,.20);--border-glow:rgba(120,170,255,.38);
+ --primary:#8b9cff;--primary-glow:rgba(139,156,255,.28);--accent-cyan:#75e4f4;--accent-rose:#ff8eae;
+ --text-main:#f4f7ff;--text-sub:#c2cde0;--text-muted:#a0aec5;--glass-blur:20px;
+ --glass-border:1px solid rgba(220,235,255,.20);--glass-shadow:0 8px 28px rgba(38,65,105,.16);
+}
+html,body{background:#182238!important;color:var(--text-main)}
+.phone-container{background:rgba(25,38,60,.94)!important;color:var(--text-main);isolation:isolate}
+.app-topbar,.app-bottom-nav,.nav-drawer,.console-box,.console-wrapper,.settings-card,.lab-card,.quick-card,.project-card,.task-item,.tasks-header-card,.profile-section-card,.profile-hero-card,.capability-card,.device-action-card,.device-action-status,.device-command-plan,.voice-transcript-card,.attachment-menu,.attachment-preview,.speech-state-bar,.bottle-result,.game-card,.agent-planner-card,.memory-item,.console-btn,.topbar-btn,.nav-tab,.menu-item,.glass-input,.glass-textarea,.glass-select,.primary-btn,.new-session-btn,.icon-action-btn,.device-action-icon,.quick-icon,.brand-mark-mini,.avatar-glow,.profile-avatar,.profile-avatar-large,.hero-orb,.voice-orb,.voice-orb-glow,.drop-zone,.status-pill,.hero-badge,.hero-eyebrow,.eyebrow,.section-kicker{
+ backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));
+}
+.app-topbar,.app-bottom-nav,.nav-drawer,.console-box,.console-wrapper,.settings-card,.lab-card,.quick-card,.project-card,.task-item,.tasks-header-card,.profile-section-card,.profile-hero-card,.capability-card,.device-action-card,.device-action-status,.device-command-plan,.voice-transcript-card,.attachment-menu,.attachment-preview,.speech-state-bar,.bottle-result,.game-card,.agent-planner-card{
+ background-color:var(--bg-surface)!important;border:var(--glass-border);box-shadow:var(--glass-shadow);color:var(--text-main)
+}
+.glass-input,.glass-textarea,.glass-select{background-color:var(--bg-input)!important;color:var(--text-main)!important;border:var(--glass-border)!important}
+button,input,textarea,select{color:inherit}button i,svg,.device-action-icon i,.quick-card i,.menu-item i,.nav-tab i,.topbar-btn i{color:inherit}
+.primary-btn,.new-session-btn,.icon-action-btn,.primary-btn-sm,.send-btn,.voice-action-btn{background-color:#6278d8!important;color:#fff!important;border:1px solid rgba(228,237,255,.24)!important}
+.avatar-glow,.profile-avatar,.profile-avatar-large,.device-action-icon,.quick-icon,.brand-mark-mini{background-color:rgba(125,159,220,.18)!important;color:#c4f4ff!important;border:1px solid var(--border-glass)}
+.welcome-hero h1{background:none!important;-webkit-text-fill-color:var(--text-main)!important;color:var(--text-main)!important}
+.nav-overlay{background:rgba(56,76,110,.36)!important}
+.menu-item:hover,.menu-item.active,.nav-tab.active,.topbar-btn:hover{background-color:rgba(150,177,255,.16)!important;color:var(--text-main)!important}
+.status-pill,.hero-badge{background-color:rgba(126,158,230,.16)!important;color:var(--text-main)!important;border:1px solid var(--border-glass)}
+.device-action-card strong,.device-action-card small,.device-capability-row,.capability-card strong,.capability-card p,.setting-group label,.setting-group small,.task-item small,.quick-card small,.text-btn,.drawer-close-btn{color:var(--text-sub)!important}
+/* Make every icon visibly themed; never default to pure black. */
+i, .fa-solid,.fa-regular,.fa-brands{color:var(--icon-color,var(--accent-cyan))}
+button i{color:inherit}.btn-icon-danger i{color:var(--accent-rose)!important}
+.device-command-input-row{display:flex;align-items:stretch;gap:8px}.device-command-input-row textarea{min-height:74px;flex:1}.device-mic-btn{width:48px;min-width:48px;border-radius:14px;border:var(--glass-border);background:rgba(130,163,230,.17);color:var(--accent-cyan);font-size:1.05rem}
+.device-command-card .primary-btn{margin-top:10px}.device-command-plan{display:flex;flex-direction:column;gap:10px;padding:14px;margin-top:12px;border-radius:16px}.device-command-plan h4{font-size:.95rem}.device-command-plan p,.device-command-plan li{font-size:.82rem;line-height:1.5;color:var(--text-sub)}.device-plan-actions{display:flex;gap:8px;flex-wrap:wrap}.device-plan-actions button{border:var(--glass-border);border-radius:12px;padding:10px 12px;background:rgba(130,163,230,.18);color:var(--text-main)}
+/* Light glass mode uses soft blue/pearl surfaces and deep blue—not black—text. */
+html[data-theme="light"],html[data-theme="light"] body{background:#dce7f8!important;color:#263858}
+html[data-theme="light"]{--bg-deep:#e8effa;--bg-surface:rgba(255,255,255,.70);--bg-glass:rgba(255,255,255,.58);--bg-input:rgba(255,255,255,.76);--border-glass:rgba(100,126,170,.22);--border-glow:rgba(95,130,205,.35);--primary:#526fc4;--primary-glow:rgba(82,111,196,.18);--accent-cyan:#327f9d;--accent-rose:#c65379;--text-main:#263858;--text-sub:#526582;--text-muted:#71819b;--glass-border:1px solid rgba(100,126,170,.22);--glass-shadow:0 8px 28px rgba(77,105,155,.10)}
+html[data-theme="light"] .phone-container{background:rgba(232,240,252,.96)!important}
+html[data-theme="light"] .app-topbar,html[data-theme="light"] .app-bottom-nav,html[data-theme="light"] .nav-drawer,html[data-theme="light"] .console-box,html[data-theme="light"] .console-wrapper,html[data-theme="light"] .settings-card,html[data-theme="light"] .lab-card,html[data-theme="light"] .quick-card,html[data-theme="light"] .project-card,html[data-theme="light"] .task-item,html[data-theme="light"] .tasks-header-card,html[data-theme="light"] .profile-section-card,html[data-theme="light"] .profile-hero-card,html[data-theme="light"] .capability-card,html[data-theme="light"] .device-action-card,html[data-theme="light"] .device-action-status,html[data-theme="light"] .device-command-plan,html[data-theme="light"] .voice-transcript-card,html[data-theme="light"] .attachment-menu,html[data-theme="light"] .attachment-preview,html[data-theme="light"] .speech-state-bar,html[data-theme="light"] .bottle-result,html[data-theme="light"] .game-card,html[data-theme="light"] .agent-planner-card{background-color:var(--bg-surface)!important;color:var(--text-main)!important}
+html[data-theme="light"] .glass-input,html[data-theme="light"] .glass-textarea,html[data-theme="light"] .glass-select{background-color:var(--bg-input)!important;color:var(--text-main)!important}
+html[data-theme="light"] .welcome-hero h1{-webkit-text-fill-color:var(--text-main)!important;color:var(--text-main)!important}
+html[data-theme="light"] .device-action-card small,html[data-theme="light"] .device-capability-row,html[data-theme="light"] .capability-card p,html[data-theme="light"] .setting-group label,html[data-theme="light"] .setting-group small,html[data-theme="light"] .task-item small,html[data-theme="light"] .quick-card small,html[data-theme="light"] .text-btn{color:var(--text-sub)!important}
+
+/* Favourite contacts: glass cards and visible recipient confirmation. */
+.favourite-contacts-card .section-heading{margin-bottom:12px}.favourite-contacts-card .section-heading h3{margin:0 0 5px}.favourite-contacts-card .section-heading p,.contact-tools small,.empty-contacts-note{color:var(--text-sub);font-size:.8rem;line-height:1.5}
+.favourite-contact-form{display:grid;grid-template-columns:1fr;gap:9px}.favourite-contact-form .glass-input{width:100%;min-width:0}.contact-tools{display:flex;flex-direction:column;gap:8px;margin-top:12px}.secondary-glass-btn{border:var(--glass-border);border-radius:13px;padding:11px 13px;background:var(--bg-glass);color:var(--text-main);font-weight:650;text-align:left}.favourite-contacts-list{display:flex;flex-direction:column;gap:8px;margin-top:14px}.favourite-contact-item{display:flex;align-items:center;gap:11px;padding:11px;border:var(--glass-border);border-radius:15px;background:var(--bg-glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}.favourite-contact-avatar{width:38px;height:38px;display:grid;place-items:center;border-radius:13px;background:rgba(120,160,230,.2);border:var(--glass-border);flex-shrink:0}.favourite-contact-meta{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}.favourite-contact-meta strong{color:var(--text-main);overflow-wrap:anywhere}.favourite-contact-meta small{color:var(--text-sub);overflow-wrap:anywhere}.contact-remove-btn{border:var(--glass-border);border-radius:10px;width:36px;height:36px;background:rgba(205,110,145,.12);color:var(--accent-rose)}.device-plan-actions button:disabled{opacity:.45;cursor:not-allowed}.empty-contacts-note{margin:0;padding:12px;border:1px dashed var(--border-glass);border-radius:12px}
+@media(min-width:520px){.favourite-contact-form{grid-template-columns:1fr 1fr}.favourite-contact-form .primary-btn-sm{grid-column:1/-1;justify-self:start}}
