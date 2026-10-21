@@ -290,6 +290,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   initVoiceEngines();
   loadSavedSettings();
   initTheme();
+  initNotificationSettings();
   updateGreeting();
   updateClock();
   setInterval(updateClock,30000);
@@ -299,7 +300,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderProjects();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
 });
-   function updateClock(){
+function updateClock(){
   const el=document.getElementById('status-time');
   if(el)el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
 }
@@ -545,7 +546,9 @@ async function sendChatMessage(text,imageData=null){
   }
 }
 
-function handleChatSubmit(){const input=document.getElementById('chat-input');if(input)sendChatMessage(input.value,state.selectedImageData);}
+function isLikelyDeviceCommand(text){const value=String(text||'').trim();return /^(?:hey\s+)?bosompem[,.! ]*(?:please\s+)?(?:open|launch|call|message|text|send|update|upgrade|navigate|go to|turn on|turn off|share my location)\b/i.test(value)||/^(?:update|upgrade)\s+(?:all\s+)?(?:my\s+)?apps\b/i.test(value);}
+function routeDeviceCommand(text,showScreen=true){const input=document.getElementById('device-command-input');if(!input)return false;input.value=String(text||'').replace(/^(?:hey\s+)?bosompem[,.! ]*/i,'').trim();if(showScreen&&state.activeScreen!=='device-control')openScreen('device-control');prepareDeviceCommand();return true;}
+function handleChatSubmit(){const input=document.getElementById('chat-input');if(!input)return;const text=input.value;if(!state.selectedImageData&&isLikelyDeviceCommand(text)){input.value='';autoExpandTextarea(input);updateSendButton();routeDeviceCommand(text,true);return;}sendChatMessage(input.value,state.selectedImageData);}
 function usePromptPreset(type){
   const input=document.getElementById('chat-input');if(!input)return;
   const prompts={code:'Help me build, debug or improve this:',research:'Research and explain this clearly:',remember:'Remember this about me:'};
@@ -595,12 +598,13 @@ function attachLocation(){
     if(input){input.value+=` My location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;autoExpandTextarea(input);}
     openScreen('chat');
   },err=>alert(err.code===1?'Location permission was denied.':'Could not get your location.'),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
-}
+                 }
 function stopGeneration(){
   // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
   stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
   const btn=document.getElementById('send-btn');if(btn)btn.disabled=false;
-   }
+}
+
 function handleChatImageUpload(e){
   const file=e.target.files?.[0];if(!file)return;
   const reader=new FileReader();
@@ -649,6 +653,11 @@ function formatMarkdown(text){
 }
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
+const BOSOMPEM_VOICE_LANGUAGE_KEY='bosompem_voice_language_v1';
+function getRecognitionLanguage(){try{return localStorage.getItem(BOSOMPEM_VOICE_LANGUAGE_KEY)||'en-GB';}catch{return'en-GB';}}
+function setRecognitionLanguage(value){const allowed=['en-GB','en-US','en-GH','en-NG'];const selected=allowed.includes(value)?value:'en-GB';try{localStorage.setItem(BOSOMPEM_VOICE_LANGUAGE_KEY,selected);}catch{}if(liveRecognition)liveRecognition.lang=selected;if(voiceNoteRecognition)voiceNoteRecognition.lang=selected;const select=document.getElementById('voice-language-select');if(select)select.value=selected;}
+function appendTranscriptOnce(existing,addition){const a=String(existing||'').trim(),b=String(addition||'').trim();if(!b)return a;if(!a)return b;if(a.toLowerCase()===b.toLowerCase())return a;const aw=a.toLowerCase().split(/\s+/),bw=b.toLowerCase().split(/\s+/);let overlap=0;for(let n=Math.min(aw.length,bw.length);n>0;n--){if(aw.slice(-n).join(' ')===bw.slice(0,n).join(' ')){overlap=n;break;}}return (a+' '+b.split(/\s+/).slice(overlap).join(' ')).trim();}
+
 function setVoiceState(newState){
   state.voiceState=newState;
   const orb=document.getElementById('voice-orb'),icon=document.getElementById('orb-icon'),bar=document.getElementById('speech-state-bar'),status=document.getElementById('voice-status-title');
@@ -668,7 +677,7 @@ function initVoiceEngines(){
   liveRecognition=new SpeechRecognition();
   liveRecognition.continuous=true;
   liveRecognition.interimResults=true;
-  liveRecognition.lang='en-US';
+  liveRecognition.lang=getRecognitionLanguage();
 
   liveRecognition.onstart=()=>{
     if(state.isLiveVoiceActive && state.voiceState!=='THINKING' && state.voiceState!=='SPEAKING'){
@@ -683,21 +692,19 @@ function initVoiceEngines(){
       const piece=(result[0]?.transcript||'').trim();
       if(!piece)continue;
       if(result.isFinal){
-        // Only consume each finalized result once. The browser may resend result events.
-        const marker=`${i}:${piece}`;
+        const marker=`${i}:${piece.toLowerCase()}`;
         if(!state._liveFinalResultMarkers)state._liveFinalResultMarkers=new Set();
         if(!state._liveFinalResultMarkers.has(marker)){
           state._liveFinalResultMarkers.add(marker);
-          state.voiceFinalTranscript=(state.voiceFinalTranscript+' '+piece).trim();
+          state.voiceFinalTranscript=appendTranscriptOnce(state.voiceFinalTranscript,piece);
         }
-      }else{
-        interim+=' '+piece;
-      }
+      }else interim=appendTranscriptOnce(interim,piece);
     }
     const full=(state.voiceFinalTranscript+' '+interim).trim();
     const card=document.getElementById('voice-live-transcript');
     if(card)card.textContent=full||'Listening…';
-    if(state.voiceFinalTranscript.trim())queueLiveVoiceSubmit(900);
+    // Wait for a quiet gap after the latest finalized result. Interim text is preview only.
+    if(state.voiceFinalTranscript.trim())queueLiveVoiceSubmit(1450);
   };
 
   liveRecognition.onerror=e=>{
@@ -730,14 +737,19 @@ function initVoiceEngines(){
   voiceNoteRecognition=new SpeechRecognition();
   voiceNoteRecognition.continuous=true;
   voiceNoteRecognition.interimResults=true;
-  voiceNoteRecognition.lang='en-US';
+  voiceNoteRecognition.lang=getRecognitionLanguage();
   voiceNoteRecognition.onresult=e=>{
     let transcript='';
-    for(let i=0;i<e.results.length;i++)transcript+=e.results[i][0].transcript+' ';
+    for(let i=0;i<e.results.length;i++){
+      const result=e.results[i];
+      const piece=(result[0]?.transcript||'').trim();
+      if(piece)transcript=appendTranscriptOnce(transcript,piece);
+    }
     const input=document.getElementById('chat-input');
-    if(input){input.value=transcript.trim();autoExpandTextarea(input);}
+    if(input){input.value=transcript.trim();autoExpandTextarea(input);updateSendButton();}
   };
-  voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording)try{voiceNoteRecognition.start();}catch{}};
+  voiceNoteRecognition.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed'){state.isVoiceNoteRecording=false;const b=document.getElementById('voice-note-btn');if(b)b.style.color='';setDeviceActionStatus?.('Microphone permission was denied. Allow it in browser settings and retry.');}};
+  voiceNoteRecognition.onend=()=>{if(state.isVoiceNoteRecording){try{voiceNoteRecognition.start();}catch{}}};
 }
 
 function queueLiveVoiceSubmit(delay=900){
@@ -763,7 +775,8 @@ function queueLiveVoiceSubmit(delay=900){
     try{
       if(liveRecognition)try{liveRecognition.stop();}catch{}
       setVoiceState('THINKING');
-      await sendChatMessage(text);
+      if(isLikelyDeviceCommand(text)){routeDeviceCommand(text, /\b(message|text|send)\b/i.test(text));setVoiceState('IDLE');}
+      else await sendChatMessage(text);
     }finally{
       state.voiceRequestPending=false;
       // Recognition restarts from speech playback's onend, or here if playback did not start.
@@ -863,23 +876,29 @@ async function enableNotifications(){
   if(permission!=='granted'){alert('Notifications are blocked. You can enable them in the browser site settings.');return false;}
   showBrowserNotification('Bosompem notifications enabled','Reminders can notify you while this page is active.');return true;
 }
-function showBrowserNotification(title,body){
+function showBrowserNotification(title,body,kind='taskUpdates'){
+  const prefs=typeof getNotificationPreferences==='function'?getNotificationPreferences():{reminders:true,taskUpdates:true,quietStart:'22:00',quietEnd:'07:00'};
+  if(!prefs[kind])return false;
+  const now=new Date(),current=now.getHours()*60+now.getMinutes();
+  const toMinutes=value=>{const parts=String(value||'').split(':').map(Number);return parts.length===2&&parts.every(Number.isFinite)&&parts[0]>=0&&parts[0]<24&&parts[1]>=0&&parts[1]<60?parts[0]*60+parts[1]:null;};
+  const qs=toMinutes(prefs.quietStart),qe=toMinutes(prefs.quietEnd);
+  if(qs!==null&&qe!==null&&qs!==qe){const quiet=qs<qe?(current>=qs&&current<qe):(current>=qs||current<qe);if(quiet)return false;}
   if(!('Notification' in window)||Notification.permission!=='granted')return false;
-  try{if('serviceWorker'in navigator&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body,icon:'./icon-192.png',badge:'./icon-192.png',tag:'bosompem-'+Date.now()})).catch(()=>new Notification(title,{body}));}
+  try{if('serviceWorker'in navigator&&navigator.serviceWorker.controller){navigator.serviceWorker.ready.then(reg=>reg.showNotification(title,{body,tag:'bosompem-'+kind+'-'+Date.now()})).catch(()=>new Notification(title,{body}));}
     else new Notification(title,{body});return true;}catch(err){console.warn('Notification failed',err);return false;}
 }
 function initReminderNotifications(){
   if(state.reminderTimer)clearInterval(state.reminderTimer);
   state.reminderTimer=setInterval(()=>{
     const now=Date.now();let changed=false;
-    for(const r of state.reminders){const due=r.dueAt?Date.parse(r.dueAt):Date.parse(r.when||'');if(Number.isFinite(due)&&due<=now&&!r.notified){r.notified=true;changed=true;showBrowserNotification('Bosompem reminder',r.title);}}
+    for(const r of state.reminders){const due=r.dueAt?Date.parse(r.dueAt):Date.parse(r.when||'');if(Number.isFinite(due)&&due<=now&&!r.notified){r.notified=true;changed=true;showBrowserNotification('Bosompem reminder',r.title,'reminders');}}
     if(changed){saveJSON(STORAGE.reminders,state.reminders);renderReminders();}
   },15000);
 }
 async function generateImage(){
   const prompt=document.getElementById('image-generation-prompt')?.value.trim();
   const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
-  if(!prompt){alert('Describe the image you want to create first.');return;}
+   if(!prompt){alert('Describe the image you want to create first.');return;}
   if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
    // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
@@ -902,7 +921,7 @@ function parseReminderDate(value){
   const parsed=Date.parse(value);return Number.isFinite(parsed)?new Date(parsed):null;
 }
 function addReminder(){
-       const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
+  const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
   const when=prompt('When? Example: tomorrow 09:00 or 2026-10-10 18:30');if(!when?.trim())return;
   const dueAt=parseReminderDate(when.trim());state.reminders.unshift({id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),dueAt:dueAt?dueAt.toISOString():null,notified:false,createdAt:new Date().toISOString()});saveJSON(STORAGE.reminders,state.reminders);renderReminders();
 }
@@ -967,7 +986,7 @@ const DeviceBridge={
   available:()=>Boolean(window.BosompemNative),
   async execute(action,payload={}){
     if(!this.available())return {ok:false,reason:'Native Android bridge not connected.',action,payload};
-    try{return await window.BosompemNative.execute(action,payload);}
+    try{const raw=await window.BosompemNative.execute(action,JSON.stringify(payload||{}));if(typeof raw==='string'){try{return JSON.parse(raw);}catch{return {ok:false,reason:raw,action};}}return raw||{ok:false,reason:'Native bridge returned no result.',action};}
     catch(error){return {ok:false,reason:error.message,action};}
   }
 };
@@ -977,6 +996,30 @@ let bosompemWakeLock = null;
 function setDeviceActionStatus(message, ok=false){
   const el=document.getElementById('device-action-status');
   if(el){el.textContent=message;el.dataset.state=ok?'success':'info';}
+  if(state?.isLiveVoiceActive){const live=document.getElementById('voice-live-transcript');if(live)live.textContent=message;}
+  if(ok&&document.hidden&&typeof showBrowserNotification==='function')showBrowserNotification('Bosompem task update',message,'taskUpdates');
+}
+function setPermissionState(id,label){const el=document.getElementById(id);if(el)el.textContent=label;}
+async function requestBosompemPermission(kind){
+  const status=document.getElementById('permission-center-status');
+  const say=(message,ok=false)=>{if(status){status.textContent=message;status.dataset.state=ok?'success':'info';}};
+  try{
+    if(kind==='microphone'){
+      if(!navigator.mediaDevices?.getUserMedia){setPermissionState('permission-mic-state','NOT SUPPORTED');say('Microphone access is not supported in this browser/context. Open the secure HTTPS site in Chrome and try again.');return;}
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});stream.getTracks().forEach(track=>track.stop());
+      setPermissionState('permission-mic-state','GRANTED');say('Microphone permission is granted. Listening still depends on browser support and whether the page is active; this does not enable always-listening in the background.',true);return;
+    }
+    if(kind==='notifications'){
+      if(!('Notification' in window)){setPermissionState('permission-notify-state','NOT SUPPORTED');say('Notifications are not supported in this browser.');return;}
+      let result=Notification.permission;if(result==='default')result=await Notification.requestPermission();
+      setPermissionState('permission-notify-state',result.toUpperCase());say(result==='granted'?'Notifications are allowed. Android or browser settings may still affect delivery.':`Notification permission status: ${result}. You can change it in your browser site settings.`,result==='granted');return;
+    }
+    if(kind==='location'){
+      if(!navigator.geolocation){setPermissionState('permission-location-state','NOT SUPPORTED');say('Location is not supported in this browser.');return;}
+      say('Waiting for Android/browser location permission…');
+      navigator.geolocation.getCurrentPosition(()=>{setPermissionState('permission-location-state','GRANTED');say('Location permission is granted. Coordinates were not saved by this permission check.',true);},err=>{const label=err.code===1?'DENIED':err.code===2?'UNAVAILABLE':'TIMEOUT';setPermissionState('permission-location-state',label);say(err.code===1?'Location was denied. You can allow it in Android site settings.':`Location check failed: ${err.message}`);},{enableHighAccuracy:false,timeout:12000,maximumAge:60000});return;
+    }
+  }catch(error){const map={microphone:'permission-mic-state',notifications:'permission-notify-state',location:'permission-location-state'};setPermissionState(map[kind]||'','BLOCKED');say(`${kind} permission was not granted: ${error.message||'request failed'}. Check Android site permissions.`);}
 }
 function refreshDeviceBridgeStatus(){
   const native=DeviceBridge.available();
@@ -1039,16 +1082,20 @@ function setTheme(theme){
   const picker=document.getElementById('theme-select');if(picker)picker.value=selected;
   const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=selected==='dark'?'#19263c':'#e8effa';
 }
-function initTheme(){let saved='dark';try{saved=localStorage.getItem('bosompem_theme')||'dark';}catch{}setTheme(saved);}
+function initTheme(){let saved='dark';try{saved=localStorage.getItem('bosompem_theme')||'dark';}catch{}setTheme(saved);const voiceSelect=document.getElementById('voice-language-select');if(voiceSelect)voiceSelect.value=getRecognitionLanguage();}
 function toggleTheme(){setTheme(document.documentElement.dataset.theme==='light'?'dark':'light');}
 function launchExternal(url){
-  // Open only a user-requested app/site. Android/browser decides whether it can handle the URI.
+  // Prefer the permissioned Android companion when available; otherwise use browser navigation.
+  if(DeviceBridge.available()){
+    DeviceBridge.execute('open-url',{url}).then(result=>{if(!result?.ok){const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();a.remove();}}).catch(()=>{});
+    return;
+  }
   const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';document.body.appendChild(a);a.click();a.remove();
 }
 function captureDeviceCommand(){
   if(!SpeechRecognition){setDeviceActionStatus('Voice command capture is not supported in this browser. Type the command instead.');return;}
   const button=document.querySelector('.device-mic-btn');
-  const recognition=new SpeechRecognition();recognition.lang=navigator.language||'en-US';recognition.interimResults=false;recognition.maxAlternatives=1;
+  const recognition=new SpeechRecognition();recognition.lang=getRecognitionLanguage();recognition.interimResults=false;recognition.maxAlternatives=1;
   if(button)button.innerHTML='<i class="fa-solid fa-ear-listen"></i>';
   recognition.onresult=e=>{const text=e.results?.[0]?.[0]?.transcript||'';const input=document.getElementById('device-command-input');if(input)input.value=text;prepareDeviceCommand();};
   recognition.onerror=()=>setDeviceActionStatus('Voice capture stopped. Check microphone permission or type your command.');
@@ -1072,7 +1119,10 @@ function prepareDeviceCommand(){
   const tell=raw.match(/(?:tell|message|text|send(?:\s+a\s+message\s+to)?)\s+([A-Za-z][A-Za-z .'-]{0,35}?)\s+(?:to\s+)?(.+?)(?:[.!?]*)$/i);
   const callNumber=raw.match(/\bcall\s+([+\d][\d ()-]{5,})/i);
   const callName=raw.match(/\bcall\s+([A-Za-z][A-Za-z .'-]{0,35})\s*$/i);
-  if(/whatsapp|message|text|tell/.test(lower)&&tell){
+  if(/instagram/.test(lower)&&/(?:message|text|dm)/.test(lower)){
+    const im=raw.match(/(?:message|text|dm)\s+(?:to\s+)?@?([A-Za-z][A-Za-z0-9_. ]{0,35}?)\s+(?:saying|that says|with message|:)\s+(.+)$/i)||raw.match(/to\s+@?([A-Za-z][A-Za-z0-9_. ]{0,35}?)\s+(?:saying|that says|with message)\s+(.+)$/i);
+    if(im)plan={kind:'instagram-message',recipient:im[1].trim(),message:im[2].trim().replace(/[.!?]+$/,'')};else plan={kind:'app',app:'instagram'};
+  }else if(/whatsapp|message|text|tell/.test(lower)&&tell){
     let recipient=tell[1].trim().replace(/^(?:on\s+)?whatsapp\s+/i,'').trim();let message=tell[2].trim().replace(/[.!?]+$/,'');
     message=message.charAt(0).toUpperCase()+message.slice(1);
     const favorite=findFavouriteContact(recipient);plan={kind:'whatsapp',recipient:favorite?favorite.name:recipient,message,phone:favorite?.phone||'',matchedFavourite:!!favorite};
@@ -1082,16 +1132,52 @@ function prepareDeviceCommand(){
   else if(/open\s+(?:google\s+)?maps|navigate\s+to/.test(lower))plan={kind:'maps',query:raw.replace(/.*?(?:navigate to|open (?:google )?maps)\s*/i,'').trim()};
   else if(/open\s+settings/.test(lower))plan={kind:'settings'};
   else if(/share.*location|my location/.test(lower))plan={kind:'location'};
-  else if(/open\s+(youtube|chrome|gmail|phone|camera)/i.test(raw))plan={kind:'app',app:raw.match(/open\s+(youtube|chrome|gmail|phone|camera)/i)[1].toLowerCase()};
+  else if(/open\s+(youtube|chrome|gmail|phone|camera|instagram|facebook|tiktok|spotify|play store|google play)/i.test(raw)){const appMatch=raw.match(/open\s+(youtube|chrome|gmail|phone|camera|instagram|facebook|tiktok|spotify|play store|google play)/i);plan={kind:'app',app:appMatch[1].toLowerCase().replace(/\s+/g,'-')};}
+  else if(/(?:update|upgrade)\s+(?:all\s+)?(?:my\s+)?apps|play\s+store.*update/i.test(lower))plan={kind:'playstore-updates'};
+  else if(/open\s+(https?:\/\/\S+|[a-z0-9.-]+\.[a-z]{2,}(?:\/\S*)?)/i.test(raw)){const match=raw.match(/open\s+(https?:\/\/\S+|[a-z0-9.-]+\.[a-z]{2,}(?:\/\S*)?)/i);plan={kind:'url',url:/^https?:\/\//i.test(match[1])?match[1]:'https://'+match[1]};}
+  else if(/open\s+([A-Za-z][A-Za-z0-9 ._-]{1,35})/i.test(raw)){const match=raw.match(/open\s+([A-Za-z][A-Za-z0-9 ._-]{1,35})/i);plan={kind:'generic-app',appName:match[1].trim()};}
   if(!plan){panel.classList.remove('hidden');panel.innerHTML='<h4>Command needs a supported action</h4><p>I can prepare messages, call drafts for saved contacts or numbers, open supported apps and maps, and request location sharing. For an unknown contact, choose it from phone contacts and add it to favourites first.</p>';setDeviceActionStatus('No supported action was confidently identified.');return;}
+  // Routine app/site navigation can proceed directly; messaging and calling still use review safeguards.
+  if(['open','maps','settings','app','url','generic-app','playstore-updates'].includes(plan.kind)){
+    if(plan.kind==='open'){runDeviceAction('open-whatsapp');return;}
+    if(plan.kind==='maps'){launchExternal('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(plan.query||''));setDeviceActionStatus('Requested Maps navigation/search.',true);return;}
+    if(plan.kind==='settings'){runDeviceAction('open-settings');return;}
+    if(plan.kind==='app'){openNamedApp(plan.app);return;}
+    if(plan.kind==='url'){launchExternal(plan.url);setDeviceActionStatus(`Requested ${plan.url}. The browser or Android decides how to open it.`,true);return;}
+    if(plan.kind==='generic-app'){Promise.resolve(DeviceBridge.execute('open-app',{appName:plan.appName})).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${plan.appName}.`,true);else{launchExternal(`https://play.google.com/store/search?q=${encodeURIComponent(plan.appName)}&c=apps`);setDeviceActionStatus(`No direct app launcher was available for ${plan.appName}; opened a Play Store search.`,true);}});return;}
+    if(plan.kind==='playstore-updates'){Promise.resolve(DeviceBridge.execute('open-play-store-updates',{})).then(r=>{if(r?.ok)setDeviceActionStatus('Opened Play Store updates.',true);else{launchExternal('market://myapps');setDeviceActionStatus('Requested the Play Store My apps screen. If it does not open, use Play Store → profile → Manage apps & device → Updates available. The web version cannot press Update all.',true);}});return;}
+  }
+  if(plan.kind==='call'&&plan.number){announceRecipient(plan.recipient,'Call');launchExternal('tel:'+plan.number.replace(/[^+\d]/g,''));setDeviceActionStatus(`Opened the dialer for ${plan.recipient}. Check the recipient and tap Call.`,true);return;}
   panel.classList.remove('hidden');
-  if(plan.kind==='whatsapp'){
-    const matchNote=plan.matchedFavourite?'Matched your Favourite contacts list first.':'This name is not in Favourite contacts. Confirm the exact person in WhatsApp before sending.';
-    panel.innerHTML=`<h4><i class="fa-brands fa-whatsapp"></i> Review WhatsApp message</h4><p><b>Recipient:</b> ${escapeHtml(plan.recipient)}</p><p><b>Message:</b> ${escapeHtml(plan.message)}</p><p>${escapeHtml(matchNote)}</p><p>Bosompem will say the recipient name before opening the draft. It will never tap Send for you; you must check the recipient and tap Send yourself.</p><div class="device-plan-actions"><button type="button" id="device-confirm-action">Open message draft</button><button type="button" id="device-find-contact">Find in phone contacts</button><button type="button" id="device-cancel-action">Cancel</button></div>`;
-    document.getElementById('device-confirm-action').onclick=()=>{announceRecipient(plan.recipient,'Message');const phone=(plan.phone||'').replace(/[^+\d]/g,'').replace(/^\+/,'');const url=phone?`https://wa.me/${phone}?text=${encodeURIComponent(plan.message)}`:`https://wa.me/?text=${encodeURIComponent(plan.message)}`;launchExternal(url);setDeviceActionStatus(phone?`Opened a WhatsApp draft addressed to ${plan.recipient}. Verify the chat and tap Send yourself.`:`Opened a WhatsApp draft for ${plan.recipient}. Select the correct chat and tap Send yourself.`,true);};
-    const find=document.getElementById('device-find-contact');find.onclick=async()=>{await pickPhoneContact();const n=document.getElementById('favorite-contact-name')?.value||'';if(n){setDeviceActionStatus(`Phone contact ${n} selected. Tap Add in Favourite contacts, then prepare the command again to match it.`);}};
+  if(plan.kind==='instagram-message'){
+    panel.innerHTML=`<h4><i class="fa-brands fa-instagram"></i> Review Instagram message</h4><p><b>Recipient:</b> ${escapeHtml(plan.recipient)}</p><label for="device-message-edit"><b>Edit message</b></label><textarea id="device-message-edit" class="glass-textarea" rows="3">${escapeHtml(plan.message)}</textarea><div class="message-countdown" id="message-countdown" aria-live="polite">Ready for your 3-second review countdown.</div><div class="device-plan-actions"><button type="button" id="device-confirm-action">Start 3-second countdown</button><button type="button" id="device-cancel-action">Cancel</button></div><p class="message-safety-note">After the countdown, Bosompem copies the message and opens Instagram inbox. Verify the recipient and send it yourself; this web version cannot send DMs automatically.</p>`;
+    const confirm=document.getElementById('device-confirm-action');const editor=document.getElementById('device-message-edit');
+    if(editor)editor.addEventListener('input',()=>{if(window.bosompemMessageCountdownTimer){clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=null;confirm.disabled=false;confirm.textContent='Start 3-second countdown';const c=document.getElementById('message-countdown');if(c)c.textContent='Message changed. Review it and start a new 3-second countdown.';}});
+    confirm.onclick=()=>{const edited=(editor?.value||'').trim();if(!edited){setDeviceActionStatus('The message is empty.');return;}confirm.disabled=true;let remaining=3;const countdown=document.getElementById('message-countdown');countdown.textContent=`Opening Instagram in ${remaining}… You can cancel now.`;clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=setInterval(async()=>{remaining--;if(remaining>0){countdown.textContent=`Opening Instagram in ${remaining}… You can cancel now.`;return;}clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=null;try{await navigator.clipboard.writeText(edited);}catch{}launchExternal('https://www.instagram.com/direct/inbox/');countdown.textContent='Countdown complete. Instagram inbox opened; verify the recipient and paste/send the message.';setDeviceActionStatus(`Opened Instagram inbox for ${plan.recipient}. The message was not sent automatically.`,true);confirm.disabled=false;confirm.textContent='Start countdown again';},1000);};
+  }else if(plan.kind==='whatsapp'){
+    const matchNote=plan.matchedFavourite?'Matched your Favourite contacts list first.':'This name is not in Favourite contacts. Verify the exact person in WhatsApp before sending.';
+    panel.innerHTML=`<h4><i class="fa-brands fa-whatsapp"></i> Review WhatsApp message</h4><p><b>Recipient:</b> ${escapeHtml(plan.recipient)}</p><label for="device-message-edit"><b>Edit message</b></label><textarea id="device-message-edit" class="glass-textarea" rows="3">${escapeHtml(plan.message)}</textarea><p>${escapeHtml(matchNote)}</p><div class="message-countdown" id="message-countdown" aria-live="polite">Ready for your 3-second review countdown.</div><div class="device-plan-actions"><button type="button" id="device-confirm-action">Start 3-second countdown</button><button type="button" id="device-find-contact">Find in phone contacts</button><button type="button" id="device-cancel-action">Cancel</button></div><p class="message-safety-note">After the countdown, Bosompem opens a prefilled WhatsApp draft. This web version cannot press WhatsApp's Send button; review the chat and tap Send in WhatsApp.</p>`;
+    const confirm=document.getElementById('device-confirm-action');
+    const messageEditor=document.getElementById('device-message-edit');
+    if(messageEditor)messageEditor.addEventListener('input',()=>{if(window.bosompemMessageCountdownTimer){window.clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=null;if(confirm){confirm.disabled=false;confirm.textContent='Start 3-second countdown';}const countdown=document.getElementById('message-countdown');if(countdown)countdown.textContent='Message changed. Review it and start a new 3-second countdown.';}});
+    confirm.onclick=()=>{
+      const edit=document.getElementById('device-message-edit');const edited=(edit?.value||'').trim();if(!edited){setDeviceActionStatus('The message is empty. Edit it before continuing.');edit?.focus();return;}
+      confirm.disabled=true;const cancelButton=document.getElementById('device-cancel-action');let remaining=3;const countdown=document.getElementById('message-countdown');
+      if(countdown)countdown.textContent=`Opening message draft in ${remaining}… You can cancel now.`;
+      window.clearInterval(window.bosompemMessageCountdownTimer);
+      window.bosompemMessageCountdownTimer=window.setInterval(()=>{
+        remaining--;
+        if(remaining>0){if(countdown)countdown.textContent=`Opening message draft in ${remaining}… You can cancel now.`;return;}
+        window.clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=null;
+        const phone=(plan.phone||'').replace(/[^+\d]/g,'').replace(/^\+/,'');const url=phone?`https://wa.me/${phone}?text=${encodeURIComponent(edited)}`:`https://wa.me/?text=${encodeURIComponent(edited)}`;
+        announceRecipient(plan.recipient,'Message');launchExternal(url);setDeviceActionStatus(`Opened a prefilled WhatsApp draft for ${plan.recipient}. Check the chat and tap Send yourself.`,true);
+        if(countdown)countdown.textContent='Countdown complete. WhatsApp draft opened; message not sent by Bosompem.';
+        confirm.disabled=false;confirm.textContent='Start countdown again';
+      },1000);
+    };
+    const find=document.getElementById('device-find-contact');find.onclick=async()=>{window.clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=null;await pickPhoneContact();const n=document.getElementById('favorite-contact-name')?.value||'';if(n)setDeviceActionStatus(`Phone contact ${n} selected. Tap Add in Favourite contacts, then prepare the command again to match it.`);};
   }else{
-    const descriptions={open:'Open WhatsApp',maps:plan.query?`Open Maps for “${plan.query}”`:'Open Google Maps',call:plan.number?`Call ${plan.recipient} (${plan.number})`:`Call ${plan.recipient}`,settings:'Open Android settings',location:'Get your location and prepare a shareable map link',app:`Open ${plan.app}`};
+    const descriptions={open:'Open WhatsApp',maps:plan.query?`Open Maps for “${plan.query}”`:'Open Google Maps',call:plan.number?`Call ${plan.recipient} (${plan.number})`:`Call ${plan.recipient}`,settings:'Open Android settings',location:'Get your location and prepare a shareable map link',app:`Open ${plan.app}`,'playstore-updates':'Open Play Store app updates',url:`Open ${plan.url}`,'generic-app':`Try to open ${plan.appName}`};
     const isCall=plan.kind==='call';
     panel.innerHTML=`<h4>${isCall?'<i class="fa-solid fa-phone"></i> Review call recipient':'Review device action'}</h4><p><b>${isCall?'Recipient':'Action'}:</b> ${escapeHtml(descriptions[plan.kind]||'Run action')}</p>${isCall?`<p>${plan.number?'Check the saved number before continuing.':'No phone number is saved for this contact. Add it to Favourite contacts first.'}</p>`:'<p>This will open an app or prepare an action; Android may ask you to choose an app or grant permission.</p>'}<div class="device-plan-actions"><button type="button" id="device-confirm-action" ${isCall&&!plan.number?'disabled':''}>${isCall?'Open dialer':'Continue'}</button>${isCall&&!plan.number?'<button type="button" id="device-find-contact">Find in phone contacts</button>':''}<button type="button" id="device-cancel-action">Cancel</button></div>`;
     if(isCall&&!plan.number){const findCall=document.getElementById('device-find-contact');if(findCall)findCall.onclick=async()=>{await pickPhoneContact();const n=document.getElementById('favorite-contact-name')?.value||'';if(n)setDeviceActionStatus(`Phone contact ${n} selected. Tap Add in Favourite contacts, then prepare the call again.`);};}
@@ -1103,13 +1189,16 @@ function prepareDeviceCommand(){
       else if(plan.kind==='settings')runDeviceAction('open-settings');
       else if(plan.kind==='location')prepareLocationShare();
       else if(plan.kind==='app')openNamedApp(plan.app);
+      else if(plan.kind==='url'){launchExternal(plan.url);setDeviceActionStatus(`Requested ${plan.url}. The browser or Android will decide how to open it.`,true);}
+      else if(plan.kind==='generic-app'){const result=DeviceBridge.execute('open-app',{appName:plan.appName});Promise.resolve(result).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${plan.appName}.`,true);else{const q=encodeURIComponent(plan.appName);launchExternal(`https://play.google.com/store/search?q=${q}&c=apps`);setDeviceActionStatus(`No direct app launcher was available for ${plan.appName}; opened a Play Store search instead.`,true);}});}
+      else if(plan.kind==='playstore-updates'){const result=DeviceBridge.execute('open-play-store-updates',{});Promise.resolve(result).then(r=>{if(r?.ok)setDeviceActionStatus('Opened Play Store updates.',true);else{launchExternal('market://myapps');setDeviceActionStatus('Requested the Play Store My apps screen. If Android does not open it, open Play Store → profile → Manage apps & device → Updates available. This web version cannot press Update all automatically.',true);}});}
     };
   }
-  const cancel=document.getElementById('device-cancel-action');if(cancel)cancel.onclick=()=>{panel.classList.add('hidden');setDeviceActionStatus('Command cancelled. No action was taken.');};
+  const cancel=document.getElementById('device-cancel-action');if(cancel)cancel.onclick=()=>{window.clearInterval(window.bosompemMessageCountdownTimer);window.bosompemMessageCountdownTimer=null;panel.classList.add('hidden');setDeviceActionStatus('Command cancelled. No action was taken.');};
   setDeviceActionStatus('Action prepared. Check the recipient name; messages and calls are not submitted automatically.');
 }
 function openNamedApp(app){
- const urls={youtube:'https://youtube.com/',chrome:'https://www.google.com/chrome/',gmail:'https://mail.google.com/',phone:'tel:',camera:'intent://camera#Intent;scheme=android-app;end'};
+ const urls={youtube:'https://youtube.com/',chrome:'https://www.google.com/chrome/',gmail:'https://mail.google.com/',phone:'tel:',camera:'intent://camera#Intent;scheme=android-app;end',instagram:'https://www.instagram.com/',facebook:'https://www.facebook.com/',tiktok:'https://www.tiktok.com/',spotify:'https://open.spotify.com/', 'play-store':'market://myapps','google-play':'market://myapps'};
  const url=urls[app];if(!url){setDeviceActionStatus('No app link is available for '+app);return;}launchExternal(url);setDeviceActionStatus('Requested '+app+'. Android/browser support determines whether the app opens.',true);
 }
 function prepareLocationShare(){
@@ -1118,7 +1207,13 @@ function prepareLocationShare(){
  navigator.geolocation.getCurrentPosition(pos=>{const url=`https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;const panel=document.getElementById('device-command-plan');if(panel){panel.classList.remove('hidden');panel.innerHTML='<h4>Location link ready</h4><p>Review before sharing. Your location has not been sent to anyone.</p><div class="device-plan-actions"><button id="copy-location-link" type="button">Copy map link</button><button id="open-location-map" type="button">Open map</button></div>';document.getElementById('copy-location-link').onclick=async()=>{try{await navigator.clipboard.writeText(url);setDeviceActionStatus('Map link copied. Paste it only into a chat you choose.',true);}catch{setDeviceActionStatus(url);}};document.getElementById('open-location-map').onclick=()=>launchExternal(url);}setDeviceActionStatus('Location obtained. Review the map link before sharing.',true);},err=>setDeviceActionStatus('Location was not obtained: '+(err.message||'permission denied')),{enableHighAccuracy:false,timeout:10000});
 }
 
-window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest};
+// Customizable browser notifications. Remote push delivery still requires a push server/service.
+const BOSOMPEM_NOTIFICATION_PREFS='bosompem_notification_preferences_v1';
+function initNotificationSettings(){const p=getNotificationPreferences();const r=document.getElementById('notify-reminders-toggle');const t=document.getElementById('notify-tasks-toggle');const qs=document.getElementById('quiet-start');const qe=document.getElementById('quiet-end');if(r)r.checked=!!p.reminders;if(t)t.checked=!!p.taskUpdates;if(qs)qs.value=p.quietStart||'22:00';if(qe)qe.value=p.quietEnd||'07:00';}
+function getNotificationPreferences(){try{return Object.assign({reminders:true,taskUpdates:true,quietStart:'22:00',quietEnd:'07:00'},JSON.parse(localStorage.getItem(BOSOMPEM_NOTIFICATION_PREFS)||'{}'));}catch{return{reminders:true,taskUpdates:true,quietStart:'22:00',quietEnd:'07:00'};}}
+function saveNotificationPreferences(patch){const next={...getNotificationPreferences(),...patch};try{localStorage.setItem(BOSOMPEM_NOTIFICATION_PREFS,JSON.stringify(next));}catch{}return next;}
+function showBosompemTaskNotification(title,body,kind='taskUpdates'){const prefs=getNotificationPreferences();if(!prefs[kind])return false; if(!('Notification'in window)||Notification.permission!=='granted')return false;try{const n=new Notification(title,{body,icon:'./icon-192.png',tag:`bosompem-${kind}`});n.onclick=()=>{window.focus();n.close();};return true;}catch{return false;}}
+window.Bosompem={state,memoryEngine,DeviceBridge,sendChatMessage,openScreen,classifyRequest,chooseModelForRequest,showBosompemTaskNotification,getNotificationPreferences,saveNotificationPreferences,setRecognitionLanguage,initNotificationSettings,routeDeviceCommand,prepareDeviceCommand};
 
 
    
@@ -1224,4 +1319,4 @@ function clearBottleHistory() {
   if(picked)picked.textContent='Ready to analyze';if(result)result.classList.remove('error');const detail=document.getElementById('bottle-analysis-detail');if(detail)detail.remove();
 }
 document.addEventListener('DOMContentLoaded',renderBottleHistory);
-                                                                                                                                                                               
+                                 
