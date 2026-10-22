@@ -300,7 +300,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderProjects();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
 });
-function updateClock(){
+   function updateClock(){
   const el=document.getElementById('status-time');
   if(el)el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
 }
@@ -598,7 +598,7 @@ function attachLocation(){
     if(input){input.value+=` My location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;autoExpandTextarea(input);}
     openScreen('chat');
   },err=>alert(err.code===1?'Location permission was denied.':'Could not get your location.'),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
-                 }
+}
 function stopGeneration(){
   // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
   stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
@@ -898,7 +898,7 @@ function initReminderNotifications(){
 async function generateImage(){
   const prompt=document.getElementById('image-generation-prompt')?.value.trim();
   const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
-   if(!prompt){alert('Describe the image you want to create first.');return;}
+  if(!prompt){alert('Describe the image you want to create first.');return;}
   if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
    // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
@@ -1144,7 +1144,7 @@ function prepareDeviceCommand(){
     if(plan.kind==='settings'){runDeviceAction('open-settings');return;}
     if(plan.kind==='app'){openNamedApp(plan.app);return;}
     if(plan.kind==='url'){launchExternal(plan.url);setDeviceActionStatus(`Requested ${plan.url}. The browser or Android decides how to open it.`,true);return;}
-    if(plan.kind==='generic-app'){Promise.resolve(DeviceBridge.execute('open-app',{appName:plan.appName})).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${plan.appName}.`,true);else{launchExternal(`https://play.google.com/store/search?q=${encodeURIComponent(plan.appName)}&c=apps`);setDeviceActionStatus(`No direct app launcher was available for ${plan.appName}; opened a Play Store search.`,true);}});return;}
+    if(plan.kind==='generic-app'){Promise.resolve(DeviceBridge.execute('open-app',{appName:plan.appName})).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${plan.appName}.`,true);else setDeviceActionStatus(`Could not directly open ${plan.appName}. This web version has no native app launcher connected. No Play Store or browser redirect was opened. Install/connect the Android companion for package-based app launching.`);}).catch(()=>setDeviceActionStatus(`Could not directly open ${plan.appName}. Connect the Android companion for direct app launching.`));return;}
     if(plan.kind==='playstore-updates'){Promise.resolve(DeviceBridge.execute('open-play-store-updates',{})).then(r=>{if(r?.ok)setDeviceActionStatus('Opened Play Store updates.',true);else{launchExternal('market://myapps');setDeviceActionStatus('Requested the Play Store My apps screen. If it does not open, use Play Store → profile → Manage apps & device → Updates available. The web version cannot press Update all.',true);}});return;}
   }
   if(plan.kind==='call'&&plan.number){announceRecipient(plan.recipient,'Call');launchExternal('tel:'+plan.number.replace(/[^+\d]/g,''));setDeviceActionStatus(`Opened the dialer for ${plan.recipient}. Check the recipient and tap Call.`,true);return;}
@@ -1190,7 +1190,7 @@ function prepareDeviceCommand(){
       else if(plan.kind==='location')prepareLocationShare();
       else if(plan.kind==='app')openNamedApp(plan.app);
       else if(plan.kind==='url'){launchExternal(plan.url);setDeviceActionStatus(`Requested ${plan.url}. The browser or Android will decide how to open it.`,true);}
-      else if(plan.kind==='generic-app'){const result=DeviceBridge.execute('open-app',{appName:plan.appName});Promise.resolve(result).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${plan.appName}.`,true);else{const q=encodeURIComponent(plan.appName);launchExternal(`https://play.google.com/store/search?q=${q}&c=apps`);setDeviceActionStatus(`No direct app launcher was available for ${plan.appName}; opened a Play Store search instead.`,true);}});}
+      else if(plan.kind==='generic-app'){Promise.resolve(DeviceBridge.execute('open-app',{appName:plan.appName})).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${plan.appName}.`,true);else setDeviceActionStatus(`Could not directly open ${plan.appName}. No Play Store or browser redirect was opened. Connect the Android companion for direct app launching.`);}).catch(()=>setDeviceActionStatus(`Could not directly open ${plan.appName}. Connect the Android companion for direct app launching.`));}
       else if(plan.kind==='playstore-updates'){const result=DeviceBridge.execute('open-play-store-updates',{});Promise.resolve(result).then(r=>{if(r?.ok)setDeviceActionStatus('Opened Play Store updates.',true);else{launchExternal('market://myapps');setDeviceActionStatus('Requested the Play Store My apps screen. If Android does not open it, open Play Store → profile → Manage apps & device → Updates available. This web version cannot press Update all automatically.',true);}});}
     };
   }
@@ -1198,8 +1198,12 @@ function prepareDeviceCommand(){
   setDeviceActionStatus('Action prepared. Check the recipient name; messages and calls are not submitted automatically.');
 }
 function openNamedApp(app){
- const urls={youtube:'https://youtube.com/',chrome:'https://www.google.com/chrome/',gmail:'https://mail.google.com/',phone:'tel:',camera:'intent://camera#Intent;scheme=android-app;end',instagram:'https://www.instagram.com/',facebook:'https://www.facebook.com/',tiktok:'https://www.tiktok.com/',spotify:'https://open.spotify.com/', 'play-store':'market://myapps','google-play':'market://myapps'};
- const url=urls[app];if(!url){setDeviceActionStatus('No app link is available for '+app);return;}launchExternal(url);setDeviceActionStatus('Requested '+app+'. Android/browser support determines whether the app opens.',true);
+ const packages={youtube:'com.google.android.youtube',gmail:'com.google.android.gm',instagram:'com.instagram.android',facebook:'com.facebook.katana',tiktok:'com.zhiliaoapp.musically',spotify:'com.spotify.music',whatsapp:'com.whatsapp',maps:'com.google.android.apps.maps',chrome:'com.android.chrome'};
+ const normalized=String(app||'').toLowerCase().trim();
+ if(DeviceBridge.available()){Promise.resolve(DeviceBridge.execute('open-app',{appName:normalized,packageName:packages[normalized]||''})).then(r=>{if(r?.ok)setDeviceActionStatus(`Opened ${normalized}.`,true);else setDeviceActionStatus(`Android could not open ${normalized}. Check that it is installed and supported by the companion.`);}).catch(()=>setDeviceActionStatus(`Could not open ${normalized}.`));return;}
+ const schemes={youtube:'youtube://',instagram:'instagram://app',facebook:'fb://',whatsapp:'whatsapp://',spotify:'spotify://',maps:'geo:0,0?q=',phone:'tel:', 'play-store':'market://myapps','google-play':'market://myapps'};
+ if(schemes[normalized]){launchExternal(schemes[normalized]);setDeviceActionStatus(`Requested direct launch for ${normalized}. If Android does not open it, this browser cannot launch that app directly; no Play Store search was opened.`,true);return;}
+ setDeviceActionStatus(`Direct launch for ${normalized} requires the Bosompem Android companion. No browser or Play Store redirect was opened.`);
 }
 function prepareLocationShare(){
  if(!navigator.geolocation){setDeviceActionStatus('Location is unavailable in this browser.');return;}
@@ -1319,4 +1323,3 @@ function clearBottleHistory() {
   if(picked)picked.textContent='Ready to analyze';if(result)result.classList.remove('error');const detail=document.getElementById('bottle-analysis-detail');if(detail)detail.remove();
 }
 document.addEventListener('DOMContentLoaded',renderBottleHistory);
-                                 
