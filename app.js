@@ -300,7 +300,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   renderProjects();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
 });
-function updateClock(){
+   function updateClock(){
   const el=document.getElementById('status-time');
   if(el)el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false});
 }
@@ -598,7 +598,7 @@ function attachLocation(){
     if(input){input.value+=` My location: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;autoExpandTextarea(input);}
     openScreen('chat');
   },err=>alert(err.code===1?'Location permission was denied.':'Could not get your location.'),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
-                 }
+}
 function stopGeneration(){
   // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
   stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
@@ -898,7 +898,7 @@ function initReminderNotifications(){
 async function generateImage(){
   const prompt=document.getElementById('image-generation-prompt')?.value.trim();
   const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
-   if(!prompt){alert('Describe the image you want to create first.');return;}
+  if(!prompt){alert('Describe the image you want to create first.');return;}
   if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
    // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
@@ -1319,4 +1319,3 @@ function clearBottleHistory() {
   if(picked)picked.textContent='Ready to analyze';if(result)result.classList.remove('error');const detail=document.getElementById('bottle-analysis-detail');if(detail)detail.remove();
 }
 document.addEventListener('DOMContentLoaded',renderBottleHistory);
-                                 
