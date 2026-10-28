@@ -271,6 +271,7 @@ const state = {
   isVoiceNoteRecording:false,
   selectedImageData:null,
   isSending:false,
+  activeRequestController:null,
   voiceRequestPending:false,
   voiceFinalTranscript:'',
   reminderTimer:null
@@ -385,7 +386,7 @@ function addGroundingSources(reply, data) {
   return /\*\*Sources\*\*/i.test(reply) ? reply : reply + sourceBlock;
 }
 
-async function requestGemini({ contents, text, model, allowSearch }) {
+async function requestGemini({ contents, text, model, allowSearch, signal }) {
   const makeBody = (includeSearch) => {
     const body = {
       contents,
@@ -404,9 +405,13 @@ async function requestGemini({ contents, text, model, allowSearch }) {
       response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(makeBody(includeSearch))
+        body: JSON.stringify(makeBody(includeSearch)),
+        signal
       });
     } catch (networkError) {
+      if (signal?.aborted || networkError?.name === 'AbortError') {
+        throw new DOMException('Request cancelled by the user.', 'AbortError');
+      }
       const error = new Error('Network connection failed before Gemini responded. Check your connection and retry.');
       error.status = 0;
       error.transient = true;
@@ -481,6 +486,8 @@ async function sendChatMessage(text,imageData=null){
   if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
   const session=getActiveSession(); if(!session)return;
   state.isSending=true;
+  const requestController = new AbortController();
+  state.activeRequestController = requestController;
 
   if(!text)text='Please analyze the attached image.';
   if(!session.messages.length)session.title=text.length>32?text.slice(0,32)+'…':text;
@@ -525,7 +532,7 @@ async function sendChatMessage(text,imageData=null){
   });
 
   try{
-    const result = await requestGemini({ contents, text, model: routing.model, allowSearch: routing.webResearch });
+    const result = await requestGemini({ contents, text, model: routing.model, allowSearch: routing.webResearch, signal: requestController.signal });
     const data = result.data;
     removeThinkingIndicator(thinkingId);hideAgentSteps();
 
@@ -539,9 +546,11 @@ async function sendChatMessage(text,imageData=null){
     if(state.isLiveVoiceActive||state.activeScreen==='live-voice')speakText(reply);else setVoiceState('IDLE');
   }catch(err){
     removeThinkingIndicator(thinkingId);hideAgentSteps();
+    if (err?.name === 'AbortError' || requestController.signal.aborted) { setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE'); return; }
     session.messages.push({role:'assistant',text:`I couldn't complete that request.\n\n**Reason:** ${err.message||'Connection error.'}`,createdAt:new Date().toISOString()});
     saveSessions();renderMessages();setVoiceState('IDLE');
   }finally{
+    if (state.activeRequestController === requestController) state.activeRequestController = null;
     state.isSending=false;
   }
 }
@@ -600,9 +609,19 @@ function attachLocation(){
   },err=>alert(err.code===1?'Location permission was denied.':'Could not get your location.'),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
 }
 function stopGeneration(){
-  // Fetch cancellation is not wired into the existing request pipeline; this safely stops speech and resets UI.
-  stopSpeechPlayback();state.isSending=false;hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
+  // Abort the active network request so a late response cannot overwrite the stopped state.
+  state.activeRequestController?.abort();
+  stopSpeechPlayback();hideAgentSteps();setVoiceState(state.isLiveVoiceActive?'LISTENING':'IDLE');
   const btn=document.getElementById('send-btn');if(btn)btn.disabled=false;
+}
+
+function openImageGenerationFromComposer(){
+  const menu=document.getElementById('attachment-menu');
+  menu?.classList.add('hidden');menu?.setAttribute('aria-hidden','true');
+  document.getElementById('plus-btn')?.setAttribute('aria-expanded','false');
+  openScreen('media-lab');
+  const prompt=document.getElementById('image-generation-prompt');
+  if(prompt){prompt.focus();prompt.scrollIntoView({behavior:'smooth',block:'center'});}
 }
 
 function handleChatImageUpload(e){
