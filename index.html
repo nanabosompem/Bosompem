@@ -99,7 +99,16 @@
 
     <section id="screen-live-voice" class="screen-view"><div class="voice-screen-content">
       <div class="voice-top-copy"><div class="hero-eyebrow"><span class="pulse-dot"></span> REAL-TIME VOICE</div><h2>Talk naturally.</h2><p>No repeated tapping. Speak, pause, think, continue.</p></div>
-      <div class="voice-orb-container"><div class="voice-orb-halo halo-a"></div><div class="voice-orb-halo halo-b"></div><div id="voice-orb-glow" class="voice-orb-glow"></div><div id="voice-orb" class="voice-orb idle"><div class="orb-core"></div><i id="orb-icon" class="fa-solid fa-microphone"></i></div></div>
+      <div class="voice-orb-container constellation-stage" aria-label="Bosompem voice activity animation">
+        <div class="constellation-grid" aria-hidden="true"></div>
+        <div class="constellation-ring ring-one" aria-hidden="true"></div>
+        <div class="constellation-ring ring-two" aria-hidden="true"></div>
+        <div class="constellation-ring ring-three" aria-hidden="true"></div>
+        <span class="constellation-node node-a" aria-hidden="true"></span><span class="constellation-node node-b" aria-hidden="true"></span><span class="constellation-node node-c" aria-hidden="true"></span><span class="constellation-node node-d" aria-hidden="true"></span><span class="constellation-node node-e" aria-hidden="true"></span><span class="constellation-node node-f" aria-hidden="true"></span>
+        <svg class="constellation-links" viewBox="0 0 240 240" aria-hidden="true"><path d="M120 25 L185 65 L211 132 L166 194 L85 208 L31 147 L48 72 Z M48 72 L120 120 L185 65 M120 120 L211 132 M120 120 L166 194 M120 120 L85 208 M120 120 L31 147 M120 120 L48 72" /></svg>
+        <div id="voice-orb-glow" class="voice-orb-glow"></div>
+        <div id="voice-orb" class="voice-orb idle"><div class="orb-core"></div><div class="orb-sigil" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div><i id="orb-icon" class="fa-solid fa-microphone" aria-hidden="true"></i></div>
+      </div>
       <div class="voice-status-block"><h2 id="voice-status-title">Live Voice Ready</h2><p id="voice-status-sub">Bosompem will keep your conversation context.</p></div>
       <div id="voice-live-transcript" class="voice-transcript-card"><span class="transcript-placeholder">Your live transcript will appear here…</span></div>
       <button id="live-voice-toggle-btn" class="voice-action-btn" onclick="toggleLiveVoiceMode()"><i class="fa-solid fa-microphone"></i><span>Start Live Mode</span></button>
