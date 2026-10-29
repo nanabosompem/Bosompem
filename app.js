@@ -292,6 +292,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   loadSavedSettings();
   initTheme();
   initNotificationSettings();
+  initPushSettings();
   updateGreeting();
   updateClock();
   setInterval(updateClock,30000);
@@ -914,24 +915,68 @@ function initReminderNotifications(){
     if(changed){saveJSON(STORAGE.reminders,state.reminders);renderReminders();}
   },15000);
 }
+let imageGenerationController=null;
 async function generateImage(){
   const prompt=document.getElementById('image-generation-prompt')?.value.trim();
-  const status=document.getElementById('image-generation-status');const result=document.getElementById('generated-image-result');
-  if(!prompt){alert('Describe the image you want to create first.');return;}
-  if(!state.apiKey){alert('Add your Gemini API key in System Settings first.');openScreen('settings');return;}
-  if(status)status.textContent='Generating image…';if(result)result.innerHTML='';
-   // Gemini image model availability depends on API key/project access. Do not silently pretend text output is an image.
-  const candidates=['gemini-2.5-flash-image','gemini-2.0-flash-preview-image-generation'];let lastError='No supported image model was available.';
-  for(const model of candidates){try{
-    const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{role:'user',parts:[{text:`Generate an image based on this prompt. Return an image, not just a description: ${prompt}`}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
-    const data=await res.json();if(!res.ok)throw new Error(data.error?.message||`Image API error ${res.status}`);
-    const parts=data.candidates?.[0]?.content?.parts||[];const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
-    const d=imagePart?.inlineData||imagePart?.inline_data;if(!d?.data)throw new Error('The selected model returned no image. Check whether image generation is enabled for your API key.');
-    const mime=d.mimeType||d.mime_type||'image/png';if(result)result.innerHTML=`<img class="generated-image" alt="AI-generated image" src="data:${mime};base64,${d.data}"><a class="primary-btn" download="bosompem-generated-image.png" href="data:${mime};base64,${d.data}">Save image</a>`;
-    if(status)status.textContent='Image generated successfully.';return;
-  }catch(err){lastError=err.message||String(err);if(/quota|billing|permission|not found|not supported|not available|model/i.test(lastError))continue;break;}}
-  if(status)status.textContent='Image generation failed.';alert(`Bosompem could not generate an image. ${lastError}`);
+  const ratio=document.getElementById('image-aspect-ratio')?.value||'1:1';
+  const size=document.getElementById('image-size')?.value||'1K';
+  const status=document.getElementById('image-generation-status');
+  const result=document.getElementById('generated-image-result');
+  const button=document.getElementById('generate-image-btn');
+  const stopButton=document.getElementById('stop-image-generation-btn');
+  if(!prompt){if(status)status.textContent='Add a prompt describing the image first.';return;}
+  if(!state.apiKey){if(status)status.textContent='Add your Gemini API key in Settings to generate images.';openScreen('settings');return;}
+  if(imageGenerationController){imageGenerationController.abort();}
+  imageGenerationController=new AbortController();
+  if(button)button.disabled=true;if(stopButton)stopButton.classList.remove('hidden');
+  if(status)status.textContent=`Creating a ${ratio} image (${size})…`;
+  if(result)result.innerHTML='';
+  // Current supported image models use Gemini's GenerateContent endpoint. Model access can vary by API project.
+  const candidates=['gemini-3.1-flash-image','gemini-2.5-flash-image'];
+  let lastError='No supported image model was available.';
+  try{
+    for(const model of candidates){
+      try{
+        const generationConfig={responseModalities:['TEXT','IMAGE'],imageConfig:{aspectRatio:ratio}};
+        if(model==='gemini-3.1-flash-image')generationConfig.imageConfig.imageSize=size;
+        const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
+          method:'POST',signal:imageGenerationController.signal,
+          headers:{'Content-Type':'application/json','x-goog-api-key':state.apiKey},
+          body:JSON.stringify({contents:[{role:'user',parts:[{text:`Create one original image from this brief. Return an actual image, not only a description. Prompt: ${prompt}`}]}],generationConfig})
+        });
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok)throw new Error(data.error?.message||`Image API error ${res.status}`);
+        const parts=data.candidates?.[0]?.content?.parts||[];
+        const imagePart=parts.find(p=>p.inlineData?.data||p.inline_data?.data);
+        const d=imagePart?.inlineData||imagePart?.inline_data;
+        if(!d?.data)throw new Error((parts.find(p=>p.text)?.text)||'The model returned no image. Check model access and API billing/quota.');
+        const mime=d.mimeType||d.mime_type||'image/png';
+        const ext=mime.includes('jpeg')||mime.includes('jpg')?'jpg':mime.includes('webp')?'webp':'png';
+        const src=`data:${mime};base64,${d.data}`;
+        if(result){
+          const img=document.createElement('img');img.className='generated-image';img.alt='AI-generated image';img.src=src;
+          const actions=document.createElement('div');actions.className='generated-image-actions';
+          const save=document.createElement('a');save.className='primary-btn';save.href=src;save.download=`bosompem-generated-image.${ext}`;save.textContent='Save image';
+          const promptCopy=document.createElement('button');promptCopy.className='secondary-glass-btn';promptCopy.type='button';promptCopy.textContent='Copy prompt';promptCopy.onclick=async()=>{try{await navigator.clipboard.writeText(prompt);if(status)status.textContent='Prompt copied.';}catch{if(status)status.textContent='Clipboard access was blocked by the browser.';}};
+          actions.append(save,promptCopy);result.append(img,actions);
+        }
+        if(status)status.textContent=`Image created with ${model}. Save it to keep a local copy.`;
+        return;
+      }catch(err){
+        if(err.name==='AbortError')throw err;
+        lastError=err.message||String(err);
+        if(!/quota|billing|permission|not found|not supported|not available|model|unsupported|404|403/i.test(lastError))break;
+      }
+    }
+    throw new Error(lastError);
+  }catch(err){
+    if(err.name==='AbortError'){if(status)status.textContent='Image generation cancelled.';}
+    else{if(status)status.textContent='Image generation failed.';alert(`Bosompem could not generate the image. ${err.message||err}`);}
+  }finally{
+    imageGenerationController=null;if(button)button.disabled=false;if(stopButton)stopButton.classList.add('hidden');
+  }
 }
+function stopImageGeneration(){if(imageGenerationController)imageGenerationController.abort();}
 
 function parseReminderDate(value){
   const now=new Date();const normalized=value.toLowerCase().trim();
@@ -1229,6 +1274,62 @@ function prepareLocationShare(){
  setDeviceActionStatus('Waiting for your location permission…');
  navigator.geolocation.getCurrentPosition(pos=>{const url=`https://maps.google.com/?q=${pos.coords.latitude},${pos.coords.longitude}`;const panel=document.getElementById('device-command-plan');if(panel){panel.classList.remove('hidden');panel.innerHTML='<h4>Location link ready</h4><p>Review before sharing. Your location has not been sent to anyone.</p><div class="device-plan-actions"><button id="copy-location-link" type="button">Copy map link</button><button id="open-location-map" type="button">Open map</button></div>';document.getElementById('copy-location-link').onclick=async()=>{try{await navigator.clipboard.writeText(url);setDeviceActionStatus('Map link copied. Paste it only into a chat you choose.',true);}catch{setDeviceActionStatus(url);}};document.getElementById('open-location-map').onclick=()=>launchExternal(url);}setDeviceActionStatus('Location obtained. Review the map link before sharing.',true);},err=>setDeviceActionStatus('Location was not obtained: '+(err.message||'permission denied')),{enableHighAccuracy:false,timeout:10000});
 }
+
+// Remote Web Push configuration. The public VAPID key is public; the private key stays on the push server.
+const BOSOMPEM_PUSH_CONFIG='bosompem_push_config_v1';
+function getPushConfig(){try{return Object.assign({serverUrl:'',vapidPublicKey:''},JSON.parse(localStorage.getItem(BOSOMPEM_PUSH_CONFIG)||'{}'));}catch{return{serverUrl:'',vapidPublicKey:''};}}
+function savePushConfig(){
+  const serverUrl=(document.getElementById('push-server-url')?.value||'').trim().replace(/\/+$/,'');
+  const vapidPublicKey=(document.getElementById('push-vapid-public-key')?.value||'').trim();
+  if(serverUrl&&!/^https:\/\//i.test(serverUrl)&&!/^http:\/\/localhost(?::\d+)?$/i.test(serverUrl)){alert('Use an HTTPS push server URL (localhost is allowed for development).');return false;}
+  try{localStorage.setItem(BOSOMPEM_PUSH_CONFIG,JSON.stringify({serverUrl,vapidPublicKey}));}catch{}
+  return true;
+}
+function urlBase64ToUint8Array(base64String){const padding='='.repeat((4-base64String.length%4)%4);const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');const raw=atob(base64);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
+async function enableRemotePush(){
+  const status=document.getElementById('remote-push-status');
+  if(!savePushConfig())return;
+  const cfg=getPushConfig();
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)){if(status)status.textContent='This browser does not support Web Push.';return;}
+  if(!window.isSecureContext){if(status)status.textContent='Web Push requires HTTPS.';return;}
+  if(!cfg.serverUrl||!cfg.vapidPublicKey){if(status)status.textContent='Enter the push server URL and VAPID public key first.';return;}
+  if(status)status.textContent='Requesting notification permission…';
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted')throw new Error('Notification permission was not granted.');
+    const registration=await navigator.serviceWorker.ready;
+    let subscription=await registration.pushManager.getSubscription();
+    if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.vapidPublicKey)});
+    const response=await fetch(`${cfg.serverUrl}/api/subscribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscription:subscription.toJSON(),origin:location.origin})});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.error||`Subscription registration failed (${response.status}).`);
+    if(status)status.textContent='Remote push enabled on this device. The server can now send notifications even when Bosompem is closed.';
+    showBrowserNotification('Bosompem push enabled','This device is subscribed to remote push notifications.');
+  }catch(err){if(status)status.textContent=`Could not enable remote push: ${err.message||err}`;}
+}
+async function disableRemotePush(){
+  const status=document.getElementById('remote-push-status');const cfg=getPushConfig();
+  try{
+    const reg=await navigator.serviceWorker.ready;const sub=await reg.pushManager.getSubscription();
+    if(sub){if(cfg.serverUrl){await fetch(`${cfg.serverUrl}/api/unsubscribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint:sub.endpoint,origin:location.origin})}).catch(()=>{});}await sub.unsubscribe();}
+    if(status)status.textContent='Remote push subscription removed from this browser.';
+  }catch(err){if(status)status.textContent=`Could not remove subscription: ${err.message||err}`;}
+}
+async function sendPushTest(){
+  const status=document.getElementById('remote-push-status');const cfg=getPushConfig();
+  const token=(document.getElementById('push-admin-token')?.value||'').trim();
+  if(!cfg.serverUrl){if(status)status.textContent='Configure the push server URL first.';return;}
+  if(!token){if(status)status.textContent='Enter the server admin token for this one-time test. It is not saved.';return;}
+  try{
+    if(status)status.textContent='Sending test push…';
+    const response=await fetch(`${cfg.serverUrl}/api/send`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},body:JSON.stringify({title:'Bosompem test notification',body:'Remote push delivery is working on your subscribed device.',url:'./',tag:'bosompem-test'})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||`Push request failed (${response.status}).`);
+    if(status)status.textContent=`Push sent: ${data.sent||0} device(s) reached${data.failed?`; ${data.failed} failed`:''}.`;
+    const tokenInput=document.getElementById('push-admin-token');if(tokenInput)tokenInput.value='';
+  }catch(err){if(status)status.textContent=`Test push failed: ${err.message||err}`;}
+}
+function initPushSettings(){const c=getPushConfig();const server=document.getElementById('push-server-url');const key=document.getElementById('push-vapid-public-key');if(server)server.value=c.serverUrl;if(key)key.value=c.vapidPublicKey;}
 
 // Customizable browser notifications. Remote push delivery still requires a push server/service.
 const BOSOMPEM_NOTIFICATION_PREFS='bosompem_notification_preferences_v1';

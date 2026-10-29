@@ -276,3 +276,15 @@ html[data-theme="light"] .fa-solid,html[data-theme="light"] .fa-regular,html[dat
 html body *,html body *:before,html body *:after{background-image:none!important}
 
 .quiet-hours-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.quiet-hours-row label{display:grid;gap:6px;font-size:.75rem;color:var(--text-sub)}.quiet-hours-row input{width:100%;box-sizing:border-box;padding:10px;border-radius:10px}
+
+
+/* Image generation and remote push controls */
+.image-generation-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.image-generation-options .setting-group{margin:0;min-width:0}
+.image-generation-actions,.generated-image-actions,.push-action-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.generated-image-result{display:grid;gap:12px;margin-top:16px}
+.generated-image{display:block;width:100%;height:auto;max-height:72vh;object-fit:contain;border-radius:16px;border:1px solid var(--border-color,rgba(255,255,255,.14))}
+.push-setup-divider{height:1px;background:var(--border-color,rgba(255,255,255,.14));margin:22px 0}
+#remote-push-status{overflow-wrap:anywhere;line-height:1.5;margin-top:12px}
+#image-generation-status{line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:520px){.image-generation-options{grid-template-columns:1fr}.image-generation-actions>* ,.push-action-row>*{flex:1 1 100%;width:100%}}
