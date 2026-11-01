@@ -400,12 +400,12 @@ async function requestGemini({ contents, text, model, allowSearch, signal }) {
 
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const call = async (targetModel, includeSearch) => {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(state.apiKey)}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent`;
     let response;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.apiKey },
         body: JSON.stringify(makeBody(includeSearch)),
         signal
       });
