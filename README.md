@@ -1,49 +1,21 @@
-# Bosompem Web Push server
+# Bosompem Pro v4 — browser-first upgrade
 
-This small Node.js service receives Web Push subscriptions and sends notifications using VAPID. The browser receives push through `sw.js`; GitHub Pages alone cannot send push messages because it has no server-side secret or scheduler.
+This package is built from the latest files you supplied. It preserves the Living Constellation voice animation and existing feature screens while refreshing the visual system and repairing offline caching.
 
-## 1. Generate VAPID keys
+## Files
+- `index.html`, `style.css`, `app.js`: browser app
+- `manifest.json`, `sw.js`: installability, offline shell and push handling
+- `icon-192.png`, `icon-512.png`: generated app icons
+- `server.js`, `package.json`: optional Web Push sender
 
-```sh
-npm install
-npm run vapid
-```
+## Important notes
+1. The Gemini API key is still entered in the browser app. A public frontend cannot keep that key secret. Do not use a key with unrestricted access or quotas you cannot afford. A server-side AI proxy is the next security step.
+2. Image generation depends on the models and quota enabled for your Gemini API project. The UI cannot guarantee free generation.
+3. Local reminder notifications work only while the browser/app can run its JavaScript. Delivery while the app is closed requires a deployed push server and a scheduler/worker that sends due reminders. The included server currently supports subscription storage and authenticated broadcast test sends; it does not yet schedule reminders automatically.
+4. The push server requires Node.js 20+, `npm install`, VAPID keys, `PUSH_ADMIN_TOKEN` (at least 24 characters), and `ALLOWED_ORIGINS` set to your exact deployed website origin. Keep `VAPID_PRIVATE_KEY` and `PUSH_ADMIN_TOKEN` private.
+5. Native Android controls and a true always-on wake word still require a native Android companion. A browser PWA cannot reliably listen in the background or control Wi-Fi, Bluetooth, flashlight or other apps.
 
-Copy the public and private key output into the hosting provider's environment variables. **Keep `VAPID_PRIVATE_KEY` and `PUSH_ADMIN_TOKEN` secret.** Never commit real values to Git.
+## Phone-friendly deployment
+Replace the matching files in your GitHub repository with the files from this folder. Upload both icon PNGs too. Keep file names exactly as shown. Commit the changes, then open your GitHub Pages site and refresh it. If an older version remains, close the installed PWA, clear the site's cached data in Chrome, and reopen it.
 
-## 2. Configure and run
-
-Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a mailto address), `PUSH_ADMIN_TOKEN` (at least 24 characters), and `ALLOWED_ORIGINS` (comma-separated exact origins of the hosted app; no paths). Then run:
-
-```sh
-npm start
-```
-
-Use a host with HTTPS and persistent storage for `subscriptions.json`. This server stores subscription endpoints and keys, which are sensitive capability URLs; restrict access to the file and back it up securely. The in-memory rate limiter is a basic safeguard, not a substitute for production identity/rate limiting. For a multi-user production service, add authentication and a managed database.
-
-## 3. Configure Bosompem
-
-In Settings → Notifications, enter the public server URL and the VAPID public key, then tap **Enable remote push** on each device. Grant notification permission. Keep the private key server-side only.
-
-## 4. Send a notification
-
-Send requests from a trusted admin environment only (not a public webpage):
-
-```sh
-curl -X POST "$PUSH_SERVER_URL/api/send" \
-  -H "Authorization: Bearer $PUSH_ADMIN_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"title":"Bosompem","body":"Your scheduled update is ready.","url":"./","tag":"daily-update"}'
-```
-
-The app's **Send test push** control is for owner testing: enter the admin token temporarily. Do not expose this token to untrusted users. For production, remove the admin-token field from the public UI and trigger `/api/send` from a trusted scheduler or authenticated backend workflow.
-
-## API
-
-- `GET /health` — health check.
-- `GET /api/config` — returns only the VAPID public key.
-- `POST /api/subscribe` — `{ "subscription": PushSubscription.toJSON(), "origin": "https://..." }`.
-- `POST /api/unsubscribe` — `{ "endpoint": "https://..." }`.
-- `POST /api/send` — admin Bearer token and `{ "title", "body", "url", "tag" }`; sends to all registered subscriptions and prunes expired (404/410) endpoints.
-
-Only allow the exact production app origin in `ALLOWED_ORIGINS`. CORS is not authentication; the send route is protected by the admin token.
+The push server is optional; the main PWA can be deployed without it. Do not upload `.env`, VAPID private keys, admin tokens, or `subscriptions.json` to the public GitHub repository.

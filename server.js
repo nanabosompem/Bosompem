@@ -7,7 +7,7 @@ const webpush = require('web-push');
 const PORT = Number(process.env.PORT || 8787);
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:bosompem-admin@example.com';
 const ADMIN_TOKEN = process.env.PUSH_ADMIN_TOKEN || '';
 const ALLOWED_ORIGINS = new Set((process.env.ALLOWED_ORIGINS || 'http://localhost:8787,http://127.0.0.1:8787').split(',').map(x => x.trim()).filter(Boolean));
 const DATA_FILE = process.env.SUBSCRIPTIONS_FILE || path.join(process.cwd(), 'subscriptions.json');
@@ -66,7 +66,8 @@ function sameOriginPayloadUrl(value) {
 function authorized(req) {
   const auth = req.headers.authorization || '';
   const supplied = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  return crypto.timingSafeEqual(Buffer.from(supplied.padEnd(ADMIN_TOKEN.length, '\0').slice(0, ADMIN_TOKEN.length)), Buffer.from(ADMIN_TOKEN));
+  if (supplied.length !== ADMIN_TOKEN.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(ADMIN_TOKEN));
 }
 
 const server = http.createServer(async (req, res) => {
@@ -78,8 +79,10 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/config') return sendJson(res, 200, { vapidPublicKey: VAPID_PUBLIC_KEY });
   if (req.headers.origin && !isAllowedOrigin(req.headers.origin)) return sendJson(res, 403, { error: 'Origin is not allowlisted.' });
   try {
+    if (req.method === 'POST' && !String(req.headers['content-type'] || '').toLowerCase().includes('application/json')) return sendJson(res, 415, { error: 'Content-Type must be application/json.' });
     if (req.method === 'POST' && url.pathname === '/api/subscribe') {
       const body = await readJson(req); const sub = body.subscription;
+      if (req.headers.origin && !isAllowedOrigin(req.headers.origin)) return sendJson(res, 403, { error: 'Origin is not allowlisted.' });
       if (!sub || typeof sub.endpoint !== 'string' || !sub.endpoint.startsWith('https://') || !sub.keys?.p256dh || !sub.keys?.auth) return sendJson(res, 400, { error: 'A valid Web Push subscription is required.' });
       const subscriptions = readSubscriptions();
       const next = subscriptions.filter(item => item.endpoint !== sub.endpoint);
@@ -88,7 +91,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 201, { ok: true, subscriptions: next.length });
     }
     if (req.method === 'POST' && url.pathname === '/api/unsubscribe') {
-      const body = await readJson(req); if (typeof body.endpoint !== 'string') return sendJson(res, 400, { error: 'Subscription endpoint is required.' });
+      const body = await readJson(req); if (req.headers.origin && !isAllowedOrigin(req.headers.origin)) return sendJson(res, 403, { error: 'Origin is not allowlisted.' }); if (typeof body.endpoint !== 'string') return sendJson(res, 400, { error: 'Subscription endpoint is required.' });
       const next = readSubscriptions().filter(item => item.endpoint !== body.endpoint); writeSubscriptions(next);
       return sendJson(res, 200, { ok: true, subscriptions: next.length });
     }

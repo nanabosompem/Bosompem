@@ -316,3 +316,38 @@ html body *,html body *:before,html body *:after{background-image:none!important
 .constellation-stage .voice-orb-glow{inset:18%;border-radius:40%;background:conic-gradient(from 20deg,rgba(89,243,226,.45),rgba(155,140,255,.42),transparent,rgba(89,243,226,.4));filter:blur(24px);opacity:.3;animation:constellation-glow 3.2s ease-in-out infinite;}
 @keyframes constellation-orbit{to{transform:rotate(360deg)}}@keyframes constellation-orbit-reverse{to{transform:rotate(-360deg)}}@keyframes constellation-breathe{0%,100%{transform:scale(.94);opacity:.45}50%{transform:scale(1.04);opacity:.9}}@keyframes constellation-flicker{0%,100%{opacity:.35}50%{opacity:.9}}@keyframes node-twinkle{0%,100%{transform:scale(.65);opacity:.45}50%{transform:scale(1.35);opacity:1}}@keyframes core-shift{0%,100%{transform:rotate(0) scale(.94)}50%{transform:rotate(12deg) scale(1.06)}}@keyframes sigil-flow{0%,100%{transform:scaleY(.45);opacity:.55}50%{transform:scaleY(1.25);opacity:1}}@keyframes constellation-listen{0%,100%{transform:rotate(45deg) scale(.98)}50%{transform:rotate(45deg) scale(1.09)}}@keyframes constellation-think{to{transform:rotate(405deg)}}@keyframes constellation-speak{from{transform:rotate(45deg) scale(.97)}to{transform:rotate(45deg) scale(1.08)}}@keyframes constellation-glow{0%,100%{transform:rotate(0) scale(.8);opacity:.2}50%{transform:rotate(180deg) scale(1.18);opacity:.55}}
 @media(prefers-reduced-motion:reduce){.constellation-stage *, .constellation-stage *::before{animation-duration:0.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}
+
+
+/* BOSOMPEM V4 — refined responsive interface */
+:root{--bg-deep:#0b1220;--bg-surface:rgba(18,29,48,.92);--bg-glass:rgba(255,255,255,.055);--bg-input:rgba(8,17,31,.92);--border-glass:rgba(148,190,220,.16);--border-glow:rgba(83,220,218,.42);--primary:#66d8d0;--primary-glow:rgba(83,220,218,.2);--accent-cyan:#67e8df;--accent-rose:#f18ca7;--text-main:#f3f7fb;--text-sub:#a9bacb;--text-muted:#72869a;--radius-xl:26px;--radius-lg:19px;--radius-md:14px}
+html,body{background:#080e18;color:var(--text-main)}
+.phone-container{max-width:480px;background:#0b1422;box-shadow:0 24px 90px rgba(0,0,0,.46);border-color:rgba(141,198,215,.14)}
+@media(min-width:700px){.phone-container{max-width:520px;height:min(94dvh,980px);border-radius:32px}}
+.app-topbar{background:rgba(11,20,34,.92)!important;border-bottom:1px solid rgba(151,193,214,.12)!important;backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important}
+.app-bottom-nav{background:rgba(11,20,34,.96)!important;border-top:1px solid rgba(151,193,214,.12)!important;backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important}
+.screen-title{letter-spacing:-.025em}.screen-subtitle,.eyebrow,.hero-eyebrow{letter-spacing:.16em}
+.brand-mark-mini,.avatar-glow{border:1px solid rgba(103,232,223,.3)!important;box-shadow:0 0 24px rgba(103,232,223,.12)!important}
+.quick-card,.lab-card,.settings-card,.profile-section-card,.profile-hero-card,.tasks-header-card,.capability-card,.device-action-card,.agent-planner-card,.project-card,.task-item,.voice-transcript-card{border:1px solid rgba(150,194,215,.15)!important;border-radius:20px!important;background:rgba(22,35,54,.78)!important;box-shadow:0 12px 34px rgba(0,0,0,.16)!important}
+.quick-card{padding:15px!important;transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.quick-card:active,.device-action-card:active,.menu-item:active{transform:scale(.985)}
+.quick-card:hover,.device-action-card:hover{border-color:rgba(103,232,223,.35)!important;background:rgba(28,48,67,.9)!important}
+.primary-btn,.send-btn,.voice-action-btn{background:#63d6ce!important;color:#09202a!important;border:1px solid rgba(180,255,250,.38)!important;border-radius:15px!important;font-weight:750!important;box-shadow:0 8px 24px rgba(70,210,201,.16)!important}
+.secondary-glass-btn,.icon-action-btn,.topbar-btn,.console-btn{border:1px solid rgba(153,196,218,.18)!important;border-radius:14px!important;background:rgba(255,255,255,.055)!important}
+.glass-input,.glass-textarea,.glass-select{border:1px solid rgba(153,196,218,.18)!important;border-radius:14px!important;background:rgba(7,16,29,.76)!important;color:#f2f7fb!important;outline:none!important}
+.glass-input:focus,.glass-textarea:focus,.glass-select:focus,#chat-input:focus{border-color:rgba(103,232,223,.62)!important;box-shadow:0 0 0 3px rgba(103,232,223,.09)!important}
+.console-box{border:1px solid rgba(103,232,223,.25)!important;background:rgba(10,21,36,.96)!important;box-shadow:0 10px 32px rgba(0,0,0,.25)!important;border-radius:20px!important}
+.message-bubble,.messages-container .assistant-message,.messages-container .message.assistant{border-radius:18px!important}
+.nav-drawer{background:rgba(12,22,37,.98)!important;border-right:1px solid rgba(150,194,215,.16)!important}
+.menu-item{border-radius:13px!important}.menu-item.active{background:rgba(99,214,206,.13)!important;color:#8ef2e9!important}
+.status-pill,.status-badge{border:1px solid rgba(103,232,223,.22)!important;border-radius:999px!important}
+.screen-scroll-container{scrollbar-width:thin;scrollbar-color:rgba(119,164,184,.28) transparent}
+#image-generation-status,#remote-push-status,.permission-note,.device-action-status{overflow-wrap:anywhere}
+.constellation-stage{--constellation-cyan:#70eee2;--constellation-violet:#a7a1ff}
+.constellation-stage .voice-orb{border-color:rgba(112,238,226,.72)!important}
+/* Light theme remains readable and consistent with the refreshed visual system. */
+html[data-theme="light"] body,html[data-theme="light"] .phone-container{background:#edf4f8!important;color:#183149!important}
+html[data-theme="light"] .app-topbar,html[data-theme="light"] .app-bottom-nav,html[data-theme="light"] .nav-drawer{background:rgba(239,247,251,.96)!important;border-color:rgba(61,111,143,.16)!important}
+html[data-theme="light"] .quick-card,html[data-theme="light"] .lab-card,html[data-theme="light"] .settings-card,html[data-theme="light"] .profile-section-card,html[data-theme="light"] .profile-hero-card,html[data-theme="light"] .tasks-header-card,html[data-theme="light"] .capability-card,html[data-theme="light"] .device-action-card,html[data-theme="light"] .agent-planner-card,html[data-theme="light"] .project-card,html[data-theme="light"] .task-item,html[data-theme="light"] .voice-transcript-card{background:rgba(255,255,255,.86)!important;border-color:rgba(74,127,157,.16)!important;color:#183149!important}
+html[data-theme="light"] .glass-input,html[data-theme="light"] .glass-textarea,html[data-theme="light"] .glass-select,html[data-theme="light"] .console-box{background:rgba(255,255,255,.94)!important;color:#183149!important;border-color:rgba(74,127,157,.22)!important}
+html[data-theme="light"] .primary-btn,html[data-theme="light"] .send-btn,html[data-theme="light"] .voice-action-btn{background:#187d82!important;color:#fff!important}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}

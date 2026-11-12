@@ -3,12 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#19263c">
+  <meta name="theme-color" content="#101827">
+  <meta name="color-scheme" content="dark light">
+  <meta name="application-name" content="Bosompem">
+  <meta name="apple-mobile-web-app-title" content="Bosompem">
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
   <meta name="description" content="Bosompem — a persistent, multimodal and user-controlled AI personal assistant.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
-  <title>Bosompem AI — Personal Assistant</title>
+  <title>Bosompem — Personal AI</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -120,7 +125,7 @@
     <section id="screen-tasks" class="screen-view"><div class="screen-scroll-container"><div class="section-heading"><div><div class="eyebrow">AUTOMATION</div><h2>Tasks</h2><p>Reminders and future automation hooks.</p></div><button class="icon-action-btn" onclick="addReminder()"><i class="fa-solid fa-plus"></i></button></div><div class="tasks-header-card"><div class="task-stat"><span id="task-count">0</span><small>scheduled locally</small></div><div class="status-pill">READY</div></div><div id="full-reminders-list" class="tasks-list"></div></div></section>
 <section id="screen-device-control" class="screen-view">
       <div class="screen-scroll-container device-control-scroll">
-        <div class="page-hero"><div class="eyebrow">SIRI · BIXBY · JARVIS</div><h2>Device Control</h2><p>Tell Bosompem what you want done. It will prepare the right action and ask before sending messages or performing sensitive tasks.</p></div>
+        <div class="page-hero"><div class="eyebrow">BOSOMPEM DEVICE BRIDGE</div><h2>Device Control</h2><p>Tell Bosompem what you want done. It will prepare the right action and ask before sending messages or performing sensitive tasks.</p></div>
         <div class="lab-card device-command-card"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Ask Bosompem to do something</h3><p>Example: “Open WhatsApp and tell Christy to buy me water.”</p><div class="device-command-input-row"><textarea id="device-command-input" class="glass-textarea" rows="2" placeholder="Hey Bosompem, open WhatsApp and tell Christy to buy me water."></textarea><button type="button" class="device-mic-btn" onclick="captureDeviceCommand()" aria-label="Speak device command" title="Speak a command"><i class="fa-solid fa-microphone"></i></button></div><button type="button" class="primary-btn" onclick="prepareDeviceCommand()"><i class="fa-solid fa-list-check"></i> Prepare action</button><div id="device-command-plan" class="device-command-plan hidden" aria-live="polite"></div></div>
         <div class="lab-card favourite-contacts-card">
           <div class="section-heading"><div><h3><i class="fa-solid fa-star"></i> Favourite contacts</h3><p>Bosompem checks this trusted list first, then lets you choose from your phone contacts if needed.</p></div></div>
@@ -202,8 +207,8 @@
   </main>
 <nav class="app-bottom-nav"><button class="nav-tab active" onclick="openScreen('chat')" data-screen="chat"><i class="fa-solid fa-message"></i><span>Assistant</span></button><button class="nav-tab" onclick="openScreen('live-voice')" data-screen="live-voice"><i class="fa-solid fa-microphone-lines"></i><span>Voice</span></button><button class="nav-tab" onclick="openScreen('projects')" data-screen="projects"><i class="fa-solid fa-folder-tree"></i><span>Projects</span></button><button class="nav-tab" onclick="openScreen('tasks')" data-screen="tasks"><i class="fa-solid fa-bolt"></i><span>Tasks</span></button></nav>
 </div>
-<script src="app.js"></script>
-<script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker:',err)));}</script>
+<script src="app.js" defer></script>
+<script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(reg=>{if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});}).catch(err=>console.warn('Bosompem offline support:',err)));}</script>
 </body>
                                                                                                                                                                                   </html>
                                                                                                                                                                                   
