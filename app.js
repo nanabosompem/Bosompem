@@ -911,7 +911,7 @@ function initReminderNotifications(){
   if(state.reminderTimer)clearInterval(state.reminderTimer);
   state.reminderTimer=setInterval(()=>{
     const now=Date.now();let changed=false;
-    for(const r of state.reminders){const due=r.dueAt?Date.parse(r.dueAt):Date.parse(r.when||'');if(Number.isFinite(due)&&due<=now&&!r.notified){r.notified=true;changed=true;showBrowserNotification('Bosompem reminder',r.title,'reminders');}}
+    for(const r of state.reminders){const due=r.dueAt?Date.parse(r.dueAt):Date.parse(r.when||'');if(Number.isFinite(due)&&due<=now&&!r.notified&&!r.remoteScheduled){r.notified=true;changed=true;showBrowserNotification('Bosompem reminder',r.title,'reminders');}}
     if(changed){saveJSON(STORAGE.reminders,state.reminders);renderReminders();}
   },15000);
 }
@@ -984,16 +984,31 @@ function parseReminderDate(value){
   if(m){let hour=Number(m[2]),minute=Number(m[3]||0);if(m[4]==='pm'&&hour<12)hour+=12;if(m[4]==='am'&&hour===12)hour=0;if(hour>23||minute>59)return null;const d=new Date(now);if(m[1]==='tomorrow')d.setDate(d.getDate()+1);d.setHours(hour,minute,0,0);return d;}
   const parsed=Date.parse(value);return Number.isFinite(parsed)?new Date(parsed):null;
 }
-function addReminder(){
+async function addReminder(){
   const title=prompt('What should Bosompem remind you about?');if(!title?.trim())return;
-  const when=prompt('When? Example: tomorrow 09:00 or 2026-10-10 18:30');if(!when?.trim())return;
-  const dueAt=parseReminderDate(when.trim());state.reminders.unshift({id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),dueAt:dueAt?dueAt.toISOString():null,notified:false,createdAt:new Date().toISOString()});saveJSON(STORAGE.reminders,state.reminders);renderReminders();
+  const when=prompt('When? Example: tomorrow 09:00 or 2026-12-10 18:30');if(!when?.trim())return;
+  const dueAt=parseReminderDate(when.trim());if(!dueAt||dueAt.getTime()<=Date.now()){alert('Please enter a valid future date and time.');return;}
+  const reminder={id:'rem_'+Date.now(),title:title.trim(),when:when.trim(),dueAt:dueAt.toISOString(),notified:false,remoteScheduled:false,createdAt:new Date().toISOString()};
+  state.reminders.unshift(reminder);saveJSON(STORAGE.reminders,state.reminders);renderReminders();
+  const result=await scheduleRemoteReminder(reminder);
+  if(result){reminder.remoteScheduled=true;saveJSON(STORAGE.reminders,state.reminders);renderReminders();alert('Reminder saved and scheduled for remote delivery, even when Bosompem is closed.');}
+  else alert('Reminder saved on this device. For delivery while Bosompem is closed, enable Remote Push in Settings and create the reminder again.');
+}
+async function getActivePushSubscription(){try{if(!('serviceWorker'in navigator))return null;const reg=await navigator.serviceWorker.ready;return await reg.pushManager.getSubscription();}catch{return null;}}
+async function scheduleRemoteReminder(reminder){
+  const cfg=getPushConfig();if(!cfg.serverUrl)return false;
+  const sub=await getActivePushSubscription();if(!sub)return false;
+  try{const response=await fetch(`${cfg.serverUrl}/api/reminders/schedule`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:reminder.id,endpoint:sub.endpoint,title:reminder.title,dueAt:reminder.dueAt})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`Scheduler request failed (${response.status})`);return !!data.scheduled;}catch(err){console.warn('Remote reminder scheduling failed:',err);return false;}
+}
+async function cancelRemoteReminder(reminder){
+  if(!reminder?.remoteScheduled)return;const cfg=getPushConfig();if(!cfg.serverUrl)return;const sub=await getActivePushSubscription();if(!sub)return;
+  fetch(`${cfg.serverUrl}/api/reminders/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:reminder.id,endpoint:sub.endpoint})}).catch(()=>{});
 }
 function renderReminders(){
   const list=document.getElementById('full-reminders-list');if(!list)return;
   list.innerHTML=state.reminders.length?state.reminders.map(r=>`<div class="task-item"><div><strong>${escapeHtml(r.title)}</strong><small>${escapeHtml(r.when)}</small></div><button class="btn-icon-danger" onclick="deleteReminder('${r.id}')"><i class="fa-solid fa-trash"></i></button></div>`).join(''):'<div class="empty-state">No scheduled reminders yet.</div>';
 }
-function deleteReminder(id){state.reminders=state.reminders.filter(r=>r.id!==id);saveJSON(STORAGE.reminders,state.reminders);renderReminders();}
+function deleteReminder(id){const reminder=state.reminders.find(r=>r.id===id);cancelRemoteReminder(reminder);state.reminders=state.reminders.filter(r=>r.id!==id);saveJSON(STORAGE.reminders,state.reminders);renderReminders();}
 
 function createProject(){
   const name=prompt('Project name');if(!name?.trim())return;

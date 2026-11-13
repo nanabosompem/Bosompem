@@ -351,3 +351,51 @@ html[data-theme="light"] .quick-card,html[data-theme="light"] .lab-card,html[dat
 html[data-theme="light"] .glass-input,html[data-theme="light"] .glass-textarea,html[data-theme="light"] .glass-select,html[data-theme="light"] .console-box{background:rgba(255,255,255,.94)!important;color:#183149!important;border-color:rgba(74,127,157,.22)!important}
 html[data-theme="light"] .primary-btn,html[data-theme="light"] .send-btn,html[data-theme="light"] .voice-action-btn{background:#187d82!important;color:#fff!important}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+/* BOSOMPEM PRO — AURORA GLASS UI LAYER (v6)
+   Visual-only overrides: preserves existing screen structure and app behavior. */
+:root{
+ --bg-deep:#070b16;--bg-surface:rgba(20,28,48,.48);--bg-glass:rgba(255,255,255,.065);
+ --bg-input:rgba(9,15,29,.58);--border-glass:rgba(210,225,255,.15);--border-glow:rgba(117,143,255,.55);
+ --primary:#8b7cff;--primary-glow:rgba(123,105,255,.34);--accent-cyan:#68e4f4;--accent-rose:#ff6f9b;
+ --text-main:#f5f7ff;--text-sub:#aab5ca;--text-muted:#78849d;
+ --glass-shadow:0 18px 55px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.10);
+}
+html,body{background:#060914!important;color:var(--text-main)}
+body:before{content:"";position:fixed;inset:-18%;z-index:-2;pointer-events:none;background:radial-gradient(ellipse at 12% 12%,rgba(94,103,255,.30),transparent 36%),radial-gradient(ellipse at 88% 22%,rgba(32,202,220,.19),transparent 34%),radial-gradient(ellipse at 52% 92%,rgba(156,76,255,.22),transparent 38%),linear-gradient(145deg,#070b17 0%,#0a1020 48%,#080b18 100%);}
+body:after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.16;background-image:radial-gradient(rgba(255,255,255,.34) .55px,transparent .7px);background-size:22px 22px;mask-image:linear-gradient(to bottom,black,transparent 85%)}
+.phone-container{background:linear-gradient(155deg,rgba(17,25,45,.82),rgba(7,11,23,.90))!important;border:1px solid rgba(220,230,255,.13);box-shadow:0 30px 100px rgba(0,0,0,.55),0 0 80px rgba(104,115,255,.12),inset 0 1px 0 rgba(255,255,255,.09)!important;isolation:isolate}
+.phone-container:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;background:radial-gradient(circle at 15% 0%,rgba(112,123,255,.10),transparent 35%),radial-gradient(circle at 100% 55%,rgba(49,213,227,.055),transparent 32%)}
+.phone-container>*{position:relative;z-index:1}
+.app-topbar,.console-wrapper,.nav-drawer,.app-bottom-nav,.bottom-nav,.floating-panel,.modal-content,.modal-card,.settings-card,.lab-card,.capability-card,.tasks-header-card,.tasks-list .task-card,.quick-card,.agent-planner-card,.voice-transcript-card,.device-action-card,.permission-center-card,.favourite-contacts-card,.chat-history-card,.project-card,.memory-card,.media-card,.image-generation-card,.profile-card,.stat-card,.feature-card,.glass-panel{
+ background:linear-gradient(145deg,rgba(255,255,255,.105),rgba(255,255,255,.035))!important;
+ border:1px solid rgba(220,232,255,.15)!important;box-shadow:var(--glass-shadow)!important;
+ -webkit-backdrop-filter:blur(22px) saturate(145%);backdrop-filter:blur(22px) saturate(145%);
+}
+.app-topbar{border-left:0!important;border-right:0!important;border-top:0!important;border-bottom:1px solid rgba(220,232,255,.12)!important;background:rgba(10,16,31,.58)!important}
+.nav-drawer{background:rgba(12,18,35,.86)!important;border-radius:0 26px 26px 0;border-left:0!important}
+.screen-scroll-container{scrollbar-width:thin;scrollbar-color:rgba(160,174,255,.32) transparent}
+.page-hero,.welcome-hero{position:relative;overflow:hidden;border-radius:26px;padding:24px 20px;background:linear-gradient(135deg,rgba(116,111,255,.16),rgba(39,198,220,.075) 55%,rgba(255,255,255,.025));border:1px solid rgba(204,218,255,.13);box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 16px 42px rgba(0,0,0,.15)}
+.page-hero:after,.welcome-hero:after{content:"";position:absolute;width:190px;height:190px;right:-90px;top:-115px;border-radius:50%;background:rgba(103,126,255,.25);filter:blur(35px);pointer-events:none}
+.welcome-hero h1{background:linear-gradient(100deg,#fff 10%,#b9c6ff 52%,#83e9f3 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.quick-card,.device-action-card,.profile-action-row,.menu-item,.topbar-btn,.icon-action-btn,.secondary-glass-btn,.primary-btn,.primary-btn-sm,.send-btn,.console-btn,.hero-badge,.status-pill,.speech-state-bar,.attachment-preview,.console-box,.glass-input,.glass-select,.glass-textarea,.device-command-plan,.task-item,.reminder-item{
+ transition:transform .22s ease,border-color .22s ease,background .22s ease,box-shadow .22s ease!important;
+}
+.quick-card,.device-action-card{border-radius:20px!important;padding:16px!important}
+.quick-card:active,.device-action-card:active,.topbar-btn:active,.primary-btn:active,.primary-btn-sm:active{transform:scale(.975)!important}
+.quick-card:hover,.device-action-card:hover,.settings-card:hover,.lab-card:hover{border-color:rgba(143,159,255,.36)!important;box-shadow:0 18px 48px rgba(0,0,0,.32),0 0 25px rgba(110,121,255,.08),inset 0 1px 0 rgba(255,255,255,.12)!important}
+.chat-bubble.user .bubble-content{background:linear-gradient(135deg,rgba(119,105,255,.88),rgba(72,122,224,.78))!important;border:1px solid rgba(218,224,255,.22);box-shadow:0 10px 28px rgba(76,85,205,.22)}
+.chat-bubble.assistant .bubble-content{background:rgba(255,255,255,.065)!important;border:1px solid rgba(218,230,255,.14)!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+.console-wrapper{background:linear-gradient(180deg,rgba(8,13,26,.20),rgba(8,13,26,.88))!important;border-top:1px solid rgba(220,230,255,.10)!important;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+.console-box,.glass-input,.glass-select,.glass-textarea{background:rgba(7,13,27,.62)!important;border:1px solid rgba(205,220,255,.17)!important;border-radius:17px!important;color:var(--text-main)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045)!important}
+.console-box:focus-within,.glass-input:focus,.glass-select:focus,.glass-textarea:focus{border-color:rgba(128,145,255,.72)!important;box-shadow:0 0 0 3px rgba(123,105,255,.13),0 8px 26px rgba(0,0,0,.18)!important}
+.primary-btn,.primary-btn-sm,.send-btn{background:linear-gradient(135deg,#887bff,#5a7eea 58%,#36b9ca)!important;border:1px solid rgba(226,231,255,.24)!important;color:white!important;border-radius:15px!important;box-shadow:0 9px 24px rgba(91,104,224,.27),inset 0 1px 0 rgba(255,255,255,.24)!important;font-weight:700}
+.secondary-glass-btn,.topbar-btn,.icon-action-btn{background:rgba(255,255,255,.075)!important;border:1px solid rgba(215,226,255,.18)!important;color:#e8edff!important;border-radius:14px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)!important}
+.hero-badge,.status-pill{background:rgba(127,124,255,.14)!important;border:1px solid rgba(153,158,255,.28)!important;color:#c7caff!important;border-radius:999px!important}
+.voice-orb{background:radial-gradient(circle at 32% 25%,rgba(255,255,255,.32),transparent 32%),linear-gradient(145deg,rgba(130,117,255,.92),rgba(40,180,206,.78))!important;border:1px solid rgba(234,240,255,.38);box-shadow:0 0 0 9px rgba(125,125,255,.08),0 0 55px rgba(90,164,255,.42),inset 0 2px 12px rgba(255,255,255,.30)!important}
+.voice-orb-glow{background:linear-gradient(135deg,#887bff,#42d5df)!important;opacity:.36!important;filter:blur(30px)!important}
+input,textarea,select{accent-color:#9387ff}
+button:focus-visible,[role=button]:focus-visible{outline:2px solid #9d9aff;outline-offset:3px}
+::selection{background:rgba(126,121,255,.38);color:white}
+@media(prefers-reduced-motion:no-preference){.page-hero,.welcome-hero{animation:glass-enter .55s ease both}.quick-card,.settings-card,.lab-card,.device-action-card{animation:glass-enter .42s ease both}@keyframes glass-enter{from{opacity:.72;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}}
+@media(max-width:360px){.screen-scroll-container{padding:15px}.page-hero,.welcome-hero{padding:19px 16px}.quick-card,.device-action-card{padding:13px!important}}
+@media(prefers-reduced-transparency:reduce){.app-topbar,.console-wrapper,.nav-drawer,.settings-card,.lab-card,.capability-card,.quick-card,.device-action-card{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(17,25,45,.96)!important}}

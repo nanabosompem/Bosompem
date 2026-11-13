@@ -11,6 +11,8 @@ const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:bosompem-admin@exampl
 const ADMIN_TOKEN = process.env.PUSH_ADMIN_TOKEN || '';
 const ALLOWED_ORIGINS = new Set((process.env.ALLOWED_ORIGINS || 'http://localhost:8787,http://127.0.0.1:8787').split(',').map(x => x.trim()).filter(Boolean));
 const DATA_FILE = process.env.SUBSCRIPTIONS_FILE || path.join(process.cwd(), 'subscriptions.json');
+const REMINDERS_FILE = process.env.REMINDERS_FILE || path.join(process.cwd(), 'reminders.json');
+const reminderLocks = new Set();
 const MAX_BODY = 64 * 1024;
 const rateBuckets = new Map();
 
@@ -32,6 +34,37 @@ function writeSubscriptions(value) {
   const temp = `${DATA_FILE}.${process.pid}.tmp`;
   fs.writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600 });
   fs.renameSync(temp, DATA_FILE);
+}
+function readReminders() {
+  try { const value = JSON.parse(fs.readFileSync(REMINDERS_FILE, 'utf8')); return Array.isArray(value) ? value : []; }
+  catch (err) { if (err.code !== 'ENOENT') console.error('Reminder store read failed:', err.message); return []; }
+}
+function writeReminders(value) {
+  const temp = `${REMINDERS_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, JSON.stringify(value, null, 2), { mode: 0o600 });
+  fs.renameSync(temp, REMINDERS_FILE);
+}
+function validReminderId(value) { return typeof value === 'string' && /^[a-zA-Z0-9_-]{4,100}$/.test(value); }
+async function processDueReminders() {
+  const now = Date.now(); const jobs = readReminders(); let changed = false;
+  for (const job of jobs) {
+    if (job.status !== 'pending' || Date.parse(job.dueAt) > now || (job.nextAttemptAt && Date.parse(job.nextAttemptAt) > now) || reminderLocks.has(job.id)) continue;
+    reminderLocks.add(job.id);
+    try {
+      const subscription = readSubscriptions().find(item => item.endpoint === job.endpoint);
+      if (!subscription) { job.status = 'cancelled'; job.updatedAt = new Date().toISOString(); changed = true; continue; }
+      const payload = JSON.stringify({ title: 'Bosompem reminder', body: job.title, url: './', tag: `bosompem-reminder-${job.id}` });
+      await webpush.sendNotification(subscription, payload, { TTL: 60 * 60 * 24, urgency: 'high' });
+      job.status = 'sent'; job.sentAt = new Date().toISOString(); job.updatedAt = job.sentAt; changed = true;
+    } catch (err) {
+      job.attempts = (job.attempts || 0) + 1; job.lastError = String(err.statusCode || err.message || 'Push failed').slice(0, 160);
+      if (err.statusCode === 404 || err.statusCode === 410) { writeSubscriptions(readSubscriptions().filter(item => item.endpoint !== job.endpoint)); job.status = 'cancelled'; }
+      else if (job.attempts >= 5) job.status = 'failed';
+      else job.nextAttemptAt = new Date(Date.now() + Math.min(60, 2 ** job.attempts) * 60_000).toISOString();
+      job.updatedAt = new Date().toISOString(); changed = true;
+    } finally { reminderLocks.delete(job.id); }
+  }
+  if (changed) writeReminders(jobs);
 }
 function sendJson(res, status, value) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
@@ -75,8 +108,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   if (limited(req)) return sendJson(res, 429, { error: 'Too many requests. Try again shortly.' });
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  if (req.method === 'GET' && url.pathname === '/health') return sendJson(res, 200, { ok: true, service: 'bosompem-web-push' });
   if (req.method === 'GET' && url.pathname === '/api/config') return sendJson(res, 200, { vapidPublicKey: VAPID_PUBLIC_KEY });
+  if (req.method === 'GET' && url.pathname === '/health') return sendJson(res, 200, { ok: true, service: 'bosompem-web-push', scheduler: 'active' });
   if (req.headers.origin && !isAllowedOrigin(req.headers.origin)) return sendJson(res, 403, { error: 'Origin is not allowlisted.' });
   try {
     if (req.method === 'POST' && !String(req.headers['content-type'] || '').toLowerCase().includes('application/json')) return sendJson(res, 415, { error: 'Content-Type must be application/json.' });
@@ -93,7 +126,24 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/unsubscribe') {
       const body = await readJson(req); if (req.headers.origin && !isAllowedOrigin(req.headers.origin)) return sendJson(res, 403, { error: 'Origin is not allowlisted.' }); if (typeof body.endpoint !== 'string') return sendJson(res, 400, { error: 'Subscription endpoint is required.' });
       const next = readSubscriptions().filter(item => item.endpoint !== body.endpoint); writeSubscriptions(next);
+      const jobs = readReminders(); let changed = false; for (const job of jobs) if (job.endpoint === body.endpoint && job.status === 'pending') { job.status = 'cancelled'; changed = true; } if (changed) writeReminders(jobs);
       return sendJson(res, 200, { ok: true, subscriptions: next.length });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/reminders/schedule') {
+      const body = await readJson(req); const { id, endpoint, title, dueAt } = body;
+      const due = Date.parse(dueAt);
+      if (!validReminderId(id) || typeof endpoint !== 'string' || !endpoint.startsWith('https://') || typeof title !== 'string' || !title.trim() || title.length > 300 || !Number.isFinite(due) || due <= Date.now() || due > Date.now() + 366 * 24 * 60 * 60 * 1000) return sendJson(res, 400, { error: 'Provide a valid reminder ID, subscribed endpoint, title, and future date within one year.' });
+      if (!readSubscriptions().some(item => item.endpoint === endpoint)) return sendJson(res, 403, { error: 'This device is not subscribed. Enable remote push first.' });
+      const jobs = readReminders().filter(item => item.id !== id || item.endpoint !== endpoint);
+      jobs.push({ id, endpoint, title: title.trim(), dueAt: new Date(due).toISOString(), status: 'pending', attempts: 0, createdAt: new Date().toISOString() });
+      writeReminders(jobs); return sendJson(res, 201, { ok: true, scheduled: true, dueAt: new Date(due).toISOString() });
+    }
+    if (req.method === 'POST' && url.pathname === '/api/reminders/cancel') {
+      const body = await readJson(req);
+      if (!validReminderId(body.id) || typeof body.endpoint !== 'string') return sendJson(res, 400, { error: 'Reminder ID and subscription endpoint are required.' });
+      const jobs = readReminders(); let changed = false;
+      for (const job of jobs) if (job.id === body.id && job.endpoint === body.endpoint && job.status === 'pending') { job.status = 'cancelled'; job.updatedAt = new Date().toISOString(); changed = true; }
+      if (changed) writeReminders(jobs); return sendJson(res, 200, { ok: true, cancelled: changed });
     }
     if (req.method === 'POST' && url.pathname === '/api/send') {
       if (!authorized(req)) return sendJson(res, 401, { error: 'Admin authorization required.' });
@@ -110,4 +160,6 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 404, { error: 'Not found.' });
   } catch (err) { return sendJson(res, err.status || 500, { error: err.status ? err.message : 'Server error.' }); }
 });
-server.listen(PORT, '0.0.0.0', () => console.log(`Bosompem Web Push server listening on ${PORT}`));
+setInterval(() => processDueReminders().catch(err => console.error('Reminder scheduler error:', err.message)), 15_000).unref();
+processDueReminders().catch(err => console.error('Initial reminder scheduler error:', err.message));
+server.listen(PORT, '0.0.0.0', () => console.log(`Bosompem Web Push server and reminder scheduler listening on ${PORT}`));
