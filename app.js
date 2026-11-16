@@ -32,6 +32,16 @@ You may help organize local projects, reminders, and saved memories when the use
 but never claim to send messages, control Android, access private apps, or complete external actions
 unless a connected, authorized tool confirms success. Ask before sensitive, irreversible, or external actions.
 
+SPECIALIST ANALYSIS:
+Adapt your analysis to the subject instead of giving generic repeated advice.
+- Music and songs: analyse mood, themes, storytelling, structure, production clues and emotional meaning. If the user has not supplied audio or lyrics, be clear about what you can and cannot assess. Do not reproduce long copyrighted lyrics; analyse short supplied excerpts or summaries.
+- Football: separate verified current facts from tactical interpretation. Discuss formations, pressing, transitions, chance creation, defensive shape, player roles, form and match context. Use current search grounding for live scores, fixtures, tables, transfers and recent team news when available.
+- Films and television: analyse plot, character arcs, themes, cinematography, pacing, performances and ending meaning; avoid spoilers unless requested.
+- Other subjects: identify the relevant discipline, state assumptions, compare evidence and explain uncertainty. Do not pretend to have listened to audio, watched a film or accessed live match data unless the user supplied it or a tool actually provided it.
+
+CONVERSATION FOCUS:
+Treat each conversation as a separate topic thread. Use the visible conversation history for continuity, but do not drag unrelated subjects into a new topic. If the user changes subject, follow the new subject rather than forcing an old topic into the answer. Avoid repeating the same generic suggestions; tailor the answer to the actual question and what has already been discussed in this thread.
+
 PERSONALIZATION:
 Use relevant memory context discreetly. Newer explicit preferences should take precedence over older ones.
 Do not infer sensitive personal traits from unrelated facts.
@@ -300,6 +310,7 @@ window.addEventListener('DOMContentLoaded',async()=>{
   initReminderNotifications();
   renderMemoryList();
   renderProjects();
+  renderConversationLibrary();
   if(!state.sessions.length) createNewChatSession(); else loadSession(state.sessions[0].id);
 });
    function updateClock(){
@@ -341,20 +352,45 @@ function handleTextareaKeyDown(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.
 
 function createNewChatSession(){
   const s={id:'session-'+Date.now(),title:'New Conversation',messages:[],createdAt:new Date().toISOString()};
-  state.sessions.unshift(s);saveJSON(STORAGE.sessions,state.sessions);loadSession(s.id);
+  state.sessions.unshift(s);saveJSON(STORAGE.sessions,state.sessions);loadSession(s.id);renderConversationLibrary();
 }
 function getActiveSession(){return state.sessions.find(s=>s.id===state.activeSessionId);}
+function getConversationTopic(session){
+  const first=session?.messages?.find(m=>m.role==='user')?.text||session?.title||'New conversation';
+  const t=String(first).toLowerCase();
+  const rules=[
+    ['Football & Sports',/\b(football|soccer|match|goal|premier league|champions league|arsenal|chelsea|manchester|barcelona|real madrid|player|fixture|league table|transfer)\b/],
+    ['Music & Songs',/\b(song|music|lyrics|artist|album|beat|melody|rap|hip.?hop|gospel|afrobeats)\b/],
+    ['Movies & TV',/\b(movie|film|series|episode|netflix|cinema|actor|actress|director|plot|ending)\b/],
+    ['Work & Career',/\b(work|job|career|boss|warehouse|salary|interview|cv|resume)\b/],
+    ['Money & Business',/\b(money|budget|saving|savings|business|profit|investment|income|salary|trading)\b/],
+    ['Technology & Code',/\b(code|coding|website|app|software|javascript|python|html|css|api|phone|android|computer|debug)\b/],
+    ['Learning & Education',/\b(study|school|university|education|essay|homework|exam|learn|course|math|science)\b/],
+    ['Relationships & Life',/\b(girlfriend|boyfriend|relationship|friend|family|love|breakup|marriage|feel|life|advice)\b/],
+    ['Research & Current Affairs',/\b(latest|today|news|current|research|search|politics|election|price|weather)\b/]
+  ];
+  return rules.find(([,re])=>re.test(t))?.[0]||'General conversations';
+}
+function renderConversationLibrary(){
+  const host=document.getElementById('conversation-topic-list');if(!host)return;
+  const query=(document.getElementById('conversation-search')?.value||'').trim().toLowerCase();
+  const groups=new Map();
+  state.sessions.forEach(session=>{const topic=getConversationTopic(session);const hay=(session.title+' '+session.messages.map(m=>m.text).join(' ')).toLowerCase();if(query&&!hay.includes(query)&&!topic.toLowerCase().includes(query))return;if(!groups.has(topic))groups.set(topic,[]);groups.get(topic).push(session);});
+  if(!groups.size){host.innerHTML='<div class="history-empty">No matching conversations yet.</div>';return;}
+  host.innerHTML=[...groups.entries()].map(([topic,items])=>`<div class="topic-group"><div class="topic-group-title"><span>${escapeHtml(topic)}</span><small>${items.length}</small></div>${items.slice(0,8).map(item=>`<button type="button" class="history-session ${item.id===state.activeSessionId?'active':''}" onclick="openConversation('${item.id}')"><i class="fa-regular fa-message"></i><span>${escapeHtml(item.title||'New conversation')}</span></button>`).join('')}</div>`).join('');
+}
+function openConversation(id){loadSession(id);openScreen('chat');toggleNavDrawer();}
 function loadSession(id){
   state.activeSessionId=id;
   const s=getActiveSession(),hero=document.getElementById('welcome-hero'),box=document.getElementById('chat-messages-container');
   if(!s||!s.messages.length){if(hero)hero.style.display='flex';if(box){box.style.display='none';box.innerHTML='';}}
   else{if(hero)hero.style.display='none';if(box)box.style.display='flex';renderMessages();}
 }
-function saveSessions(){saveJSON(STORAGE.sessions,state.sessions);}
+function saveSessions(){saveJSON(STORAGE.sessions,state.sessions);renderConversationLibrary();}
 
 function classifyRequest(text) {
   const t = String(text || '').toLowerCase();
-  const webResearch = /\b(latest|current|today|tonight|this week|recent|news|price|prices|cost|available|availability|weather|score|standings|compare.*(online|market|options)|research|search the web|look up|find online|source|sources|citation|202[5-9])\b/.test(t);
+  const webResearch = /\b(latest|current|today|tonight|this week|recent|news|price|prices|cost|available|availability|weather|score|standings|fixtures|transfer|football|soccer|compare.*(online|market|options)|research|search the web|look up|find online|source|sources|citation|202[5-9])\b/.test(t);
   const complex = /\b(architecture|debug|debugging|code|program|programming|analy[sz]e|analysis|reasoning|step.by.step|multi.step|plan|strategy|compare|evaluate|design|build|project|research|report|long term|integrate|automation|automate)\b/.test(t) || String(text || '').length > 180;
   return { webResearch, complex };
 }
@@ -640,17 +676,34 @@ function clearSelectedImage(){state.selectedImageData=null;document.getElementBy
 function renderMessages(){
   const box=document.getElementById('chat-messages-container'),session=getActiveSession();if(!box||!session)return;
   box.innerHTML=session.messages.map((m,i)=>{
-    const body=m.role==='assistant'?formatMarkdown(m.text):escapeHtml(m.text).replace(/\n/g,'<br>');
-      const actions=m.role==='assistant'?`<div class="bubble-actions">
-      <button class="btn-bubble-action" onclick="speakMessage(${i})"><i class="fa-solid fa-volume-high"></i> Speak</button>
-      <button class="btn-bubble-action" onclick="copyMessage(${i})"><i class="fa-solid fa-copy"></i> Copy</button>
+    const body=m.role==='assistant'?formatMarkdown(m.text,i):escapeHtml(m.text).replace(/\n/g,'<br>');
+    const feedback=m.feedback||'';
+    const actions=m.role==='assistant'?`<div class="bubble-actions" aria-label="Response actions">
+      <button class="btn-bubble-action" onclick="copySelectedText(${i})" title="Select text in this answer, then copy it"><i class="fa-regular fa-copy"></i><span>Copy selection</span></button>
+      <button class="btn-bubble-action" onclick="speakMessage(${i})" title="Read aloud"><i class="fa-solid fa-volume-high"></i><span>Speak</span></button>
+      <button class="btn-bubble-action feedback-action ${feedback==='like'?'selected':''}" onclick="rateMessage(${i},'like')" aria-label="Like response" title="Helpful"><i class="fa-regular fa-thumbs-up"></i></button>
+      <button class="btn-bubble-action feedback-action ${feedback==='dislike'?'selected':''}" onclick="rateMessage(${i},'dislike')" aria-label="Dislike response" title="Not helpful"><i class="fa-regular fa-thumbs-down"></i></button>
+      <button class="btn-bubble-action" onclick="shareMessage(${i})" title="Share response"><i class="fa-solid fa-share-nodes"></i><span>Share</span></button>
+      <button class="btn-bubble-action" onclick="searchMessageOnWeb(${i})" title="Search this topic on the web"><i class="fa-solid fa-globe"></i><span>Web</span></button>
     </div>`:'';
     return `<div class="chat-bubble ${m.role}"><div class="bubble-content">${body}${actions}</div></div>`;
   }).join('');
   scrollToBottom();
 }
 function speakMessage(i){const s=getActiveSession();if(s?.messages[i])speakText(s.messages[i].text);}
-async function copyMessage(i){const s=getActiveSession();if(!s?.messages[i])return;try{await navigator.clipboard.writeText(s.messages[i].text);alert('Copied.');}catch{alert('Copy is not available here.');}}
+async function writeClipboard(text){if(navigator.clipboard?.writeText)return navigator.clipboard.writeText(text);const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('Clipboard unavailable');}
+async function copySelectedText(i){
+  const selection=window.getSelection?.();const selected=selection?.toString().trim();
+  const bubbles=document.querySelectorAll('#chat-messages-container .chat-bubble');const bubble=bubbles[i];
+  if(!selected||!bubble||!bubble.contains(selection.anchorNode)){showToast('Press and select the exact text you want first');return;}
+  try{await writeClipboard(selected);selection.removeAllRanges();showToast('Selected text copied');}catch{showToast('Could not copy selected text');}
+}
+function getCodeBlocks(text){return [...String(text||'').matchAll(/```[^\n]*\n?([\s\S]*?)```/g)].map(m=>m[1].replace(/^\n|\n$/g,''));}
+async function copyCodeBlock(messageIndex,codeIndex){const s=getActiveSession(),m=s?.messages[messageIndex];if(!m)return;const code=getCodeBlocks(m.text)[codeIndex];if(code==null)return;try{await writeClipboard(code);showToast('Code block copied exactly');}catch{showToast('Could not copy code');}}
+function rateMessage(i,choice){const s=getActiveSession(),m=s?.messages[i];if(!m)return;m.feedback=m.feedback===choice?'':choice;saveSessions();renderMessages();}
+async function shareMessage(i){const s=getActiveSession(),m=s?.messages[i];if(!m)return;const title=s.title||'Bosompem response';try{if(navigator.share)await navigator.share({title,text:m.text});else{await writeClipboard(m.text);showToast('Response copied for sharing');}}catch(err){if(err?.name!=='AbortError')showToast('Sharing is unavailable here');}}
+function searchMessageOnWeb(i){const s=getActiveSession(),m=s?.messages[i];if(!m)return;const question=s.messages.slice(0,i).reverse().find(x=>x.role==='user')?.text||m.text;const query=String(question).slice(0,500);window.open('https://www.google.com/search?q='+encodeURIComponent(query),'_blank','noopener,noreferrer');}
+function showToast(message){let toast=document.getElementById('bosompem-toast');if(!toast){toast=document.createElement('div');toast.id='bosompem-toast';toast.className='bosompem-toast';toast.setAttribute('role','status');document.body.appendChild(toast);}toast.textContent=message;toast.classList.add('show');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.classList.remove('show'),2100);}
 function appendThinkingIndicator(){
   const box=document.getElementById('chat-messages-container');if(!box)return null;
   const id='thinking-'+Date.now();box.insertAdjacentHTML('beforeend',`<div id="${id}" class="chat-bubble assistant"><div class="bubble-content">Thinking…</div></div>`);scrollToBottom();return id;
@@ -658,9 +711,9 @@ function appendThinkingIndicator(){
 function removeThinkingIndicator(id){if(id)document.getElementById(id)?.remove();}
 function scrollToBottom(){const b=document.getElementById('chat-messages-container');if(b)b.scrollTop=b.scrollHeight;}
 
-function formatMarkdown(text){
-  let s=escapeHtml(text);
-  s=s.replace(/```([\s\S]*?)```/g,(_,code)=>`<pre><code>${code.trim()}</code></pre>`);
+function formatMarkdown(text,messageIndex=-1){
+  let s=escapeHtml(text),codeIndex=0;
+  s=s.replace(/```([^\n]*)\n?([\s\S]*?)```/g,(_,lang,code)=>{const index=codeIndex++;const label=lang.trim()||'Code';return `<div class="code-result"><div class="code-result-head"><span>${escapeHtml(label)}</span><button type="button" class="copy-code-btn" onclick="copyCodeBlock(${messageIndex},${index})"><i class="fa-regular fa-copy"></i> Copy code only</button></div><pre><code>${code.trim()}</code></pre></div>`;});
   s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
   s=s.replace(/^###\s+(.*)$/gm,'<h4>$1</h4>').replace(/^##\s+(.*)$/gm,'<h3>$1</h3>').replace(/^#\s+(.*)$/gm,'<h2>$1</h2>');
   s=s.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/__(.*?)__/g,'<strong>$1</strong>');

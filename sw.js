@@ -1,7 +1,7 @@
 /* Bosompem v4 service worker — resilient offline shell and Web Push */
 'use strict';
-const CACHE_NAME='bosompem-pro-v6-aurora-glass';
-const CORE=['./','./index.html','./style.css','./app.js','./manifest.json'];
+const CACHE_NAME='bosompem-pro-v7-topic-studio';
+const CORE=['./','./index.html','./style.css?v=7','./app.js?v=7','./manifest.json'];
 self.addEventListener('install',event=>{
   event.waitUntil((async()=>{
     const cache=await caches.open(CACHE_NAME);

@@ -1,12 +1,21 @@
-# Bosompem Pro v4 — browser-first upgrade
+# Bosompem Pro v7 — Topic Studio repair and premium mobile UI
 
-This package is built from the latest files you supplied. It preserves the Living Constellation voice animation and existing feature screens while refreshing the visual system and repairing offline caching.
+This package is built from the latest files you supplied. It preserves the Living Constellation voice animation and existing feature screens while refreshing the visual system, correcting excessive blur/overlay effects on mobile, improving conversation organization and adding response-level tools.
 
 ## Files
 - `index.html`, `style.css`, `app.js`: browser app
 - `manifest.json`, `sw.js`: installability, offline shell and push handling
 - `icon-192.png`, `icon-512.png`: generated app icons
 - `server.js`, `package.json`: optional Web Push sender
+
+## v7 additions
+
+- Topic-based conversation library in the navigation drawer, with search and separate threads for Football & Sports, Music & Songs, Movies & TV, Work & Career, Money & Business, Technology & Code, Learning & Education, Relationships & Life, Research & Current Affairs, and General conversations. Topics are classified from each thread’s opening message; users can still search all conversations.
+- Response action bar: copy selected text, speak, like, dislike, share (native share sheet where supported), and open a web search for the user’s question. Users select only the passage they need; fenced code blocks also have a dedicated exact-code copy action.
+- Each fenced code block has its own **Copy code only** action. It copies the exact code content without the surrounding explanation.
+- Expanded assistant instructions for more structured music, football, film and general subject analysis, while requiring honesty about unavailable audio/video and live data.
+- Mobile visual repair: removes oversized ambient blur objects, reduces backdrop blur, prevents decorative layers from intercepting taps, and improves the drawer/history layout.
+- Cache version bumped to v7 to force refreshed app assets.
 
 ## Automatic remote reminders (v5)
 

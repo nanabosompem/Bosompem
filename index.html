@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-  <meta name="theme-color" content="#101827">
+  <meta name="theme-color" content="#0b1220">
   <meta name="color-scheme" content="dark light">
   <meta name="application-name" content="Bosompem">
   <meta name="apple-mobile-web-app-title" content="Bosompem">
@@ -14,7 +14,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="./manifest.json">
   <title>Bosompem — Personal AI</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=7">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -61,6 +61,11 @@
       <button class="menu-item" data-screen="profile" onclick="switchScreenFromDrawer('profile')"><i class="fa-regular fa-user"></i><span>Profile</span></button>
       <button class="menu-item" data-screen="settings" onclick="switchScreenFromDrawer('settings')"><i class="fa-solid fa-sliders"></i><span>Settings</span></button>
     </nav>
+    <section class="conversation-library" aria-label="Conversation topics">
+      <div class="conversation-library-head"><div><span class="drawer-label">YOUR CONVERSATIONS</span><small>Keep every topic in its own space</small></div><button type="button" class="history-refresh-btn" onclick="renderConversationLibrary()" aria-label="Refresh conversations"><i class="fa-solid fa-rotate"></i></button></div>
+      <input id="conversation-search" class="history-search" type="search" placeholder="Find a conversation…" oninput="renderConversationLibrary()" aria-label="Search conversations">
+      <div id="conversation-topic-list" class="conversation-topic-list"></div>
+    </section>
     <div class="drawer-footer"><button class="new-session-btn" onclick="createNewChatSession();toggleNavDrawer();"><i class="fa-solid fa-plus"></i> New conversation</button></div>
   </aside>
 
@@ -207,7 +212,7 @@
   </main>
 <nav class="app-bottom-nav"><button class="nav-tab active" onclick="openScreen('chat')" data-screen="chat"><i class="fa-solid fa-message"></i><span>Assistant</span></button><button class="nav-tab" onclick="openScreen('live-voice')" data-screen="live-voice"><i class="fa-solid fa-microphone-lines"></i><span>Voice</span></button><button class="nav-tab" onclick="openScreen('projects')" data-screen="projects"><i class="fa-solid fa-folder-tree"></i><span>Projects</span></button><button class="nav-tab" onclick="openScreen('tasks')" data-screen="tasks"><i class="fa-solid fa-bolt"></i><span>Tasks</span></button></nav>
 </div>
-<script src="app.js" defer></script>
+<script src="app.js?v=7" defer></script>
 <script>if('serviceWorker'in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(reg=>{if(reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});}).catch(err=>console.warn('Bosompem offline support:',err)));}</script>
 </body>
                                                                                                                                                                                   </html>
